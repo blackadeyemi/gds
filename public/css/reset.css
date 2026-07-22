@@ -1,0 +1,108 @@
+@font-face {
+	font-family: Open Sans;
+	src: url(fonts/opensans/OpenSans-Regular.ttf);
+}
+
+html, body, div, span, applet, object, iframe,
+h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+a, abbr, acronym, address, big, cite, code,
+del, dfn, em, img, ins, kbd, q, s, samp,
+small, strike, strong, sub, sup, tt, var,
+b, u, i, center,
+dl, dt, dd, ol, ul, li,
+fieldset, form, label, legend,
+table, caption, tbody, tfoot, thead, tr, th, td,
+article, aside, canvas, details, embed,
+figure, figcaption, footer, header, hgroup,
+menu, nav, output, ruby, section, summary,
+time, mark, audio, video {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	font-size: 99%;
+	font-family: Open Sans;
+	vertical-align: middle;
+}
+/* HTML5 display-role reset for older browsers */
+article, aside, details, figcaption, figure,
+footer, header, hgroup, menu, nav, section, main {
+	display: block;
+}
+body {
+  font-size: 99%;
+  background-color: #FCFCFC;
+}
+ol, ul {
+	list-style: none;
+}
+blockquote, q {
+	quotes: none;
+}
+blockquote:before, blockquote:after,
+q:before, q:after {
+	content: '';
+	content: none;
+}
+table {
+	border-collapse: collapse;
+	border-spacing: 0;
+}
+
+input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button{
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+textarea {
+	resize: none !important;
+}
+
+button:disabled, button[disabled] {
+	cursor: not-allowed;
+}
+
+.table.table-md th, .table.table-md td {
+    padding: 0.5rem;
+}
+
+.table.edge-pad th:first-child, .table.edge-pad td:first-child {
+    padding-left: 1rem;
+}
+
+.table.edge-pad th:last-child, .table.edge-pad td:last-child {
+	padding-right: 1rem;
+}
+
+.table.borderless-top th {
+	border-top: none;
+}
+
+.position-top-right {
+    position: absolute;
+    top: 0;
+    right: 0;
+}
+
+.position-bottom-right {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+}
+
+.alert.fixed-top {
+	border-radius: 0;
+}
+
+.tooltip .tooltip-inner {
+    max-width: 300px;
+}
+
+.pointer { cursor: pointer; }
+
+.nounderline, .nounderline:hover {
+    text-decoration: none;
+}
+
+.hide-dtsearch .dataTables_wrapper div.row:first-child { display: none; }
+
+body table.table { border-collapse: collapse !important; }
