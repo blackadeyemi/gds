@@ -57,6 +57,21 @@ abstract class DataGrid extends Component
     public function defaultSort(): array { return []; }   // [field, dir]
     public function modalSize(): string { return '480px'; }
 
+    /** Optional extra Blade (e.g. a page-specific modal) appended after the grid. */
+    public function extraView(): ?string { return null; }
+
+    /**
+     * Referential-integrity guard. Return null when a row may be deleted, or a
+     * human-readable reason (e.g. "In use by 3 users — cannot delete.") when it
+     * has active downline references. The reason disables the row's delete
+     * button (as a tooltip) and is enforced again server-side. Override per grid
+     * to declare what "in use" means; base grids are always deletable.
+     */
+    public function deleteGuard($row): ?string { return null; }
+
+    /** Reload a row (with any counts deleteGuard needs) for the server-side re-check. */
+    protected function findRow(int $id) { return null; }
+
     // Editable children override these:
     protected function resetForm(): void {}
     protected function fillForm(int $id): void {}
@@ -177,8 +192,16 @@ abstract class DataGrid extends Component
     public function deleteConfirmed(): void
     {
         if ($this->editable() && $this->confirmingDelete) {
-            $this->performDelete($this->confirmingDelete);
-            session()->flash('ok', 'Record deleted.');
+            $row = $this->findRow($this->confirmingDelete);
+            $reason = $row ? $this->deleteGuard($row) : null;
+            if ($reason) {
+                // Downline references still active — refuse (belt-and-braces
+                // behind the disabled button).
+                session()->flash('err', $reason);
+            } else {
+                $this->performDelete($this->confirmingDelete);
+                session()->flash('ok', 'Record deleted.');
+            }
         }
         $this->confirmingDelete = null;
     }

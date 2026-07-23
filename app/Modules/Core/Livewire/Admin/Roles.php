@@ -2,6 +2,7 @@
 
 namespace Modules\Core\Livewire\Admin;
 
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Modules\Core\Livewire\DataGrid;
@@ -15,11 +16,14 @@ class Roles extends DataGrid
     public ?string $description = null;
     public array $selectedPermissions = [];
 
+    public ?int $viewingRoleId = null;
+
     public function pageKey(): string { return 'admin.roles'; }
     public function pageLabel(): string { return 'Roles'; }
     public function pageSubtitle(): string { return 'Manage user roles and the permissions assigned to each.'; }
     public function editable(): bool { return true; }
     public function formView(): ?string { return 'core::livewire.forms.role'; }
+    public function extraView(): ?string { return 'core::livewire.role-permissions-modal'; }
     public function defaultSort(): array { return ['name', 'asc']; }
     public function modalSize(): string { return '660px'; }
 
@@ -30,14 +34,51 @@ class Roles extends DataGrid
                 'label' => 'Default',
                 'type' => 'table',
                 'columns' => [
-                    ['Role Name', 'name'],
+                    ['Role Name', 'name', fn ($r) => '<a href="#" wire:click.prevent="showPermissions(' . $r->id . ')" style="color:var(--brand);font-weight:600;text-decoration:none;cursor:pointer;">' . e($r->name) . '</a>'],
                     ['Description', 'description', fn ($r) => e($r->description ?? '—')],
                     ['Permissions', 'permissions_count', fn ($r) => '<span class="badge badge-muted">' . $r->permissions_count . '</span>'],
+                    ['Users', 'users_count', fn ($r) => '<span class="badge badge-muted">' . ($r->users_count ?? 0) . '</span>'],
                 ],
-                'query' => fn () => Role::query()->withCount('permissions'),
+                'query' => fn () => Role::query()->withCount('permissions')->withCount('users'),
                 'searchable' => ['name', 'description'],
                 'sortable' => ['name'],
             ],
+        ];
+    }
+
+    /** Open the read-only permissions modal for a role. */
+    public function showPermissions(int $id): void
+    {
+        $this->viewingRoleId = $id;
+    }
+
+    /** Editing from the view modal should replace it with the editor. */
+    public function edit(int $id): void
+    {
+        $this->viewingRoleId = null;
+        parent::edit($id);
+    }
+
+    /** The role being viewed, with its permissions grouped by module. */
+    #[Computed]
+    public function viewingRole()
+    {
+        if (! $this->viewingRoleId) {
+            return null;
+        }
+
+        $role = Role::with('permissions.module')->find($this->viewingRoleId);
+        if (! $role) {
+            return null;
+        }
+
+        return [
+            'name' => $role->name,
+            'description' => $role->description,
+            'count' => $role->permissions->count(),
+            'grouped' => $role->permissions
+                ->sortBy('name')
+                ->groupBy(fn ($p) => $p->module?->name ?? 'Unassigned'),
         ];
     }
 
@@ -71,6 +112,21 @@ class Roles extends DataGrid
         $this->name = $role->name;
         $this->description = $role->description;
         $this->selectedPermissions = $role->permissions->pluck('id')->map(fn ($i) => (int) $i)->all();
+    }
+
+    /** A role can't be removed while any user still holds it. */
+    public function deleteGuard($row): ?string
+    {
+        $c = $row->users_count ?? 0;
+
+        return $c > 0
+            ? 'In use by ' . $c . ' ' . Str::plural('user', $c) . ' — cannot delete.'
+            : null;
+    }
+
+    protected function findRow(int $id)
+    {
+        return Role::withCount('users')->find($id);
     }
 
     protected function performDelete(int $id): void

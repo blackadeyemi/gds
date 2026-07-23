@@ -2,6 +2,7 @@
 
 namespace Modules\Core\Livewire\Admin;
 
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Modules\Core\Livewire\DataGrid;
@@ -32,8 +33,9 @@ class Departments extends DataGrid
                     ['Name', 'name'],
                     ['Company', 'company.name', fn ($r) => e($r->company?->name ?? '—')],
                     ['Status', 'status', fn ($r) => '<span class="badge ' . ($r->status === 'active' ? 'badge-success' : 'badge-muted') . '">' . $r->status . '</span>'],
+                    ['Users', 'users_count'],
                 ],
-                'query' => fn () => Department::query()->with('company'),
+                'query' => fn () => Department::query()->with('company')->withCount('users'),
                 'searchable' => ['name'],
                 'sortable' => ['name', 'status'],
             ],
@@ -80,6 +82,21 @@ class Departments extends DataGrid
         $this->name = $d->name;
         $this->company_id = $d->company_id;
         $this->status = $d->status;
+    }
+
+    /** A department can't be removed while users still belong to it. */
+    public function deleteGuard($row): ?string
+    {
+        $c = $row->users_count ?? 0;
+
+        return $c > 0
+            ? 'In use by ' . $c . ' ' . Str::plural('user', $c) . ' — cannot delete.'
+            : null;
+    }
+
+    protected function findRow(int $id)
+    {
+        return Department::withCount('users')->find($id);
     }
 
     protected function performDelete(int $id): void

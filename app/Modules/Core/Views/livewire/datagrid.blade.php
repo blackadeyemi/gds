@@ -9,6 +9,9 @@
     @if (session('ok'))
         <div class="card" style="border-color:var(--success);color:var(--success);margin-bottom:1rem;padding:0.7rem 1.25rem;">{{ session('ok') }}</div>
     @endif
+    @if (session('err'))
+        <div class="card" style="border-color:var(--danger);color:var(--danger);margin-bottom:1rem;padding:0.7rem 1.25rem;">{{ session('err') }}</div>
+    @endif
 
     <div class="card">
         <div class="card-head" style="flex-wrap:wrap;gap:0.75rem;">
@@ -101,9 +104,16 @@
                                     <button class="btn btn-ghost btn-icon btn-sm" wire:click="edit({{ $row->id }})" title="Edit">
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                     </button>
-                                    <button class="btn btn-danger btn-icon btn-sm" wire:click="$set('confirmingDelete', {{ $row->id }})" title="Delete">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
-                                    </button>
+                                    @php $blockReason = $this->deleteGuard($row); @endphp
+                                    @if ($blockReason)
+                                        <button class="btn btn-danger btn-icon btn-sm" disabled title="{{ $blockReason }}" style="opacity:.35;cursor:not-allowed;">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                                        </button>
+                                    @else
+                                        <button class="btn btn-danger btn-icon btn-sm" wire:click="$set('confirmingDelete', {{ $row->id }})" title="Delete">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                                        </button>
+                                    @endif
                                 </td>
                             @endif
                         </tr>
@@ -154,5 +164,10 @@
                 </div>
             </div>
         </div>
+    @endif
+
+    {{-- Page-specific extra markup (e.g. the Roles permissions modal) --}}
+    @if ($this->extraView())
+        @include($this->extraView())
     @endif
 </div>

@@ -2,6 +2,7 @@
 
 namespace Modules\Core\Livewire\Admin;
 
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Modules\Core\Livewire\DataGrid;
@@ -32,8 +33,9 @@ class Permissions extends DataGrid
                     ['Permission Name', 'name'],
                     ['Description', 'description', fn ($r) => e($r->description ?? '—')],
                     ['Module', 'module.name', fn ($r) => e($r->module?->name ?? '—')],
+                    ['Roles', 'roles_count', fn ($r) => '<span class="badge badge-muted">' . ($r->roles_count ?? 0) . '</span>'],
                 ],
-                'query' => fn () => Permission::query()->with('module'),
+                'query' => fn () => Permission::query()->with('module')->withCount('roles'),
                 'searchable' => ['name', 'description'],
                 'sortable' => ['name'],
             ],
@@ -80,6 +82,21 @@ class Permissions extends DataGrid
         $this->name = $p->name;
         $this->description = $p->description;
         $this->module_id = $p->module_id;
+    }
+
+    /** A permission can't be removed while any role still holds it. */
+    public function deleteGuard($row): ?string
+    {
+        $c = $row->roles_count ?? 0;
+
+        return $c > 0
+            ? 'Assigned to ' . $c . ' ' . Str::plural('role', $c) . ' — cannot delete.'
+            : null;
+    }
+
+    protected function findRow(int $id)
+    {
+        return Permission::withCount('roles')->find($id);
     }
 
     protected function performDelete(int $id): void
