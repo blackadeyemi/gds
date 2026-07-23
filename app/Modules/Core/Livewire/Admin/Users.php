@@ -3,9 +3,12 @@
 namespace Modules\Core\Livewire\Admin;
 
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Modules\Core\Livewire\DataGrid;
+use Modules\Core\Models\Company;
+use Modules\Core\Models\Department;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 
@@ -16,6 +19,8 @@ class Users extends DataGrid
     public ?string $fullname = null;
     public ?string $email = null;
     public ?int $role_id = null;
+    public ?int $company_id = null;
+    public ?int $department_id = null;
     public ?string $password = null;
 
     public function pageKey(): string { return 'admin.users'; }
@@ -37,8 +42,10 @@ class Users extends DataGrid
                     ['Full Name', 'fullname', fn ($r) => e($r->fullname ?? '—')],
                     ['Email', 'email', fn ($r) => e($r->email ?? '—')],
                     ['Role', 'role', fn ($r) => e($r->roles->first()?->name ?? '—')],
+                    ['Company', 'company.name', fn ($r) => e($r->company?->name ?? '—')],
+                    ['Department', 'department.name', fn ($r) => e($r->department?->name ?? '—')],
                 ],
-                'query' => fn () => User::query()->with('roles'),
+                'query' => fn () => User::query()->with('roles', 'company', 'department'),
                 'searchable' => ['username', 'fullname', 'email'],
                 'sortable' => ['username', 'fullname', 'email'],
             ],
@@ -67,13 +74,50 @@ class Users extends DataGrid
         return Role::orderBy('name')->get();
     }
 
+    #[Computed]
+    public function companies()
+    {
+        return Company::orderBy('name')->get();
+    }
+
+    /** Departments within the chosen company — drives the dependent select. */
+    #[Computed]
+    public function departmentsForCompany()
+    {
+        return $this->company_id
+            ? Department::where('company_id', $this->company_id)->orderBy('name')->get()
+            : collect();
+    }
+
+    /** Changing company invalidates the previously-picked department. */
+    public function updatedCompanyId(): void
+    {
+        $this->department_id = null;
+    }
+
+    /** Admin users span all companies, so company/department don't apply. */
+    #[Computed]
+    public function isAdminRole(): bool
+    {
+        return (int) optional(Role::find($this->role_id))->legacy_level === 1;
+    }
+
     protected function rules(): array
     {
+        $scoped = ! $this->isAdminRole();
+
         return [
             'username' => ['required', 'string', 'max:255', 'unique:user,username,' . ($this->editingId ?? 'NULL') . ',userid'],
             'fullname' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:50'],
             'role_id' => ['required', 'exists:roles,id'],
+            'company_id' => [$scoped ? 'required' : 'nullable', 'nullable', 'exists:companies,id'],
+            // Department must belong to the chosen company (keeps the hierarchy intact).
+            'department_id' => [
+                $scoped ? 'required' : 'nullable',
+                'nullable',
+                Rule::exists('departments', 'id')->where('company_id', $this->company_id),
+            ],
             'password' => [$this->editingId ? 'nullable' : 'required', 'nullable', 'string', 'min:4'],
         ];
     }
@@ -84,6 +128,8 @@ class Users extends DataGrid
         $this->fullname = null;
         $this->email = null;
         $this->role_id = null;
+        $this->company_id = null;
+        $this->department_id = null;
         $this->password = null;
     }
 
@@ -94,6 +140,8 @@ class Users extends DataGrid
         $this->fullname = $u->fullname;
         $this->email = $u->email;
         $this->role_id = optional(Role::where('name', $u->roles->first()?->name)->first())->id;
+        $this->company_id = $u->company_id;
+        $this->department_id = $u->department_id;
         $this->password = null;
     }
 
@@ -114,6 +162,11 @@ class Users extends DataGrid
         if ($this->password) {
             $u->password = Hash::make($this->password);
         }
+        // Admins span everything; everyone else is scoped to a company and a
+        // department within it.
+        $scoped = ! $this->isAdminRole();
+        $u->company_id = $scoped ? $this->company_id : null;
+        $u->department_id = $scoped ? $this->department_id : null;
         // Keep the legacy NOT NULL columns valid: userlevel mirrors the role's
         // legacy level; new rows get a default landing page.
         $u->userlevel = $role?->legacy_level ?? 1;

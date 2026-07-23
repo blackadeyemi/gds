@@ -2,6 +2,7 @@
 
 namespace Modules\Core\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -21,6 +22,18 @@ class User extends Authenticatable
     public $timestamps = false;
 
     protected $hidden = ['password'];
+
+    /** Company this user is scoped to (null for Admins, who span all). */
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'company_id');
+    }
+
+    /** Department this user belongs to, within their company (null for Admins). */
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class, 'department_id');
+    }
 
     /**
      * Legacy default landing page for this user, resolved through
