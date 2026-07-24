@@ -6,6 +6,9 @@
     $is = fn ($p) => request()->is($p) ? 'active' : '';
     $onAdmin = request()->is('admin/*');
     $onSettings = request()->is('settings/*');
+    $onBil = request()->is('bil/*');
+    $onRawMaterials = request()->is('bil/raw-materials/*');
+    $onRmReports = request()->is('bil/raw-materials/reports/*');
 @endphp
 <!DOCTYPE html>
 <html lang="en" data-theme="light" data-font="small">
@@ -38,11 +41,14 @@
         mobileOpen: false,
         adminOpen: {{ $onAdmin ? 'true' : 'false' }},
         settingsOpen: {{ $onSettings ? 'true' : 'false' }},
+        bilOpen: {{ $onBil ? 'true' : 'false' }},
+        rawMaterialsOpen: {{ $onRawMaterials ? 'true' : 'false' }},
+        rmReportsOpen: {{ $onRmReports ? 'true' : 'false' }},
         toggleSidebar() {
             if (window.innerWidth <= 900) { this.mobileOpen = !this.mobileOpen; return; }
             this.collapsed = !this.collapsed;
             localStorage.setItem('gds_sidebar_collapsed', JSON.stringify(this.collapsed));
-            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; }
+            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; }
         },
         openGroup(group) {
             if (this.collapsed) {
@@ -70,6 +76,85 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
                 <span class="label">Dashboard</span>
             </a>
+
+            @can('view-raw-materials')
+            <div class="nav-group" :class="{ open: bilOpen }">
+                <button type="button" class="nav-link" :class="{ active: {{ $onBil ? 'true' : 'false' }} && collapsed }" @click="openGroup('bilOpen')" title="BIL">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M6 21V8l6-4 6 4v13M10 21v-5h4v5"/><path d="M9 11h.01M15 11h.01"/></svg>
+                    <span class="label">BIL</span>
+                    <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+                <div class="nav-sub" x-show="bilOpen">
+                    <div class="nav-group" :class="{ open: rawMaterialsOpen }">
+                        <button type="button" class="nav-link" :class="{ active: {{ $onRawMaterials ? 'true' : 'false' }} && collapsed }" @click="openGroup('rawMaterialsOpen')" title="Raw Materials">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg>
+                            <span class="label">Raw Materials</span>
+                            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                        </button>
+                        <div class="nav-sub" x-show="rawMaterialsOpen">
+                            <a href="{{ route('bil.raw-materials.products') }}" class="nav-link {{ $is('bil/raw-materials/products*') }}" title="Products">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7l-8-4-8 4 8 4 8-4zM4 7v10l8 4 8-4V7M12 11v10"/></svg>
+                                <span class="label">Products</span>
+                            </a>
+                            <a href="{{ route('bil.raw-materials.suppliers') }}" class="nav-link {{ $is('bil/raw-materials/suppliers*') }}" title="Suppliers">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                <span class="label">Suppliers</span>
+                            </a>
+                            <a href="{{ route('bil.raw-materials.supplier-deliveries') }}" class="nav-link {{ $is('bil/raw-materials/supplier-deliveries*') }}" title="Supplier Deliveries">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7V8zM5.5 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM18.5 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>
+                                <span class="label">Supplier Deliveries</span>
+                            </a>
+                            <a href="{{ route('bil.raw-materials.warehouse-entry') }}" class="nav-link {{ $is('bil/raw-materials/warehouse-entry*') }}" title="Warehouse Entry">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>
+                                <span class="label">Warehouse Entry</span>
+                            </a>
+                            <a href="{{ route('bil.raw-materials.warehouse-exit') }}" class="nav-link {{ $is('bil/raw-materials/warehouse-exit*') }}" title="Warehouse Exit">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5M4 21h16"/></svg>
+                                <span class="label">Warehouse Exit</span>
+                            </a>
+                            <a href="{{ route('bil.raw-materials.stock-transfer') }}" class="nav-link {{ $is('bil/raw-materials/stock-transfer*') }}" title="Stock Transfer">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg>
+                                <span class="label">Stock Transfer</span>
+                            </a>
+                            <a href="{{ route('bil.raw-materials.factory-entrance') }}" class="nav-link {{ $is('bil/raw-materials/factory-entrance*') }}" title="Factory Entrance">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M4 21V10l8-6 8 6v11M9 21v-6h6v6"/></svg>
+                                <span class="label">Factory Entrance</span>
+                            </a>
+                            <a href="{{ route('bil.raw-materials.consumption') }}" class="nav-link {{ $is('bil/raw-materials/consumption*') }}" title="Consumption">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12M6 2v6l4 4-4 4v6M18 2v6l-4 4 4 4v6M6 22h12"/></svg>
+                                <span class="label">Consumption</span>
+                            </a>
+                            <a href="{{ route('bil.raw-materials.factory-returns') }}" class="nav-link {{ $is('bil/raw-materials/factory-returns*') }}" title="Factory Returns">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6M3 13a9 9 0 1 0 3-7.7L3 8"/></svg>
+                                <span class="label">Factory Returns</span>
+                            </a>
+                            <a href="{{ route('bil.raw-materials.damaged-goods') }}" class="nav-link {{ $is('bil/raw-materials/damaged-goods*') }}" title="Damaged Goods">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+                                <span class="label">Damaged Goods</span>
+                            </a>
+
+                            <div class="nav-group" :class="{ open: rmReportsOpen }">
+                                <button type="button" class="nav-link" :class="{ active: {{ $onRmReports ? 'true' : 'false' }} && collapsed }" @click="openGroup('rmReportsOpen')" title="Reports">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+                                    <span class="label">Reports</span>
+                                    <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                                </button>
+                                <div class="nav-sub" x-show="rmReportsOpen">
+                                    <a href="{{ route('bil.raw-materials.reports.supplier-deliveries') }}" class="nav-link {{ $is('bil/raw-materials/reports/supplier-deliveries*') }}" title="Supplier Deliveries"><span class="label">Supplier Deliveries</span></a>
+                                    <a href="{{ route('bil.raw-materials.reports.warehouse-entry') }}" class="nav-link {{ $is('bil/raw-materials/reports/warehouse-entry*') }}" title="Warehouse Entry"><span class="label">Warehouse Entry</span></a>
+                                    <a href="{{ route('bil.raw-materials.reports.warehouse-exit') }}" class="nav-link {{ $is('bil/raw-materials/reports/warehouse-exit*') }}" title="Warehouse Exit"><span class="label">Warehouse Exit</span></a>
+                                    <a href="{{ route('bil.raw-materials.reports.factory-entrance') }}" class="nav-link {{ $is('bil/raw-materials/reports/factory-entrance*') }}" title="Factory Entrance"><span class="label">Factory Entrance</span></a>
+                                    <a href="{{ route('bil.raw-materials.reports.consumption') }}" class="nav-link {{ $is('bil/raw-materials/reports/consumption*') }}" title="Consumption"><span class="label">Consumption</span></a>
+                                    <a href="{{ route('bil.raw-materials.reports.warehouse-stock') }}" class="nav-link {{ $is('bil/raw-materials/reports/warehouse-stock*') }}" title="Warehouse Stock"><span class="label">Warehouse Stock</span></a>
+                                    <a href="{{ route('bil.raw-materials.reports.factory-floor-stock') }}" class="nav-link {{ $is('bil/raw-materials/reports/factory-floor-stock*') }}" title="Factory Floor Stock"><span class="label">Factory Floor Stock</span></a>
+                                    <a href="{{ route('bil.raw-materials.reports.damaged-goods') }}" class="nav-link {{ $is('bil/raw-materials/reports/damaged-goods*') }}" title="Damaged Goods"><span class="label">Damaged Goods</span></a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endcan
 
             @canany(['view-user', 'view-role', 'view-permission', 'view-department', 'view-company'])
             <div class="nav-group" :class="{ open: adminOpen }">

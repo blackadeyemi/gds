@@ -13,5 +13,9 @@ return [
         \Modules\Core\Livewire\Admin\Permissions::class,
         \Modules\Core\Livewire\Admin\Roles::class,
         \Modules\Core\Livewire\Admin\Users::class,
+
+        // BIL — Raw Materials
+        \Modules\Bil\Livewire\RawMaterials\Products::class,
+        \Modules\Bil\Livewire\RawMaterials\Suppliers::class,
     ],
 ];

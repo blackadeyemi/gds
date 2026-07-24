@@ -99,3 +99,20 @@
     .main, .app.collapsed .main { margin-left: 0; }
     .app.mobile-open .sidebar-backdrop { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 39; }
 }
+
+/* ---- Type-ahead combobox (Supplier Deliveries product/supplier pickers) ---- */
+.combobox { position: relative; }
+.combobox-panel {
+    position: absolute; z-index: 40; top: calc(100% + 3px); left: 0; right: 0;
+    max-height: 260px; overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    box-shadow: var(--shadow-lg); padding: 4px;
+}
+.combobox-item {
+    display: block; width: 100%; text-align: left; border: 0; background: transparent;
+    padding: 0.45rem 0.6rem; border-radius: 6px; font-size: 0.9rem; color: var(--ink); cursor: pointer;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.combobox-item:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.combobox-item.is-selected { background: var(--brand); color: #fff; }
+.combobox-empty { padding: 0.5rem 0.6rem; color: var(--muted); font-size: 0.88rem; }

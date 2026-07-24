@@ -31,6 +31,8 @@ class MigrateLegacyAuth extends Command
         $this->seedModules();
         $this->seedRolesFromUserlevels();
         $this->seedAdminPermissions();
+        $this->seedRawMaterialsPermissions();
+        $this->seedBackdatePermission();
         $this->assignUsers();
 
         $this->info('Legacy auth migrated.');
@@ -80,6 +82,63 @@ class MigrateLegacyAuth extends Command
         if ($admin) {
             $admin->syncPermissions($created);
             $this->line('  baseline admin permissions: ' . count($created) . ' → role "' . $admin->name . '"');
+        }
+    }
+
+    /**
+     * Seed the Raw Materials module's page permissions and grant the baseline
+     * `view-raw-materials` to the Admin role so the BIL → Raw Materials nav and
+     * routes are reachable. givePermissionTo (not sync) preserves the admin's
+     * other permissions. Idempotent.
+     */
+    protected function seedRawMaterialsPermissions(): void
+    {
+        $module = ApplicationModule::where('slug', 'raw-materials')->first();
+        $created = [];
+        foreach ($this->actions as $act) {
+            $name = "$act-raw-materials";
+            $perm = Permission::firstOrNew(['name' => $name, 'guard_name' => 'web']);
+            $perm->description = ucfirst($act) . ' raw materials';
+            $perm->module_id = $module?->id;
+            $perm->save();
+            $created[] = $name;
+        }
+
+        // Approval capability for the two-stage flows (Factory Returns,
+        // Damaged Goods): who may sign off on submitted entries.
+        $approve = Permission::firstOrNew(['name' => 'approve-raw-materials', 'guard_name' => 'web']);
+        $approve->description = 'Approve raw-material returns and damaged goods';
+        $approve->module_id = $module?->id;
+        $approve->save();
+        $created[] = 'approve-raw-materials';
+
+        $admin = Role::where('legacy_level', 1)->first();
+        if ($admin) {
+            // Admin gets the full raw-materials set (view/create/edit/delete + approve);
+            // report row edit/delete is gated by edit-/delete-raw-materials.
+            $admin->givePermissionTo($created);
+            $this->line('  raw-materials permissions: ' . count($created) . ' → all granted to role "' . $admin->name . '"');
+        }
+    }
+
+    /**
+     * A cross-cutting capability: change/backdate the date on entry forms
+     * (Warehouse Entry, Supplier Deliveries, …). Granted to Admin by default
+     * (matches the legacy "only level 1 can edit the date" behaviour); other
+     * roles can be granted it from the Roles admin. Idempotent.
+     */
+    protected function seedBackdatePermission(): void
+    {
+        $module = ApplicationModule::where('slug', 'raw-materials')->first();
+        $perm = Permission::firstOrNew(['name' => 'backdate', 'guard_name' => 'web']);
+        $perm->description = 'Change/backdate the date on entry forms';
+        $perm->module_id = $perm->module_id ?: $module?->id;
+        $perm->save();
+
+        $admin = Role::where('legacy_level', 1)->first();
+        if ($admin) {
+            $admin->givePermissionTo('backdate');
+            $this->line('  backdate permission → granted to role "' . $admin->name . '"');
         }
     }
 

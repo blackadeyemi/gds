@@ -219,8 +219,13 @@ abstract class DataGrid extends Component
         $view = $this->currentView();
         $headings = array_map(fn ($c) => $c[0], $view['columns']);
         $base = str_replace('.', '-', $this->pageKey());
+        $rows = $this->rowsForExport($view);
 
-        return GridExporter::download($format, $base, $headings, $this->rowsForExport($view));
+        if (strtolower($format) === 'pdf') {
+            return GridExporter::pdf($base, $this->pageLabel(), $headings, $rows);
+        }
+
+        return GridExporter::download($format, $base, $headings, $rows);
     }
 
     /** Used by the generic print controller (plain call, no Livewire lifecycle). */

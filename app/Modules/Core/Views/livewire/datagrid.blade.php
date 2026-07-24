@@ -64,6 +64,10 @@
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
                             Export CSV
                         </button>
+                        <button class="dropdown-item" wire:click="export('pdf')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h6M9 18h6M9 12h2"/></svg>
+                            Export PDF
+                        </button>
                         <div class="dropdown-sep"></div>
                         <a class="dropdown-item" target="_blank"
                            href="{{ url('/admin/grid/' . $this->pageKey() . '/print') }}?view={{ $gridView['key'] }}&search={{ urlencode($this->search) }}">
