@@ -7,6 +7,7 @@ use Modules\Bil\Livewire\RawMaterials\FactoryEntrance;
 use Modules\Bil\Livewire\RawMaterials\Consumption;
 use Modules\Bil\Livewire\RawMaterials\FactoryReturns;
 use Modules\Bil\Livewire\RawMaterials\Products;
+use Modules\Bil\Livewire\RawMaterials\Statistics;
 use Modules\Bil\Livewire\RawMaterials\StockTransfer;
 use Modules\Bil\Livewire\RawMaterials\Reports\Consumption as ConsumptionReport;
 use Modules\Bil\Livewire\RawMaterials\Reports\DamagedGoods as DamagedGoodsReport;
@@ -36,6 +37,18 @@ use Modules\Bil\Livewire\RawMaterials\WarehouseExit;
 Route::middleware(['auth', 'can:view-raw-materials'])
     ->prefix('raw-materials')->name('raw-materials.')
     ->group(function () {
+        Route::get('/statistics', Statistics::class)->name('statistics');
+        // Direct download of the current statistics section as xlsx/csv/pdf.
+        Route::get('/statistics/export', function () {
+            $format = strtolower((string) request('format', 'xlsx'));
+            abort_unless(in_array($format, ['xlsx', 'csv', 'pdf'], true), 404);
+
+            $c = new Statistics();
+            $c->section = (string) request('section', '');
+            $c->range = (string) request('range', '30d');
+
+            return $c->exportResponse($format);
+        })->name('statistics.export');
         Route::get('/products', Products::class)->name('products');
         Route::get('/suppliers', Suppliers::class)->name('suppliers');
         Route::get('/supplier-deliveries', SupplierDeliveries::class)->name('supplier-deliveries');
