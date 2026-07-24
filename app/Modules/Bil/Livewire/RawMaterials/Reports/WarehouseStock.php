@@ -41,6 +41,15 @@ class WarehouseStock extends RawMaterialReport
         return false; // stock is a live snapshot
     }
 
+    public function usesSimplePagination(): bool
+    {
+        // rawmaterials_stock is a small aggregate (~130 rows), so a full COUNT is
+        // instant — use numbered pagination with a visible total ("Showing 1–25
+        // of 133") rather than the count-free prev/next used for the big
+        // date-ranged tables. Otherwise it looks like there are only 25 rows.
+        return false;
+    }
+
     protected function options(): array
     {
         return $this->optCache ??= [
