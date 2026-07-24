@@ -49,7 +49,34 @@ class FactoryFloorStock extends RawMaterialReport
 
     public function usesSimplePagination(): bool
     {
-        return true; // ~50k on-floor rows — skip the expensive COUNT(*)
+        // Full numbered pagination with a fast join-free total (see
+        // paginationTotal()) — EXCEPT when a predicate hits a joined column
+        // (group/sub-group filter, or a search that matches product/factory/
+        // group names): then the count needs the joins (~1.6s over 57k rows),
+        // so fall back to count-free prev/next.
+        return $this->search !== ''
+            || ($this->filters['group'] ?? '') !== ''
+            || ($this->filters['subgroup'] ?? '') !== '';
+    }
+
+    /**
+     * Fast total for full pagination. Reached only when no joined-column
+     * predicate is active (see usesSimplePagination), so the display left-joins
+     * — all on unique keys — don't change the count. Count the base table
+     * directly: status is indexed, and factory/product filter on the now-indexed
+     * location_id/product_id, so this is ~ms instead of the ~1.6s joined COUNT.
+     */
+    protected function paginationTotal(array $view): ?int
+    {
+        $q = DB::connection('bil')->table('factory_entrance_rawmaterials as f')
+            ->whereNull('f.status');
+
+        $this->applyFilters($q, [
+            'factory' => 'f.location_id',
+            'product' => 'f.product_id',
+        ]);
+
+        return $q->count();
     }
 
     protected function options(): array

@@ -91,6 +91,17 @@ abstract class RawMaterialReport extends Component
     }
 
     /**
+     * A cheap pre-computed total for full pagination, or null to let paginate()
+     * run its default COUNT(*). Override when the default count is expensive but
+     * a faster equivalent exists (e.g. a join-free count on the base table).
+     * Only consulted when usesSimplePagination() is false.
+     */
+    protected function paginationTotal(array $view): ?int
+    {
+        return null;
+    }
+
+    /**
      * Dropdown filters: name => ['label' => string, 'options' => [value => label]].
      * The selected value is applied to a column by the report's own queries.
      */
@@ -428,7 +439,11 @@ abstract class RawMaterialReport extends Component
         } elseif ($this->usesSimplePagination()) {
             $rows = $q->simplePaginate($this->perPage);
         } else {
-            $rows = $q->paginate($this->perPage);
+            // A report may supply a cheap pre-computed total (e.g. a join-free
+            // count) so full pagination doesn't run the expensive default
+            // COUNT(*) over the display-joined set; null → let paginate() count.
+            $total = $this->paginationTotal($view);
+            $rows = $q->paginate($this->perPage, ['*'], 'page', null, $total);
         }
 
         // Decide whether PDF export is allowed for the current result set. Reuse
