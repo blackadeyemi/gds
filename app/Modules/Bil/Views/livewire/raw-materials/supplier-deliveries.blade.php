@@ -16,7 +16,7 @@
             <form wire:submit="toConfirm" wire:key="rmsd-step-form">
                 <div class="form-group">
                     <label class="form-label">Current Date</label>
-                    <input type="date" class="form-control" wire:model="dateIso" max="{{ now()->format('Y-m-d') }}" @cannot('backdate') disabled @endcannot>
+                    @include('bil::partials.date-field', ['model' => 'dateIso', 'disabled' => ! auth()->user()?->can('backdate')])
                     @error('dateIso') <div class="form-error">{{ $message }}</div> @enderror
                     @cannot('backdate')
                         <div class="text-muted text-sm" style="margin-top:.25rem;">Locked to today — needs the “backdate” permission.</div>

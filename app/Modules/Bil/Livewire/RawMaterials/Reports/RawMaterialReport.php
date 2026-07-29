@@ -231,6 +231,42 @@ abstract class RawMaterialReport extends Component
         return $q;
     }
 
+    /* ---------------- Date display ---------------- */
+
+    /**
+     * The standard report date display: DD/Mon/YYYY (e.g. 03/Jul/2026). Used by
+     * every report so dates read the same on screen, in print, and in exports
+     * (all of which run each cell through the column closure via mapRow). Pass
+     * $format when the stored value isn't year-first/ISO — e.g. the legacy
+     * `d/m/y` text in return_approval, which Carbon would otherwise misread as
+     * m/d/y. Blank / zero dates render empty; anything unparseable is left as-is.
+     */
+    protected function fmtDate($value, ?string $format = null): string
+    {
+        $value = trim((string) $value);
+        if ($value === '' || str_starts_with($value, '0000')) {
+            return '';
+        }
+        try {
+            $dt = $format
+                ? \Carbon\Carbon::createFromFormat($format, $value)
+                : \Carbon\Carbon::parse($value);
+
+            return $dt ? $dt->format('d/M/Y') : $value;
+        } catch (\Throwable $e) {
+            return $value;
+        }
+    }
+
+    /**
+     * A date column spec rendered via fmtDate() — use this for every report date
+     * column so the DD/Mon/YYYY format stays consistent everywhere and in one place.
+     */
+    protected function dateCol(string $label, string $field, ?string $format = null): array
+    {
+        return [$label, $field, fn ($r) => $this->fmtDate(data_get($r, $field), $format)];
+    }
+
     /* ---------------- Edit / delete ---------------- */
 
     public function editRow(int $id): void

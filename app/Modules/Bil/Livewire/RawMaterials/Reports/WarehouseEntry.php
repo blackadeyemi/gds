@@ -112,7 +112,7 @@ class WarehouseEntry extends RawMaterialReport
                     ['Sub Group', 'subgroupname'],
                     ['Product', 'productname'],
                     ['Weight (kg)', 'weight'],
-                    ['Date', 'dateofcreation'],
+                    $this->dateCol('Date', 'dateofcreation'),
                     ['Status', 'status', $status],
                 ],
                 'searchable' => ['r.barcode', 'p.productname', 'g.groupname', 'sg.subgroupname', 'r.status'],

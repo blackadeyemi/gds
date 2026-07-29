@@ -210,3 +210,28 @@
     .chart-card, .stat-card { box-shadow: none !important; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
+
+/* ---- Date entry (flatpickr, DD/MM/YYYY) ---- */
+.datefield-wrap { display: block; }
+.datefield-wrap input.form-control { width: 100%; }
+.datefield-compact { display: inline-block; width: 160px; vertical-align: bottom; }
+
+/* Brand the selected day (light + dark). */
+.flatpickr-day.selected, .flatpickr-day.selected:hover,
+.flatpickr-day.startRange, .flatpickr-day.endRange { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+/* Dark-mode calendar to match the app surface. */
+[data-theme="dark"] .flatpickr-calendar { background: var(--surface); color: var(--ink); box-shadow: 0 6px 24px rgba(0,0,0,.5); }
+[data-theme="dark"] .flatpickr-months .flatpickr-month { color: var(--ink); fill: var(--ink); }
+[data-theme="dark"] span.flatpickr-weekday { color: var(--muted); background: transparent; }
+[data-theme="dark"] .flatpickr-day { color: var(--ink); }
+[data-theme="dark"] .flatpickr-day.flatpickr-disabled,
+[data-theme="dark"] .flatpickr-day.prevMonthDay,
+[data-theme="dark"] .flatpickr-day.nextMonthDay { color: var(--muted); }
+[data-theme="dark"] .flatpickr-day:hover:not(.selected) { background: color-mix(in srgb, var(--ink) 12%, transparent); }
+[data-theme="dark"] .flatpickr-months .flatpickr-prev-month svg,
+[data-theme="dark"] .flatpickr-months .flatpickr-next-month svg { fill: var(--ink); }
+[data-theme="dark"] .flatpickr-current-month input.cur-year,
+[data-theme="dark"] .flatpickr-current-month .flatpickr-monthDropdown-months { color: var(--ink); background: var(--surface); }
+[data-theme="dark"] .flatpickr-calendar.arrowTop::before, [data-theme="dark"] .flatpickr-calendar.arrowTop::after { border-bottom-color: var(--surface); }
+[data-theme="dark"] .flatpickr-calendar.arrowBottom::before, [data-theme="dark"] .flatpickr-calendar.arrowBottom::after { border-top-color: var(--surface); }

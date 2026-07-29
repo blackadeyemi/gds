@@ -95,7 +95,7 @@ class SupplierDeliveries extends RawMaterialReport
                     ['Sub Group', 'subgroupname'],
                     ['Product', 'productname'],
                     ['Weight (kg)', 'weight'],
-                    ['Date', 'dateofcreation'],
+                    $this->dateCol('Date', 'dateofcreation'),
                 ],
                 'searchable' => ['c.barcode', 'c.suppliercode', 'p.productname', 'g.groupname', 'sg.subgroupname'],
                 'query' => fn () => $this->base()

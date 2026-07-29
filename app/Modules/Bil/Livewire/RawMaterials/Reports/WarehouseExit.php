@@ -117,7 +117,7 @@ class WarehouseExit extends RawMaterialReport
                     ['Sub Group', 'subgroupname'],
                     ['Product', 'productname'],
                     ['Weight (kg)', 'weight'],
-                    ['Date', 'dateofcreation'],
+                    $this->dateCol('Date', 'dateofcreation'),
                 ],
                 'searchable' => ['we.barcode', 'p.productname', 'g.groupname', 'sg.subgroupname'],
                 'query' => fn () => $this->base()

@@ -32,6 +32,7 @@
     </script>
     <link rel="stylesheet" href="{{ asset('css/app.css') }}" />
     <link rel="stylesheet" href="{{ asset('css/admin.css') }}" />
+    <link rel="stylesheet" href="{{ asset('css/flatpickr.min.css') }}" />
     @livewireStyles
 </head>
 <body>
@@ -270,6 +271,8 @@
 </div>
 
 @livewireScripts
+<script src="{{ asset('js/flatpickr.min.js') }}"></script>
+<script src="{{ asset('js/datefield.js') }}"></script>
 <script src="{{ asset('js/settings.js') }}"></script>
 </body>
 </html>

@@ -101,7 +101,7 @@ class FactoryEntrance extends RawMaterialReport
                     ['Sub Group', 'subgroupname'],
                     ['Product', 'productname'],
                     ['Weight (kg)', 'weight'],
-                    ['Date', 'entrance_date'],
+                    $this->dateCol('Date', 'entrance_date'),
                     ['Status', 'status', $status],
                 ],
                 'searchable' => ['f.barcode', 'fd.factoryname', 'p.productname', 'g.groupname', 'sg.subgroupname', 'f.status'],

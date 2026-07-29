@@ -137,7 +137,7 @@ class FactoryFloorStock extends RawMaterialReport
                     ['Sub Group', 'subgroupname'],
                     ['Product', 'productname'],
                     ['Weight (kg)', 'weight'],
-                    ['Date', 'entrance_date'],
+                    $this->dateCol('Date', 'entrance_date'),
                 ],
                 'searchable' => ['f.barcode', 'fd.factoryname', 'p.productname', 'g.groupname', 'sg.subgroupname'],
                 'query' => fn () => $this->base()

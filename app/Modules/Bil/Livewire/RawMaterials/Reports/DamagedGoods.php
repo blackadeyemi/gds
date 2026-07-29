@@ -94,7 +94,7 @@ class DamagedGoods extends RawMaterialReport
                     ['Sub Group', 'subgroupname'],
                     ['Product', 'productname'],
                     ['Weight (kg)', 'weight'],
-                    ['Date', 'entrance_date'],
+                    $this->dateCol('Date', 'entrance_date'),
                     ['By', 'user_name'],
                     ['Status', 'status', $status],
                 ],

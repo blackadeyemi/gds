@@ -19,11 +19,11 @@
             @if ($this->hasDateRange())
                 <div class="form-group" style="margin:0;">
                     <label class="form-label text-sm">From</label>
-                    <input type="date" class="form-control" style="width:auto;" wire:model.live="dateFrom" max="{{ now()->format('Y-m-d') }}">
+                    @include('bil::partials.date-field', ['model' => 'dateFrom', 'live' => true, 'compact' => true])
                 </div>
                 <div class="form-group" style="margin:0;">
                     <label class="form-label text-sm">To</label>
-                    <input type="date" class="form-control" style="width:auto;" wire:model.live="dateTo" max="{{ now()->format('Y-m-d') }}">
+                    @include('bil::partials.date-field', ['model' => 'dateTo', 'live' => true, 'compact' => true])
                 </div>
             @endif
 

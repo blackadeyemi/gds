@@ -115,7 +115,7 @@ class Consumption extends RawMaterialReport
                     ['Raw Material', 'productname'],
                     ['Shift', 'shift'],
                     ['Weight (kg)', 'weight'],
-                    ['Date', 'dateofuse'],
+                    $this->dateCol('Date', 'dateofuse'),
                 ],
                 'searchable' => ['f.barcode', 'f.location', 'f.linename', 'f.project', 'p.productname', 'g.groupname', 'sg.subgroupname', 'f.shift'],
                 'query' => fn () => $this->base()
