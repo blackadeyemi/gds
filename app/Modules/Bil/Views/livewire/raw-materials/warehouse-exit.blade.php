@@ -32,7 +32,7 @@
 
         <form wire:submit.prevent="addScan" style="margin-top:0.5rem;">
             <div class="form-group" style="max-width:520px;">
-                <label class="form-label">Scan Barcode <span class="text-muted text-sm">({{ count($items) }} scanned)</span></label>
+                <label class="form-label">Scan Barcode <span class="text-muted text-sm">({{ count($items) }}/{{ $this->maxScan() }})</span></label>
                 <input type="text" class="form-control" wire:model="scan" wire:key="scan-input"
                        placeholder="Scan or type a barcode, then Enter" autocomplete="off" autofocus>
                 @if ($scanError)

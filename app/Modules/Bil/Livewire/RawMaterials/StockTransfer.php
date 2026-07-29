@@ -24,6 +24,8 @@ use Modules\Bil\Models\RawMaterialTransfer;
  */
 class StockTransfer extends Component
 {
+    public const MAX_SCAN = 10; // barcodes per submit
+
     public string $dateIso = '';
     public string $exitLocation = '';
     public string $scan = '';
@@ -41,6 +43,11 @@ class StockTransfer extends Component
     public function canBackdate(): bool
     {
         return (bool) auth()->user()?->can('backdate');
+    }
+
+    public function maxScan(): int
+    {
+        return self::MAX_SCAN;
     }
 
     /** Exit locations (each maps 1:1 to a destination store). */
@@ -100,6 +107,12 @@ class StockTransfer extends Component
         }
         if (collect($this->items)->contains('barcode', $barcode)) {
             $this->scanError = 'Barcode already scanned.';
+
+            return;
+        }
+
+        if (count($this->items) >= self::MAX_SCAN) {
+            $this->scanError = 'You can only scan ' . self::MAX_SCAN . ' barcodes per submit.';
 
             return;
         }

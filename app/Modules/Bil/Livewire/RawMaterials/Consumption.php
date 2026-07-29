@@ -23,6 +23,8 @@ use Modules\Bil\Models\RawMaterialProduct;
  */
 class Consumption extends Component
 {
+    public const MAX_SCAN = 10; // barcodes per submit
+
     public string $dateIso = '';
     public string $shift = 'Day';
     public string $factory = '';
@@ -42,6 +44,11 @@ class Consumption extends Component
     public function canBackdate(): bool
     {
         return (bool) auth()->user()?->can('backdate');
+    }
+
+    public function maxScan(): int
+    {
+        return self::MAX_SCAN;
     }
 
     #[Computed]
@@ -104,6 +111,12 @@ class Consumption extends Component
         }
         if (collect($this->items)->contains('barcode', $barcode)) {
             $this->scanError = 'Barcode already scanned.';
+
+            return;
+        }
+
+        if (count($this->items) >= self::MAX_SCAN) {
+            $this->scanError = 'You can only scan ' . self::MAX_SCAN . ' barcodes per submit.';
 
             return;
         }

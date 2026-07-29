@@ -26,6 +26,8 @@ class FactoryEntrance extends Component
     /** Factory lines not offered for raw-material entrance (legacy exclusions). */
     protected const EXCLUDED = ['PM2', 'PM3', 'Oregun Store'];
 
+    public const MAX_SCAN = 10; // barcodes per submit
+
     public string $dateIso = '';
     public ?int $locationId = null;
     public string $scan = '';
@@ -44,6 +46,11 @@ class FactoryEntrance extends Component
     public function canBackdate(): bool
     {
         return (bool) auth()->user()?->can('backdate');
+    }
+
+    public function maxScan(): int
+    {
+        return self::MAX_SCAN;
     }
 
     /** Selectable factory locations. */
@@ -76,6 +83,12 @@ class FactoryEntrance extends Component
         }
         if (collect($this->items)->contains('barcode', $barcode)) {
             $this->scanError = 'Barcode already scanned.';
+
+            return;
+        }
+
+        if (count($this->items) >= self::MAX_SCAN) {
+            $this->scanError = 'You can only scan ' . self::MAX_SCAN . ' barcodes per submit.';
 
             return;
         }

@@ -27,6 +27,7 @@ class WarehouseExit extends Component
 {
     public const LOCATION_ID = 1;      // Ogba — the only raw-materials store location
     public const EXIT_LOCATION = 'Rawmaterial Store';
+    public const MAX_SCAN = 10;        // barcodes per submit
 
     public string $dateIso = '';
     public string $scan = '';
@@ -46,6 +47,11 @@ class WarehouseExit extends Component
         return (bool) auth()->user()?->can('backdate');
     }
 
+    public function maxScan(): int
+    {
+        return self::MAX_SCAN;
+    }
+
     /** Validate a scanned barcode (must be in stock, not already exited). */
     public function addScan(): void
     {
@@ -59,6 +65,12 @@ class WarehouseExit extends Component
 
         if (collect($this->items)->contains('barcode', $barcode)) {
             $this->scanError = 'Barcode already scanned.';
+
+            return;
+        }
+
+        if (count($this->items) >= self::MAX_SCAN) {
+            $this->scanError = 'You can only scan ' . self::MAX_SCAN . ' barcodes per submit.';
 
             return;
         }
