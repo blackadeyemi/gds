@@ -54,6 +54,9 @@ class FactoryReturns extends Component
 
     public string $scanError = '';
 
+    /** Barcode of the most recently approved return, offered for a label reprint. */
+    public string $printBarcode = '';
+
     public function mount(): void
     {
         $this->dateIso = now()->format('Y-m-d');
@@ -167,7 +170,8 @@ class FactoryReturns extends Component
     {
         $now = now();
 
-        return ($now->hour < 7 ? $now->copy()->subDay() : $now)->format('Y/m/d');
+        // return_approval stores dates as legacy `d/m/y` (e.g. 03/07/26).
+        return ($now->hour < 7 ? $now->copy()->subDay() : $now)->format('d/m/y');
     }
 
     /** Submit every scanned barcode for approval (pending return_approval rows). */
@@ -189,7 +193,9 @@ class FactoryReturns extends Component
             }
         }
 
-        $date = $this->canBackdate() ? str_replace('-', '/', $this->dateIso) : $this->shiftDate();
+        $date = $this->canBackdate()
+            ? \Carbon\Carbon::createFromFormat('Y-m-d', $this->dateIso)->format('d/m/y')
+            : $this->shiftDate();
         $username = auth()->user()?->username ?? '';
 
         $conn = DB::connection('bil');
@@ -235,6 +241,7 @@ class FactoryReturns extends Component
 
         $this->items = [];
         $this->scanError = '';
+        $this->printBarcode = '';
         unset($this->pendingReturns);
         session()->flash('ok', $submitted . ' item' . ($submitted === 1 ? '' : 's') . ' submitted for approval.');
     }
@@ -275,10 +282,11 @@ class FactoryReturns extends Component
             $parent = RawMaterialItem::where('barcode', $barcode)->first();
 
             if ($req->type === self::TYPE_NON_CONSUMED) {
-                // Whole item returns to the store under its own barcode.
+                // Whole item returns to the store under its own barcode, now
+                // sourced from the factory rather than the original supplier.
                 RawMaterialFactoryEntrance::where('barcode', $barcode)->update(['status' => 'return']);
                 RawMaterialWarehouseExit::where('barcode', $barcode)->update(['status' => 'return']);
-                RawMaterialItem::where('barcode', $barcode)->update(['status' => null]);
+                RawMaterialItem::where('barcode', $barcode)->update(['status' => null, 'source' => 'factory']);
                 RawMaterialFactoryUsage::where('barcode', $barcode)->update(['status' => 'return']);
 
                 if ($parent) {
@@ -297,12 +305,17 @@ class FactoryReturns extends Component
                         'location_id' => self::LOCATION_ID,
                         'dateofcreation' => now()->format('Y-m-d'),
                         'status' => null,
+                        'source' => 'factory',
                     ]);
                     $this->addToStock($parent->productid, (float) $req->weight);
                 }
             }
 
             $req->update(['status' => 'approved', 'authorizer' => auth()->user()?->username]);
+
+            // A partial return makes a brand-new child barcode that needs a
+            // physical label; a whole-item return reuses its own. Offer a reprint.
+            $this->printBarcode = $childBarcode ?? $barcode;
         } finally {
             $conn->select("SELECT RELEASE_LOCK('rm_return')");
         }
@@ -324,6 +337,7 @@ class FactoryReturns extends Component
             ->update(['status' => 'rejected', 'authorizer' => auth()->user()?->username]);
 
         unset($this->pendingReturns);
+        $this->printBarcode = '';
         session()->flash('ok', 'Return rejected.');
     }
 

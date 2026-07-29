@@ -29,7 +29,7 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Date</label>
-                <input type="date" class="form-control" wire:model="dateIso" max="{{ now()->format('Y-m-d') }}" @cannot('backdate') disabled @endcannot>
+                @include('bil::partials.date-field', ['model' => 'dateIso', 'disabled' => ! auth()->user()?->can('backdate')])
                 @cannot('backdate')
                     <div class="text-muted text-sm" style="margin-top:.25rem;">Shift date — needs the “backdate” permission to change.</div>
                 @endcannot
@@ -102,6 +102,19 @@
     @can('approve-raw-materials')
         <div class="card card-pad" style="margin-top:1.25rem;">
             <h3 style="margin-top:0;">Awaiting Approval <span class="text-muted text-sm">({{ $this->pendingReturns->count() }})</span></h3>
+
+            @if ($printBarcode)
+                <div class="flex items-center gap-2" style="margin-bottom:0.9rem;">
+                    <a href="{{ route('bil.raw-materials.factory-returns.print', ['barcode' => $printBarcode]) }}"
+                       target="_blank" class="btn btn-ghost btn-sm" style="border:1px solid var(--line);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>
+                        Print label for {{ $printBarcode }}
+                    </a>
+                    <button type="button" class="btn btn-ghost btn-icon btn-sm" wire:click="$set('printBarcode', '')" title="Dismiss">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                    </button>
+                </div>
+            @endif
 
             <div class="table-wrap">
                 <table class="data">

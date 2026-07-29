@@ -152,6 +152,7 @@
                                     <a href="{{ route('bil.raw-materials.reports.consumption') }}" class="nav-link {{ $is('bil/raw-materials/reports/consumption*') }}" title="Consumption"><span class="label">Consumption</span></a>
                                     <a href="{{ route('bil.raw-materials.reports.warehouse-stock') }}" class="nav-link {{ $is('bil/raw-materials/reports/warehouse-stock*') }}" title="Warehouse Stock"><span class="label">Warehouse Stock</span></a>
                                     <a href="{{ route('bil.raw-materials.reports.factory-floor-stock') }}" class="nav-link {{ $is('bil/raw-materials/reports/factory-floor-stock*') }}" title="Factory Floor Stock"><span class="label">Factory Floor Stock</span></a>
+                                    <a href="{{ route('bil.raw-materials.reports.factory-returns') }}" class="nav-link {{ $is('bil/raw-materials/reports/factory-returns*') }}" title="Factory Returns"><span class="label">Factory Returns</span></a>
                                     <a href="{{ route('bil.raw-materials.reports.damaged-goods') }}" class="nav-link {{ $is('bil/raw-materials/reports/damaged-goods*') }}" title="Damaged Goods"><span class="label">Damaged Goods</span></a>
                                 </div>
                             </div>

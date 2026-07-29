@@ -13,6 +13,7 @@ use Modules\Bil\Livewire\RawMaterials\Reports\Consumption as ConsumptionReport;
 use Modules\Bil\Livewire\RawMaterials\Reports\DamagedGoods as DamagedGoodsReport;
 use Modules\Bil\Livewire\RawMaterials\Reports\FactoryEntrance as FactoryEntranceReport;
 use Modules\Bil\Livewire\RawMaterials\Reports\FactoryFloorStock;
+use Modules\Bil\Livewire\RawMaterials\Reports\FactoryReturns as FactoryReturnsReport;
 use Modules\Bil\Livewire\RawMaterials\Reports\SupplierDeliveries as SupplierDeliveriesReport;
 use Modules\Bil\Livewire\RawMaterials\Reports\WarehouseEntry as WarehouseEntryReport;
 use Modules\Bil\Livewire\RawMaterials\Reports\WarehouseExit as WarehouseExitReport;
@@ -74,6 +75,27 @@ Route::middleware(['auth', 'can:view-raw-materials'])
         Route::get('/factory-entrance', FactoryEntrance::class)->name('factory-entrance');
         Route::get('/consumption', Consumption::class)->name('consumption');
         Route::get('/factory-returns', FactoryReturns::class)->name('factory-returns');
+
+        // Reprint a CODE93 label for a returned item (esp. the new child barcode
+        // a partial return creates). Barcode(s) via ?barcode=A or ?barcode=A,B —
+        // resolved against the in-store warehouse row, rendered as store labels.
+        Route::get('/factory-returns/print', function () {
+            $barcodes = array_values(array_filter(array_map('trim', explode(',', (string) request('barcode', '')))));
+            abort_if($barcodes === [], 404);
+
+            $rows = DB::connection('bil')->table('rawmaterials_warehouse_entry as w')
+                ->leftJoin('rawmaterials_products as p', 'w.productid', '=', 'p.id')
+                ->leftJoin('rawmaterials_groups as g', 'p.groupid', '=', 'g.id')
+                ->whereIn('w.barcode', $barcodes)
+                ->whereNull('w.status') // the unit currently in store
+                ->orderByDesc('w.id')
+                ->get(['w.barcode', 'w.weight', 'w.suppliercode', 'p.storecode', 'p.productname', 'g.groupcode'])
+                ->unique('barcode')->values();
+            abort_if($rows->isEmpty(), 404);
+
+            return view('bil::print.delivery-barcodes', ['rows' => $rows]);
+        })->name('factory-returns.print');
+
         Route::get('/damaged-goods', DamagedGoods::class)->name('damaged-goods');
 
         // Reports — sub-menu of raw-materials reports (flow order).
@@ -89,6 +111,7 @@ Route::middleware(['auth', 'can:view-raw-materials'])
                     'consumption' => ConsumptionReport::class,
                     'warehouse-stock' => WarehouseStock::class,
                     'factory-floor-stock' => FactoryFloorStock::class,
+                    'factory-returns' => FactoryReturnsReport::class,
                     'damaged-goods' => DamagedGoodsReport::class,
                 ];
                 abort_unless(isset($map[$report]), 404);
@@ -117,6 +140,7 @@ Route::middleware(['auth', 'can:view-raw-materials'])
                     'consumption' => ConsumptionReport::class,
                     'warehouse-stock' => WarehouseStock::class,
                     'factory-floor-stock' => FactoryFloorStock::class,
+                    'factory-returns' => FactoryReturnsReport::class,
                     'damaged-goods' => DamagedGoodsReport::class,
                 ];
                 abort_unless(isset($map[$report]), 404);
@@ -141,6 +165,7 @@ Route::middleware(['auth', 'can:view-raw-materials'])
             Route::get('/consumption', ConsumptionReport::class)->name('consumption');
             Route::get('/warehouse-stock', WarehouseStock::class)->name('warehouse-stock');
             Route::get('/factory-floor-stock', FactoryFloorStock::class)->name('factory-floor-stock');
+            Route::get('/factory-returns', FactoryReturnsReport::class)->name('factory-returns');
             Route::get('/damaged-goods', DamagedGoodsReport::class)->name('damaged-goods');
         });
     });
