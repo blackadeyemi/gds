@@ -63,6 +63,46 @@ class SupplierDeliveries extends RawMaterialReport
         ];
     }
 
+    /**
+     * Show full numbered pagination (with a total) on any date span — the base
+     * would drop to count-free prev/next past ~92 days, which reads as "only 25
+     * rows". The total comes from the fast join-free paginationTotal() below.
+     * Only fall back to count-free when a joined-column predicate is active
+     * (group/sub-group filter, or a name search), since those can't be counted
+     * without the display joins.
+     */
+    public function usesSimplePagination(): bool
+    {
+        return ($this->filters['group'] ?? '') !== ''
+            || ($this->filters['subgroup'] ?? '') !== ''
+            || $this->search !== '';
+    }
+
+    /**
+     * A fast total for the default view: count the base deliveries table with
+     * the date range + supplier/product filters applied (all indexed base
+     * columns, no display joins). Null for summaries or when a joined predicate
+     * is active (usesSimplePagination() is true then, so this isn't consulted).
+     */
+    protected function paginationTotal(array $view): ?int
+    {
+        if (($view['type'] ?? 'table') !== 'table') {
+            return null;
+        }
+        if (($this->filters['group'] ?? '') !== '' || ($this->filters['subgroup'] ?? '') !== '' || $this->search !== '') {
+            return null;
+        }
+
+        $q = DB::connection('bil')->table('rawmaterials_supplier_deliveries');
+        $this->applyDate($q, 'dateofcreation', slash: true);
+        $this->applyFilters($q, [
+            'supplier' => 'suppliercode',
+            'product' => 'productid',
+        ]);
+
+        return $q->count();
+    }
+
     /** Base joined + filtered query over the deliveries table. */
     protected function base()
     {
