@@ -9,6 +9,7 @@
     $onBil = request()->is('bil/*');
     $onRawMaterials = request()->is('bil/raw-materials/*');
     $onRmReports = request()->is('bil/raw-materials/reports/*');
+    $onBpl = request()->is('bpl/*');
 @endphp
 <!DOCTYPE html>
 <html lang="en" data-theme="light" data-font="small">
@@ -19,15 +20,21 @@
     <link rel="icon" href="{{ asset('images/bilicon.ico') }}" />
     <script>
         (function () {
-            try {
-                var f = localStorage.getItem('gds_font') || 'small';
-                var mode = localStorage.getItem('gds_theme') || 'system';
-                var r = document.documentElement;
-                r.setAttribute('data-font', f);
-                r.setAttribute('data-theme-mode', mode);
-                var dark = mode === 'system' ? window.matchMedia('(prefers-color-scheme: dark)').matches : mode === 'dark';
-                r.setAttribute('data-theme', dark ? 'dark' : 'light');
-            } catch (e) {}
+            function applyAppearance() {
+                try {
+                    var f = localStorage.getItem('gds_font') || 'small';
+                    var mode = localStorage.getItem('gds_theme') || 'system';
+                    var r = document.documentElement;
+                    r.setAttribute('data-font', f);
+                    r.setAttribute('data-theme-mode', mode);
+                    var dark = mode === 'system' ? window.matchMedia('(prefers-color-scheme: dark)').matches : mode === 'dark';
+                    r.setAttribute('data-theme', dark ? 'dark' : 'light');
+                } catch (e) {}
+            }
+            applyAppearance();
+            // Re-apply after Livewire SPA navigation (wire:navigate), which otherwise
+            // reverts <html> to the layout's default data-font/data-theme.
+            document.addEventListener('livewire:navigated', applyAppearance);
         })();
     </script>
     <link rel="stylesheet" href="{{ asset('css/app.css') }}" />
@@ -45,11 +52,12 @@
         bilOpen: {{ $onBil ? 'true' : 'false' }},
         rawMaterialsOpen: {{ $onRawMaterials ? 'true' : 'false' }},
         rmReportsOpen: {{ $onRmReports ? 'true' : 'false' }},
+        bplOpen: {{ $onBpl ? 'true' : 'false' }},
         toggleSidebar() {
             if (window.innerWidth <= 900) { this.mobileOpen = !this.mobileOpen; return; }
             this.collapsed = !this.collapsed;
             localStorage.setItem('gds_sidebar_collapsed', JSON.stringify(this.collapsed));
-            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; }
+            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; this.bplOpen = false; }
         },
         openGroup(group) {
             if (this.collapsed) {
@@ -158,6 +166,26 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+            @endcan
+
+            @can('view-bpl')
+            <div class="nav-group" :class="{ open: bplOpen }">
+                <button type="button" class="nav-link" :class="{ active: {{ $onBpl ? 'true' : 'false' }} && collapsed }" @click="openGroup('bplOpen')" title="BPL">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M6 21V8l6-4 6 4v13M10 21v-5h4v5"/><path d="M9 11h.01M15 11h.01"/></svg>
+                    <span class="label">BPL</span>
+                    <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+                <div class="nav-sub" x-show="bplOpen">
+                    <a href="{{ route('bpl.grades') }}" class="nav-link {{ $is('bpl/grades*') }}" title="Grades">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                        <span class="label">Grades</span>
+                    </a>
+                    <a href="{{ route('bpl.products.hardroll') }}" class="nav-link {{ $is('bpl/products*') }}" title="Products">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7l-8-4-8 4 8 4 8-4zM4 7v10l8 4 8-4V7M12 11v10"/></svg>
+                        <span class="label">Products</span>
+                    </a>
                 </div>
             </div>
             @endcan

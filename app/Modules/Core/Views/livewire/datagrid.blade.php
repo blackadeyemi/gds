@@ -6,6 +6,10 @@
         @endif
     </div>
 
+    @if ($this->headerView())
+        @include($this->headerView())
+    @endif
+
     @if (session('ok'))
         <div class="card" style="border-color:var(--success);color:var(--success);margin-bottom:1rem;padding:0.7rem 1.25rem;">{{ session('ok') }}</div>
     @endif

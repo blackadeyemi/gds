@@ -32,6 +32,7 @@ class MigrateLegacyAuth extends Command
         $this->seedRolesFromUserlevels();
         $this->seedAdminPermissions();
         $this->seedRawMaterialsPermissions();
+        $this->seedBplPermissions();
         $this->seedBackdatePermission();
         $this->assignUsers();
 
@@ -118,6 +119,31 @@ class MigrateLegacyAuth extends Command
             // report row edit/delete is gated by edit-/delete-raw-materials.
             $admin->givePermissionTo($created);
             $this->line('  raw-materials permissions: ' . count($created) . ' → all granted to role "' . $admin->name . '"');
+        }
+    }
+
+    /**
+     * Seed the BPL module's page permissions (view/create/edit/delete-bpl) and
+     * grant the full set to Admin so the BPL nav (Grades, Products) and routes
+     * are reachable. Mirrors seedRawMaterialsPermissions. Idempotent.
+     */
+    protected function seedBplPermissions(): void
+    {
+        $module = ApplicationModule::where('slug', 'bpl')->first();
+        $created = [];
+        foreach ($this->actions as $act) {
+            $name = "$act-bpl";
+            $perm = Permission::firstOrNew(['name' => $name, 'guard_name' => 'web']);
+            $perm->description = ucfirst($act) . ' BPL';
+            $perm->module_id = $module?->id;
+            $perm->save();
+            $created[] = $name;
+        }
+
+        $admin = Role::where('legacy_level', 1)->first();
+        if ($admin) {
+            $admin->givePermissionTo($created);
+            $this->line('  bpl permissions: ' . count($created) . ' → all granted to role "' . $admin->name . '"');
         }
     }
 

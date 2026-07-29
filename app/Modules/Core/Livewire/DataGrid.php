@@ -60,6 +60,10 @@ abstract class DataGrid extends Component
     /** Optional extra Blade (e.g. a page-specific modal) appended after the grid. */
     public function extraView(): ?string { return null; }
 
+    /** Optional Blade rendered between the page heading and the grid card
+     *  (e.g. a tab bar switching between sibling grids). Null = nothing. */
+    public function headerView(): ?string { return null; }
+
     /**
      * Referential-integrity guard. Return null when a row may be deleted, or a
      * human-readable reason (e.g. "In use by 3 users — cannot delete.") when it
