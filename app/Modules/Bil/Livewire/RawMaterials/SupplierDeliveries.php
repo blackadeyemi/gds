@@ -48,7 +48,7 @@ class SupplierDeliveries extends Component
     /** Whether the current user may change the date (backdate). */
     public function canBackdate(): bool
     {
-        return (bool) auth()->user()?->can('backdate');
+        return (bool) auth()->user()?->canDo('bil.raw_materials.supplier_deliveries', 'backdate');
     }
 
     /**

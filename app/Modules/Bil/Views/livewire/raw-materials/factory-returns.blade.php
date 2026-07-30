@@ -29,10 +29,10 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Date</label>
-                @include('bil::partials.date-field', ['model' => 'dateIso', 'disabled' => ! auth()->user()?->can('backdate')])
-                @cannot('backdate')
+                @include('bil::partials.date-field', ['model' => 'dateIso', 'disabled' => ! $this->canBackdate()])
+                @unless($this->canBackdate())
                     <div class="text-muted text-sm" style="margin-top:.25rem;">Shift date — needs the “backdate” permission to change.</div>
-                @endcannot
+                @endunless
             </div>
         </div>
 
@@ -99,7 +99,7 @@
     </div>
 
     {{-- Stage 2 — approval --}}
-    @can('approve-raw-materials')
+    @if ($this->canApprove())
         <div class="card card-pad" style="margin-top:1.25rem;">
             <h3 style="margin-top:0;">Awaiting Approval <span class="text-muted text-sm">({{ $this->pendingReturns->count() }})</span></h3>
 
@@ -155,5 +155,5 @@
                 </table>
             </div>
         </div>
-    @endcan
+    @endif
 </div>

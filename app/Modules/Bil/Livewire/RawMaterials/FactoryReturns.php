@@ -65,7 +65,7 @@ class FactoryReturns extends Component
 
     public function canBackdate(): bool
     {
-        return (bool) auth()->user()?->can('backdate');
+        return (bool) auth()->user()?->canDo('bil.raw_materials.factory_returns', 'backdate');
     }
 
     public function maxScan(): int
@@ -75,7 +75,7 @@ class FactoryReturns extends Component
 
     public function canApprove(): bool
     {
-        return (bool) auth()->user()?->can('approve-raw-materials');
+        return (bool) auth()->user()?->canDo('bil.raw_materials.factory_returns', 'approve');
     }
 
     public function updatedReturnType(): void

@@ -46,7 +46,7 @@ class WarehouseEntry extends Component
     /** Whether the current user may change the date (backdate). */
     public function canBackdate(): bool
     {
-        return (bool) auth()->user()?->can('backdate');
+        return (bool) auth()->user()?->canDo('bil.raw_materials.warehouse_entry', 'backdate');
     }
 
     /** The 10 most recent delivered barcodes not yet entered into the warehouse. */

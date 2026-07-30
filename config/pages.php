@@ -15,7 +15,9 @@
 
 $crud = ['view', 'create', 'edit', 'delete'];
 $access = ['view'];
-$entry = ['view', 'create', 'backdate'];
+// Entry forms: access IS the create action, so no separate create/edit/delete —
+// just view plus the special abilities that page supports.
+$entry = ['view', 'backdate'];
 $report = ['view', 'edit', 'delete'];
 
 return [
@@ -38,10 +40,10 @@ return [
         ['key' => 'bil.raw_materials.warehouse_entry',     'label' => 'Warehouse Entry',     'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.warehouse-entry',     'abilities' => $entry],
         ['key' => 'bil.raw_materials.warehouse_exit',      'label' => 'Warehouse Exit',      'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.warehouse-exit',      'abilities' => $entry],
         ['key' => 'bil.raw_materials.stock_transfer',      'label' => 'Stock Transfer',      'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.stock-transfer',      'abilities' => $entry],
-        ['key' => 'bil.raw_materials.factory_entrance',    'label' => 'Factory Entrance',    'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.factory-entrance',    'abilities' => ['view', 'create', 'backdate', 'bypass-shift']],
-        ['key' => 'bil.raw_materials.consumption',         'label' => 'Consumption',         'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.consumption',         'abilities' => ['view', 'create', 'backdate', 'bypass-shift']],
-        ['key' => 'bil.raw_materials.factory_returns',     'label' => 'Factory Returns',     'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.factory-returns',     'abilities' => ['view', 'create', 'backdate', 'approve']],
-        ['key' => 'bil.raw_materials.damaged_goods',       'label' => 'Damaged Goods',       'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.damaged-goods',       'abilities' => ['view', 'create', 'backdate', 'approve']],
+        ['key' => 'bil.raw_materials.factory_entrance',    'label' => 'Factory Entrance',    'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.factory-entrance',    'abilities' => ['view', 'backdate', 'bypass-shift']],
+        ['key' => 'bil.raw_materials.consumption',         'label' => 'Consumption',         'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.consumption',         'abilities' => ['view', 'backdate', 'bypass-shift']],
+        ['key' => 'bil.raw_materials.factory_returns',     'label' => 'Factory Returns',     'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.factory-returns',     'abilities' => ['view', 'backdate', 'approve']],
+        ['key' => 'bil.raw_materials.damaged_goods',       'label' => 'Damaged Goods',       'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.damaged-goods',       'abilities' => ['view', 'backdate', 'approve']],
 
         // BIL — Raw Materials Reports
         ['key' => 'bil.raw_materials.reports.supplier_deliveries', 'label' => 'Supplier Deliveries', 'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.supplier-deliveries', 'abilities' => $report],

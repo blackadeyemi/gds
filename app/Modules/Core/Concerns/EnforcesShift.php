@@ -34,7 +34,7 @@ trait EnforcesShift
         }
 
         $status = (new ShiftService())->status($key);
-        $status['can_bypass'] = (bool) (auth()->user()?->can('bypass-shift-window'));
+        $status['can_bypass'] = (bool) (auth()->user()?->canDo($key, 'bypass-shift'));
         $status['blocked'] = ! $status['open'] && ! $status['can_bypass'];
 
         return $status;

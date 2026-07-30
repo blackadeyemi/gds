@@ -42,7 +42,7 @@ class StockTransfer extends Component
 
     public function canBackdate(): bool
     {
-        return (bool) auth()->user()?->can('backdate');
+        return (bool) auth()->user()?->canDo('bil.raw_materials.stock_transfer', 'backdate');
     }
 
     public function maxScan(): int

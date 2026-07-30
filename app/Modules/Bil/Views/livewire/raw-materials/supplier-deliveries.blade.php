@@ -16,11 +16,11 @@
             <form wire:submit="toConfirm" wire:key="rmsd-step-form">
                 <div class="form-group">
                     <label class="form-label">Current Date</label>
-                    @include('bil::partials.date-field', ['model' => 'dateIso', 'disabled' => ! auth()->user()?->can('backdate')])
+                    @include('bil::partials.date-field', ['model' => 'dateIso', 'disabled' => ! $this->canBackdate()])
                     @error('dateIso') <div class="form-error">{{ $message }}</div> @enderror
-                    @cannot('backdate')
+                    @unless($this->canBackdate())
                         <div class="text-muted text-sm" style="margin-top:.25rem;">Locked to today — needs the “backdate” permission.</div>
-                    @endcannot
+                    @endunless
                 </div>
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">

@@ -134,14 +134,26 @@ abstract class RawMaterialReport extends Component
 
     /* ---------------- Permissions ---------------- */
 
+    /** Page key for this report's abilities: bil.raw_materials.reports.{slug}. */
+    protected function reportPageKey(): string
+    {
+        return 'bil.raw_materials.reports.' . str_replace('-', '_', $this->printKey());
+    }
+
+    /** May the current user perform an ability on this report's page? */
+    public function mayDo(string $ability): bool
+    {
+        return (bool) auth()->user()?->canDo($this->reportPageKey(), $ability);
+    }
+
     public function canEdit(): bool
     {
-        return ! $this->readOnly() && $this->editFields() !== [] && (bool) auth()->user()?->can('edit-raw-materials');
+        return ! $this->readOnly() && $this->editFields() !== [] && $this->mayDo('edit');
     }
 
     public function canDelete(): bool
     {
-        return ! $this->readOnly() && (bool) auth()->user()?->can('delete-raw-materials');
+        return ! $this->readOnly() && $this->mayDo('delete');
     }
 
     public function hasActions(): bool

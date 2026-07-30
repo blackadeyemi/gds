@@ -44,7 +44,7 @@ class WarehouseExit extends Component
 
     public function canBackdate(): bool
     {
-        return (bool) auth()->user()?->can('backdate');
+        return (bool) auth()->user()?->canDo('bil.raw_materials.warehouse_exit', 'backdate');
     }
 
     public function maxScan(): int

@@ -26,10 +26,10 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Date</label>
-                @include('bil::partials.date-field', ['model' => 'dateIso', 'disabled' => ! auth()->user()?->can('backdate')])
-                @cannot('backdate')
+                @include('bil::partials.date-field', ['model' => 'dateIso', 'disabled' => ! $this->canBackdate()])
+                @unless($this->canBackdate())
                     <div class="text-muted text-sm" style="margin-top:.25rem;">Shift date — needs the “backdate” permission to change.</div>
-                @endcannot
+                @endunless
             </div>
         </div>
 

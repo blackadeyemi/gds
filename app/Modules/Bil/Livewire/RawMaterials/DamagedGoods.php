@@ -47,7 +47,7 @@ class DamagedGoods extends Component
 
     public function canBackdate(): bool
     {
-        return (bool) auth()->user()?->can('backdate');
+        return (bool) auth()->user()?->canDo('bil.raw_materials.damaged_goods', 'backdate');
     }
 
     public function maxScan(): int
@@ -57,7 +57,7 @@ class DamagedGoods extends Component
 
     public function canApprove(): bool
     {
-        return (bool) auth()->user()?->can('approve-raw-materials');
+        return (bool) auth()->user()?->canDo('bil.raw_materials.damaged_goods', 'approve');
     }
 
     /** Validate a scanned barcode (in store, not exited, not already reported). */
