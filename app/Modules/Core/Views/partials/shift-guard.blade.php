@@ -26,6 +26,10 @@
                         @endforeach
                     </div>
                 @endif
+                <a href="{{ route('dashboard') }}" class="btn btn-primary" style="margin-top:1.5rem;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg>
+                    Go to Dashboard
+                </a>
             </div>
         </div>
     </div>
