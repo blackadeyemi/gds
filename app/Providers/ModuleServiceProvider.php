@@ -7,6 +7,7 @@ use Illuminate\Support\ServiceProvider;
 use Modules\Bil\Console\ReconcileWarehouseStock;
 use Modules\Core\Console\MigrateLegacyAuth;
 use Modules\Core\Console\SyncDataViews;
+use Modules\Core\Console\SyncShiftContexts;
 
 /**
  * Wires the Bil/Bpl/Core modules into the app: each module owns its own
@@ -24,7 +25,7 @@ class ModuleServiceProvider extends ServiceProvider
     public function boot(): void
     {
         if ($this->app->runningInConsole()) {
-            $this->commands([SyncDataViews::class, MigrateLegacyAuth::class, ReconcileWarehouseStock::class]);
+            $this->commands([SyncDataViews::class, MigrateLegacyAuth::class, ReconcileWarehouseStock::class, SyncShiftContexts::class]);
         }
 
         $modules = base_path('app/Modules');

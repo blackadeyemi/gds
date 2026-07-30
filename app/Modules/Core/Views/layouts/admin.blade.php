@@ -249,6 +249,12 @@
                         <span class="label">Data Views</span>
                     </a>
                     @endcan
+                    @can('manage-shift-settings')
+                    <a href="{{ url('/settings/shifts') }}" class="nav-link {{ $is('settings/shifts*') }}" title="Shift Settings">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                        <span class="label">Shift Settings</span>
+                    </a>
+                    @endcan
                 </div>
             </div>
         </nav>

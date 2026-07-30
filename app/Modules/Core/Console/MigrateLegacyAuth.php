@@ -34,6 +34,7 @@ class MigrateLegacyAuth extends Command
         $this->seedRawMaterialsPermissions();
         $this->seedBplPermissions();
         $this->seedBackdatePermission();
+        $this->seedShiftPermissions();
         $this->assignUsers();
 
         $this->info('Legacy auth migrated.');
@@ -165,6 +166,33 @@ class MigrateLegacyAuth extends Command
         if ($admin) {
             $admin->givePermissionTo('backdate');
             $this->line('  backdate permission → granted to role "' . $admin->name . '"');
+        }
+    }
+
+    /**
+     * Shift-scheduling capabilities: `manage-shift-settings` (configure the
+     * Day/Night windows per area) and `bypass-shift-window` (reach a gated page
+     * even when it's closed). Granted to Admin; assign to an Operations Manager
+     * (or any) role from the Roles admin. Idempotent (givePermissionTo is additive).
+     */
+    protected function seedShiftPermissions(): void
+    {
+        $adminModule = ApplicationModule::where('slug', 'admin')->first();
+        $perms = [
+            'manage-shift-settings' => 'Configure shift windows (Day/Night times) per area',
+            'bypass-shift-window' => 'Access a shift-gated page even when its window is closed',
+        ];
+        foreach ($perms as $name => $desc) {
+            $perm = Permission::firstOrNew(['name' => $name, 'guard_name' => 'web']);
+            $perm->description = $desc;
+            $perm->module_id = $perm->module_id ?: $adminModule?->id;
+            $perm->save();
+        }
+
+        $admin = Role::where('legacy_level', 1)->first();
+        if ($admin) {
+            $admin->givePermissionTo(array_keys($perms));
+            $this->line('  shift permissions: ' . count($perms) . ' → granted to role "' . $admin->name . '"');
         }
     }
 

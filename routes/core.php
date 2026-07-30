@@ -9,6 +9,7 @@ use Modules\Core\Livewire\Admin\Roles;
 use Modules\Core\Livewire\Admin\Users;
 use Modules\Core\Livewire\Settings\Appearance;
 use Modules\Core\Livewire\Settings\DataViews;
+use Modules\Core\Livewire\Settings\ShiftSettings;
 
 /*
 | Core (shared) routes — auth and anything not owned by the Bil or Bpl
@@ -48,4 +49,8 @@ Route::middleware('auth')->group(function () {
     // is admin configuration — gated.
     Route::get('/settings/appearance', Appearance::class)->name('settings.appearance');
     Route::get('/settings/data-views', DataViews::class)->middleware('can:view-module')->name('settings.data-views');
+
+    // Shift windows — configurable by Admin + Operations Manager (any role
+    // granted manage-shift-settings), not only admins.
+    Route::get('/settings/shifts', ShiftSettings::class)->middleware('can:manage-shift-settings')->name('settings.shifts');
 });
