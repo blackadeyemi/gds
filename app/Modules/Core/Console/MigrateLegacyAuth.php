@@ -33,16 +33,14 @@ class MigrateLegacyAuth extends Command
         ['name' => 'Jumbo Rolls', 'company' => 'BPL'],
         ['name' => 'Reports', 'company' => null],
     ];
-    protected array $resources = ['user', 'role', 'permission', 'department', 'company', 'module'];
-    protected array $actions = ['view', 'create', 'edit', 'delete'];
+    /** Row-level capabilities seeded for Raw Materials (access is per-page). */
+    protected array $actions = ['edit', 'delete'];
 
     public function handle(): int
     {
         $this->seedModules();
         $this->seedRolesFromUserlevels();
-        $this->seedAdminPermissions();
         $this->seedRawMaterialsPermissions();
-        $this->seedBplPermissions();
         $this->seedBackdatePermission();
         $this->seedShiftPermissions();
         $this->assignUsers();
@@ -76,33 +74,11 @@ class MigrateLegacyAuth extends Command
         $this->line('  roles from userlevels: ' . $levels->count());
     }
 
-    protected function seedAdminPermissions(): void
-    {
-        $adminModule = ApplicationModule::where('slug', 'admin')->first();
-        $created = [];
-        foreach ($this->resources as $res) {
-            foreach ($this->actions as $act) {
-                $name = "$act-$res";
-                $perm = Permission::firstOrNew(['name' => $name, 'guard_name' => 'web']);
-                $perm->description = ucfirst($act) . ' ' . $res;
-                $perm->module_id = $adminModule?->id;
-                $perm->save();
-                $created[] = $name;
-            }
-        }
-
-        $admin = Role::where('legacy_level', 1)->first();
-        if ($admin) {
-            $admin->syncPermissions($created);
-            $this->line('  baseline admin permissions: ' . count($created) . ' → role "' . $admin->name . '"');
-        }
-    }
-
     /**
-     * Seed the Raw Materials module's page permissions and grant the baseline
-     * `view-raw-materials` to the Admin role so the BIL → Raw Materials nav and
-     * routes are reachable. givePermissionTo (not sync) preserves the admin's
-     * other permissions. Idempotent.
+     * Seed the Raw Materials row-level capabilities (edit/delete a report row +
+     * approve two-stage flows) and grant them to Admin. Page ACCESS is handled
+     * by the per-page model (config/pages.php), not permissions like these.
+     * givePermissionTo is additive. Idempotent.
      */
     protected function seedRawMaterialsPermissions(): void
     {
@@ -111,7 +87,7 @@ class MigrateLegacyAuth extends Command
         foreach ($this->actions as $act) {
             $name = "$act-raw-materials";
             $perm = Permission::firstOrNew(['name' => $name, 'guard_name' => 'web']);
-            $perm->description = ucfirst($act) . ' raw materials';
+            $perm->description = ucfirst($act) . ' a raw-materials report row';
             $perm->module_id = $module?->id;
             $perm->save();
             $created[] = $name;
@@ -127,35 +103,8 @@ class MigrateLegacyAuth extends Command
 
         $admin = Role::where('legacy_level', 1)->first();
         if ($admin) {
-            // Admin gets the full raw-materials set (view/create/edit/delete + approve);
-            // report row edit/delete is gated by edit-/delete-raw-materials.
             $admin->givePermissionTo($created);
-            $this->line('  raw-materials permissions: ' . count($created) . ' → all granted to role "' . $admin->name . '"');
-        }
-    }
-
-    /**
-     * Seed the BPL module's page permissions (view/create/edit/delete-bpl) and
-     * grant the full set to Admin so the BPL nav (Grades, Products) and routes
-     * are reachable. Mirrors seedRawMaterialsPermissions. Idempotent.
-     */
-    protected function seedBplPermissions(): void
-    {
-        $module = ApplicationModule::where('slug', 'bpl-jumbo-rolls')->first();
-        $created = [];
-        foreach ($this->actions as $act) {
-            $name = "$act-bpl";
-            $perm = Permission::firstOrNew(['name' => $name, 'guard_name' => 'web']);
-            $perm->description = ucfirst($act) . ' BPL';
-            $perm->module_id = $module?->id;
-            $perm->save();
-            $created[] = $name;
-        }
-
-        $admin = Role::where('legacy_level', 1)->first();
-        if ($admin) {
-            $admin->givePermissionTo($created);
-            $this->line('  bpl permissions: ' . count($created) . ' → all granted to role "' . $admin->name . '"');
+            $this->line('  raw-materials capabilities: ' . count($created) . ' → granted to role "' . $admin->name . '"');
         }
     }
 
@@ -181,29 +130,23 @@ class MigrateLegacyAuth extends Command
     }
 
     /**
-     * Shift-scheduling capabilities: `manage-shift-settings` (configure the
-     * Day/Night windows per area) and `bypass-shift-window` (reach a gated page
-     * even when it's closed). Granted to Admin; assign to an Operations Manager
-     * (or any) role from the Roles admin. Idempotent (givePermissionTo is additive).
+     * Shift capability: `bypass-shift-window` (reach a shift-gated page even when
+     * it's closed). Granted to Admin; assign to others from the Roles admin.
+     * (Configuring shift windows is now page access — the Shift Settings page —
+     * not a permission.) Idempotent (givePermissionTo is additive).
      */
     protected function seedShiftPermissions(): void
     {
         $adminModule = ApplicationModule::where('slug', 'admin')->first();
-        $perms = [
-            'manage-shift-settings' => 'Configure shift windows (Day/Night times) per area',
-            'bypass-shift-window' => 'Access a shift-gated page even when its window is closed',
-        ];
-        foreach ($perms as $name => $desc) {
-            $perm = Permission::firstOrNew(['name' => $name, 'guard_name' => 'web']);
-            $perm->description = $desc;
-            $perm->module_id = $perm->module_id ?: $adminModule?->id;
-            $perm->save();
-        }
+        $perm = Permission::firstOrNew(['name' => 'bypass-shift-window', 'guard_name' => 'web']);
+        $perm->description = 'Access a shift-gated page even when its window is closed';
+        $perm->module_id = $perm->module_id ?: $adminModule?->id;
+        $perm->save();
 
         $admin = Role::where('legacy_level', 1)->first();
         if ($admin) {
-            $admin->givePermissionTo(array_keys($perms));
-            $this->line('  shift permissions: ' . count($perms) . ' → granted to role "' . $admin->name . '"');
+            $admin->givePermissionTo('bypass-shift-window');
+            $this->line('  shift capability: bypass-shift-window → granted to role "' . $admin->name . '"');
         }
     }
 
