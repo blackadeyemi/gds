@@ -22,7 +22,7 @@ class MigrateLegacyAuth extends Command
     protected $signature = 'gds:migrate-legacy-auth';
     protected $description = 'Seed roles/permissions from legacy userlevels and assign all users';
 
-    protected array $modules = ['Admin', 'Factory', 'Raw Materials', 'Store', 'Sales', 'Quality', 'BPL', 'Reports'];
+    protected array $modules = ['Admin', 'Factory', 'Raw Materials', 'Store', 'Sales', 'Quality', 'Jumbo Rolls', 'Reports'];
     protected array $resources = ['user', 'role', 'permission', 'department', 'company', 'module'];
     protected array $actions = ['view', 'create', 'edit', 'delete'];
 
@@ -130,7 +130,7 @@ class MigrateLegacyAuth extends Command
      */
     protected function seedBplPermissions(): void
     {
-        $module = ApplicationModule::where('slug', 'bpl')->first();
+        $module = ApplicationModule::where('slug', 'jumbo-rolls')->first();
         $created = [];
         foreach ($this->actions as $act) {
             $name = "$act-bpl";

@@ -52,8 +52,8 @@ return [
         ['key' => 'bil.raw_materials.reports.damaged_goods',       'label' => 'Damaged Goods',       'module' => 'Raw Materials Reports', 'route' => 'bil.raw-materials.reports.damaged-goods'],
 
         // BPL — Jumbo Rolls
-        ['key' => 'bpl.jumbo_rolls.grades',            'label' => 'Grades',              'module' => 'BPL', 'route' => 'bpl.jumbo-rolls.grades'],
-        ['key' => 'bpl.jumbo_rolls.products.hardroll', 'label' => 'Products (Hardroll)', 'module' => 'BPL', 'route' => 'bpl.jumbo-rolls.products.hardroll'],
-        ['key' => 'bpl.jumbo_rolls.products.softroll', 'label' => 'Products (Softroll)', 'module' => 'BPL', 'route' => 'bpl.jumbo-rolls.products.softroll'],
+        ['key' => 'bpl.jumbo_rolls.grades',            'label' => 'Grades',              'module' => 'Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.grades'],
+        ['key' => 'bpl.jumbo_rolls.products.hardroll', 'label' => 'Products (Hardroll)', 'module' => 'Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.products.hardroll'],
+        ['key' => 'bpl.jumbo_rolls.products.softroll', 'label' => 'Products (Softroll)', 'module' => 'Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.products.softroll'],
     ],
 ];
