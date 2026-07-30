@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -27,5 +28,9 @@ class AppServiceProvider extends ServiceProvider
         if (str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }
+
+        // @canPage('bil.raw_materials.products') … @endcanPage — nav/link gating
+        // by page key (mirrors the `page:` route middleware).
+        Blade::if('canPage', fn (string $key) => (bool) auth()->user()?->canAccessPage($key));
     }
 }

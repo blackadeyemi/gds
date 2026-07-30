@@ -35,6 +35,42 @@ class User extends Authenticatable
         return $this->belongsTo(Department::class, 'department_id');
     }
 
+    /** Admin role (legacy_level 1) grants full page access. */
+    public function isAdmin(): bool
+    {
+        return $this->roles->contains(fn ($r) => (int) $r->legacy_level === 1);
+    }
+
+    /** @var array<int,string>|null memoized per request */
+    protected ?array $pageKeyCache = null;
+
+    /** Keys of pages this user may open (Admin = all, else via their permissions). */
+    public function accessiblePageKeys(): array
+    {
+        if ($this->pageKeyCache !== null) {
+            return $this->pageKeyCache;
+        }
+
+        if ($this->isAdmin()) {
+            return $this->pageKeyCache = Page::pluck('key')->all();
+        }
+
+        $permissionIds = $this->getAllPermissions()->pluck('id');
+        if ($permissionIds->isEmpty()) {
+            return $this->pageKeyCache = [];
+        }
+
+        return $this->pageKeyCache = Page::whereHas(
+            'permissions',
+            fn ($q) => $q->whereIn('permissions.id', $permissionIds)
+        )->pluck('key')->all();
+    }
+
+    public function canAccessPage(string $key): bool
+    {
+        return in_array($key, $this->accessiblePageKeys(), true);
+    }
+
     /**
      * Legacy default landing page for this user, resolved through
      * redirections (user.redirection_id -> redirections.page). `redirections`
