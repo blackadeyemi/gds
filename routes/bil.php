@@ -31,14 +31,15 @@ use Modules\Bil\Livewire\RawMaterials\WarehouseExit;
 
 /*
 | Raw Materials — the flow of raw material from supplier, through the
-| warehouse, into the factory and back. Gated by the `view-raw-materials`
-| permission (Raw Materials application module). Products is live; the rest
-| are placeholders until each is rebuilt from its legacy page.
+| warehouse, into the factory and back. Each route is gated per page by the
+| `page:{key}` middleware (page keys mirror the route names); export/print
+| helpers inherit the page they belong to.
 */
-Route::middleware(['auth', 'can:view-raw-materials'])
+Route::middleware('auth')
     ->prefix('raw-materials')->name('raw-materials.')
     ->group(function () {
-        Route::get('/statistics', Statistics::class)->name('statistics');
+        Route::get('/statistics', Statistics::class)
+            ->middleware('page:bil.raw_materials.statistics')->name('statistics');
         // Direct download of the current statistics section as xlsx/csv/pdf.
         Route::get('/statistics/export', function () {
             $format = strtolower((string) request('format', 'xlsx'));
@@ -49,10 +50,13 @@ Route::middleware(['auth', 'can:view-raw-materials'])
             $c->range = (string) request('range', '30d');
 
             return $c->exportResponse($format);
-        })->name('statistics.export');
-        Route::get('/products', Products::class)->name('products');
-        Route::get('/suppliers', Suppliers::class)->name('suppliers');
-        Route::get('/supplier-deliveries', SupplierDeliveries::class)->name('supplier-deliveries');
+        })->middleware('page:bil.raw_materials.statistics')->name('statistics.export');
+        Route::get('/products', Products::class)
+            ->middleware('page:bil.raw_materials.products')->name('products');
+        Route::get('/suppliers', Suppliers::class)
+            ->middleware('page:bil.raw_materials.suppliers')->name('suppliers');
+        Route::get('/supplier-deliveries', SupplierDeliveries::class)
+            ->middleware('page:bil.raw_materials.supplier_deliveries')->name('supplier-deliveries');
 
         // Label print for the barcodes just generated (ids held in session).
         Route::get('/supplier-deliveries/print', function () {
@@ -67,14 +71,20 @@ Route::middleware(['auth', 'can:view-raw-materials'])
                 ->get(['c.barcode', 'c.weight', 'c.suppliercode', 'p.storecode', 'p.productname', 'g.groupcode']);
 
             return view('bil::print.delivery-barcodes', ['rows' => $rows]);
-        })->name('supplier-deliveries.print');
+        })->middleware('page:bil.raw_materials.supplier_deliveries')->name('supplier-deliveries.print');
 
-        Route::get('/warehouse-entry', WarehouseEntry::class)->name('warehouse-entry');
-        Route::get('/warehouse-exit', WarehouseExit::class)->name('warehouse-exit');
-        Route::get('/stock-transfer', StockTransfer::class)->name('stock-transfer');
-        Route::get('/factory-entrance', FactoryEntrance::class)->name('factory-entrance');
-        Route::get('/consumption', Consumption::class)->name('consumption');
-        Route::get('/factory-returns', FactoryReturns::class)->name('factory-returns');
+        Route::get('/warehouse-entry', WarehouseEntry::class)
+            ->middleware('page:bil.raw_materials.warehouse_entry')->name('warehouse-entry');
+        Route::get('/warehouse-exit', WarehouseExit::class)
+            ->middleware('page:bil.raw_materials.warehouse_exit')->name('warehouse-exit');
+        Route::get('/stock-transfer', StockTransfer::class)
+            ->middleware('page:bil.raw_materials.stock_transfer')->name('stock-transfer');
+        Route::get('/factory-entrance', FactoryEntrance::class)
+            ->middleware('page:bil.raw_materials.factory_entrance')->name('factory-entrance');
+        Route::get('/consumption', Consumption::class)
+            ->middleware('page:bil.raw_materials.consumption')->name('consumption');
+        Route::get('/factory-returns', FactoryReturns::class)
+            ->middleware('page:bil.raw_materials.factory_returns')->name('factory-returns');
 
         // Reprint a CODE93 label for a returned item (esp. the new child barcode
         // a partial return creates). Barcode(s) via ?barcode=A or ?barcode=A,B —
@@ -94,14 +104,16 @@ Route::middleware(['auth', 'can:view-raw-materials'])
             abort_if($rows->isEmpty(), 404);
 
             return view('bil::print.delivery-barcodes', ['rows' => $rows]);
-        })->name('factory-returns.print');
+        })->middleware('page:bil.raw_materials.factory_returns')->name('factory-returns.print');
 
-        Route::get('/damaged-goods', DamagedGoods::class)->name('damaged-goods');
+        Route::get('/damaged-goods', DamagedGoods::class)
+            ->middleware('page:bil.raw_materials.damaged_goods')->name('damaged-goods');
 
         // Reports — sub-menu of raw-materials reports (flow order).
         Route::prefix('reports')->name('reports.')->group(function () {
             // Printable HTML for a report's current view/filters (opens in a new
             // tab and auto-prints; the browser's print dialog can Save as PDF).
+            // The {report} slug maps to its report page key for access control.
             Route::get('/{report}/print', function (string $report) {
                 $map = [
                     'supplier-deliveries' => SupplierDeliveriesReport::class,
@@ -115,6 +127,7 @@ Route::middleware(['auth', 'can:view-raw-materials'])
                     'damaged-goods' => DamagedGoodsReport::class,
                 ];
                 abort_unless(isset($map[$report]), 404);
+                abort_unless((bool) request()->user()?->canAccessPage('bil.raw_materials.reports.' . str_replace('-', '_', $report)), 403);
 
                 $c = new $map[$report]();
                 $c->view = (string) request('view', '');
@@ -144,6 +157,7 @@ Route::middleware(['auth', 'can:view-raw-materials'])
                     'damaged-goods' => DamagedGoodsReport::class,
                 ];
                 abort_unless(isset($map[$report]), 404);
+                abort_unless((bool) request()->user()?->canAccessPage('bil.raw_materials.reports.' . str_replace('-', '_', $report)), 403);
 
                 $format = strtolower((string) request('format', 'xlsx'));
                 abort_unless(in_array($format, ['xlsx', 'csv', 'pdf'], true), 404);
@@ -158,14 +172,23 @@ Route::middleware(['auth', 'can:view-raw-materials'])
                 return $c->export($format);
             })->name('download');
 
-            Route::get('/supplier-deliveries', SupplierDeliveriesReport::class)->name('supplier-deliveries');
-            Route::get('/warehouse-entry', WarehouseEntryReport::class)->name('warehouse-entry');
-            Route::get('/warehouse-exit', WarehouseExitReport::class)->name('warehouse-exit');
-            Route::get('/factory-entrance', FactoryEntranceReport::class)->name('factory-entrance');
-            Route::get('/consumption', ConsumptionReport::class)->name('consumption');
-            Route::get('/warehouse-stock', WarehouseStock::class)->name('warehouse-stock');
-            Route::get('/factory-floor-stock', FactoryFloorStock::class)->name('factory-floor-stock');
-            Route::get('/factory-returns', FactoryReturnsReport::class)->name('factory-returns');
-            Route::get('/damaged-goods', DamagedGoodsReport::class)->name('damaged-goods');
+            Route::get('/supplier-deliveries', SupplierDeliveriesReport::class)
+                ->middleware('page:bil.raw_materials.reports.supplier_deliveries')->name('supplier-deliveries');
+            Route::get('/warehouse-entry', WarehouseEntryReport::class)
+                ->middleware('page:bil.raw_materials.reports.warehouse_entry')->name('warehouse-entry');
+            Route::get('/warehouse-exit', WarehouseExitReport::class)
+                ->middleware('page:bil.raw_materials.reports.warehouse_exit')->name('warehouse-exit');
+            Route::get('/factory-entrance', FactoryEntranceReport::class)
+                ->middleware('page:bil.raw_materials.reports.factory_entrance')->name('factory-entrance');
+            Route::get('/consumption', ConsumptionReport::class)
+                ->middleware('page:bil.raw_materials.reports.consumption')->name('consumption');
+            Route::get('/warehouse-stock', WarehouseStock::class)
+                ->middleware('page:bil.raw_materials.reports.warehouse_stock')->name('warehouse-stock');
+            Route::get('/factory-floor-stock', FactoryFloorStock::class)
+                ->middleware('page:bil.raw_materials.reports.factory_floor_stock')->name('factory-floor-stock');
+            Route::get('/factory-returns', FactoryReturnsReport::class)
+                ->middleware('page:bil.raw_materials.reports.factory_returns')->name('factory-returns');
+            Route::get('/damaged-goods', DamagedGoodsReport::class)
+                ->middleware('page:bil.raw_materials.reports.damaged_goods')->name('damaged-goods');
         });
     });

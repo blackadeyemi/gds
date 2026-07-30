@@ -27,11 +27,11 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 */
 Route::middleware('auth')->group(function () {
     Route::prefix('admin')->group(function () {
-        Route::get('/companies', Companies::class)->middleware('can:view-company')->name('admin.companies');
-        Route::get('/departments', Departments::class)->middleware('can:view-department')->name('admin.departments');
-        Route::get('/permissions', Permissions::class)->middleware('can:view-permission')->name('admin.permissions');
-        Route::get('/roles', Roles::class)->middleware('can:view-role')->name('admin.roles');
-        Route::get('/users', Users::class)->middleware('can:view-user')->name('admin.users');
+        Route::get('/companies', Companies::class)->middleware('page:admin.companies')->name('admin.companies');
+        Route::get('/departments', Departments::class)->middleware('page:admin.departments')->name('admin.departments');
+        Route::get('/permissions', Permissions::class)->middleware('page:admin.permissions')->name('admin.permissions');
+        Route::get('/roles', Roles::class)->middleware('page:admin.roles')->name('admin.roles');
+        Route::get('/users', Users::class)->middleware('page:admin.users')->name('admin.users');
 
         // Generic DataGrid print — resolves the grid class by its pageKey.
         Route::get('/grid/{page}/print', function (string $page) {
@@ -48,9 +48,9 @@ Route::middleware('auth')->group(function () {
     // Appearance is a personal preference — any authenticated user. Data Views
     // is admin configuration — gated.
     Route::get('/settings/appearance', Appearance::class)->name('settings.appearance');
-    Route::get('/settings/data-views', DataViews::class)->middleware('can:view-module')->name('settings.data-views');
+    Route::get('/settings/data-views', DataViews::class)->middleware('page:settings.data_views')->name('settings.data-views');
 
-    // Shift windows — configurable by Admin + Operations Manager (any role
-    // granted manage-shift-settings), not only admins.
-    Route::get('/settings/shifts', ShiftSettings::class)->middleware('can:manage-shift-settings')->name('settings.shifts');
+    // Shift windows — access granted per page (settings.shifts). Give the
+    // Shift Settings page to Admin + an Operations Manager role, etc.
+    Route::get('/settings/shifts', ShiftSettings::class)->middleware('page:settings.shifts')->name('settings.shifts');
 });

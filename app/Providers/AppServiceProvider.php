@@ -32,5 +32,12 @@ class AppServiceProvider extends ServiceProvider
         // @canPage('bil.raw_materials.products') … @endcanPage — nav/link gating
         // by page key (mirrors the `page:` route middleware).
         Blade::if('canPage', fn (string $key) => (bool) auth()->user()?->canAccessPage($key));
+
+        // @canPrefix('bil.raw_materials.') — true if the user can access ANY
+        // page whose key starts with the prefix. For nav group wrappers.
+        Blade::if('canPrefix', function (string $prefix) {
+            return collect(auth()->user()?->accessiblePageKeys() ?? [])
+                ->contains(fn ($k) => str_starts_with($k, $prefix));
+        });
     }
 }
