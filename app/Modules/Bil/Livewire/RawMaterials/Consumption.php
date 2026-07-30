@@ -10,6 +10,7 @@ use Livewire\Component;
 use Modules\Bil\Models\RawMaterialFactoryEntrance;
 use Modules\Bil\Models\RawMaterialFactoryUsage;
 use Modules\Bil\Models\RawMaterialProduct;
+use Modules\Core\Concerns\EnforcesShift;
 
 /**
  * Raw Materials → Consumption. Rebuilt from the legacy Rawmaterial Consumption
@@ -23,6 +24,14 @@ use Modules\Bil\Models\RawMaterialProduct;
  */
 class Consumption extends Component
 {
+    use EnforcesShift;
+
+    /** Gated by the Consumption shift window. */
+    public function shiftKey(): ?string
+    {
+        return 'bil.consumption';
+    }
+
     public const MAX_SCAN = 10; // barcodes per submit
 
     public string $dateIso = '';
@@ -163,7 +172,7 @@ class Consumption extends Component
     /** Record consumption for every scanned barcode. */
     public function save(): void
     {
-        if ($this->items === [] || $this->factory === '' || $this->machine === '') {
+        if ($this->items === [] || $this->factory === '' || $this->machine === '' || ! $this->ensureShiftOpen()) {
             return;
         }
 

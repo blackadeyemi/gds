@@ -20,9 +20,13 @@ trait EnforcesShift
         return null;
     }
 
-    /** Resolved shift status (+ can_bypass/blocked), or null when not gated. */
+    /**
+     * Resolved shift status (+ can_bypass/blocked), or null when not gated.
+     * Named shiftStatus (not shift) so it never clashes with a component's own
+     * `$shift` property (e.g. a Day/Night selector).
+     */
     #[Computed]
-    public function shift(): ?array
+    public function shiftStatus(): ?array
     {
         $key = $this->shiftKey();
         if (! $key) {
@@ -39,9 +43,9 @@ trait EnforcesShift
     /** May the current user act on this page right now? */
     public function shiftOpen(): bool
     {
-        $shift = $this->shift();
+        $status = $this->shiftStatus();
 
-        return $shift === null || ! $shift['blocked'];
+        return $status === null || ! $status['blocked'];
     }
 
     /** Server-side guard for write actions: flash + refuse when closed. */
@@ -51,7 +55,7 @@ trait EnforcesShift
             return true;
         }
 
-        session()->flash('err', ($this->shift()['label'] ?? 'This area') . ' is closed for the current shift.');
+        session()->flash('err', ($this->shiftStatus()['label'] ?? 'This area') . ' is closed for the current shift.');
 
         return false;
     }

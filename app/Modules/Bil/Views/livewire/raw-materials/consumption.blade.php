@@ -112,4 +112,7 @@
             </button>
         </div>
     </div>
+
+    {{-- Shift window guard: closed outside the Consumption shift --}}
+    @include('core::partials.shift-guard')
 </div>
