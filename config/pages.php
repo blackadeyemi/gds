@@ -1,59 +1,73 @@
 <?php
 
 /*
-| Registry of gated pages — the unit of access control. A permission grants
-| access to a set of these pages (permission_page pivot); a page is reachable
-| if any of the user's permissions include it. `gds:sync-pages` upserts these
-| into the `pages` table (preserving nothing but pruning pages dropped here).
+| Registry of gated pages and the ABILITIES each supports. A page is the unit
+| of access; its abilities are the actions on it. `gds:sync-pages` materializes
+| every page+ability as a permission named "{key}:{ability}" and grants are made
+| per role (page × ability matrix in the Role editor).
 |
-| `key`    stable identifier (also used by route middleware `page:{key}`)
-| `label`  display name in the permission picker / nav
-| `module` display grouping in the permission form
-| `route`  the named route this page lives at (for reference / nav)
+| 'view' = access (drives the `page:` route middleware and nav). Special
+| abilities (backdate, approve, bypass-shift) live only on the pages that
+| support them, so they never appear where they don't apply.
 |
-| Add a page here when its route is built; keep keys aligned with route names.
+| Keep page keys aligned with route names ('-' -> '_').
 */
+
+$crud = ['view', 'create', 'edit', 'delete'];
+$access = ['view'];
+$entry = ['view', 'create', 'backdate'];
+$report = ['view', 'edit', 'delete'];
 
 return [
     'pages' => [
         // Admin
-        ['key' => 'admin.users',       'label' => 'Users',       'module' => 'Admin', 'route' => 'admin.users'],
-        ['key' => 'admin.roles',       'label' => 'Roles',       'module' => 'Admin', 'route' => 'admin.roles'],
-        ['key' => 'admin.permissions', 'label' => 'Permissions', 'module' => 'Admin', 'route' => 'admin.permissions'],
-        ['key' => 'admin.departments', 'label' => 'Departments', 'module' => 'Admin', 'route' => 'admin.departments'],
-        ['key' => 'admin.companies',   'label' => 'Companies',   'module' => 'Admin', 'route' => 'admin.companies'],
+        ['key' => 'admin.users',       'label' => 'Users',       'module' => 'Admin', 'route' => 'admin.users',       'abilities' => $crud],
+        ['key' => 'admin.roles',       'label' => 'Roles',       'module' => 'Admin', 'route' => 'admin.roles',       'abilities' => $crud],
+        ['key' => 'admin.departments', 'label' => 'Departments', 'module' => 'Admin', 'route' => 'admin.departments', 'abilities' => $crud],
+        ['key' => 'admin.companies',   'label' => 'Companies',   'module' => 'Admin', 'route' => 'admin.companies',   'abilities' => $crud],
 
         // Settings
-        ['key' => 'settings.data_views', 'label' => 'Data Views',     'module' => 'Settings', 'route' => 'settings.data-views'],
-        ['key' => 'settings.shifts',     'label' => 'Shift Settings', 'module' => 'Settings', 'route' => 'settings.shifts'],
+        ['key' => 'settings.data_views', 'label' => 'Data Views',     'module' => 'Settings', 'route' => 'settings.data-views', 'abilities' => $access],
+        ['key' => 'settings.shifts',     'label' => 'Shift Settings', 'module' => 'Settings', 'route' => 'settings.shifts',     'abilities' => $access],
 
         // BIL — Raw Materials
-        ['key' => 'bil.raw_materials.statistics',          'label' => 'Statistics',          'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.statistics'],
-        ['key' => 'bil.raw_materials.products',            'label' => 'Products',            'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.products'],
-        ['key' => 'bil.raw_materials.suppliers',           'label' => 'Suppliers',           'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.suppliers'],
-        ['key' => 'bil.raw_materials.supplier_deliveries', 'label' => 'Supplier Deliveries', 'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.supplier-deliveries'],
-        ['key' => 'bil.raw_materials.warehouse_entry',     'label' => 'Warehouse Entry',     'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.warehouse-entry'],
-        ['key' => 'bil.raw_materials.warehouse_exit',      'label' => 'Warehouse Exit',      'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.warehouse-exit'],
-        ['key' => 'bil.raw_materials.stock_transfer',      'label' => 'Stock Transfer',      'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.stock-transfer'],
-        ['key' => 'bil.raw_materials.factory_entrance',    'label' => 'Factory Entrance',    'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.factory-entrance'],
-        ['key' => 'bil.raw_materials.consumption',         'label' => 'Consumption',         'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.consumption'],
-        ['key' => 'bil.raw_materials.factory_returns',     'label' => 'Factory Returns',     'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.factory-returns'],
-        ['key' => 'bil.raw_materials.damaged_goods',       'label' => 'Damaged Goods',       'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.damaged-goods'],
+        ['key' => 'bil.raw_materials.statistics',          'label' => 'Statistics',          'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.statistics',          'abilities' => $access],
+        ['key' => 'bil.raw_materials.products',            'label' => 'Products',            'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.products',            'abilities' => $crud],
+        ['key' => 'bil.raw_materials.suppliers',           'label' => 'Suppliers',           'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.suppliers',           'abilities' => $crud],
+        ['key' => 'bil.raw_materials.supplier_deliveries', 'label' => 'Supplier Deliveries', 'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.supplier-deliveries', 'abilities' => $entry],
+        ['key' => 'bil.raw_materials.warehouse_entry',     'label' => 'Warehouse Entry',     'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.warehouse-entry',     'abilities' => $entry],
+        ['key' => 'bil.raw_materials.warehouse_exit',      'label' => 'Warehouse Exit',      'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.warehouse-exit',      'abilities' => $entry],
+        ['key' => 'bil.raw_materials.stock_transfer',      'label' => 'Stock Transfer',      'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.stock-transfer',      'abilities' => $entry],
+        ['key' => 'bil.raw_materials.factory_entrance',    'label' => 'Factory Entrance',    'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.factory-entrance',    'abilities' => ['view', 'create', 'backdate', 'bypass-shift']],
+        ['key' => 'bil.raw_materials.consumption',         'label' => 'Consumption',         'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.consumption',         'abilities' => ['view', 'create', 'backdate', 'bypass-shift']],
+        ['key' => 'bil.raw_materials.factory_returns',     'label' => 'Factory Returns',     'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.factory-returns',     'abilities' => ['view', 'create', 'backdate', 'approve']],
+        ['key' => 'bil.raw_materials.damaged_goods',       'label' => 'Damaged Goods',       'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.damaged-goods',       'abilities' => ['view', 'create', 'backdate', 'approve']],
 
         // BIL — Raw Materials Reports
-        ['key' => 'bil.raw_materials.reports.supplier_deliveries', 'label' => 'Supplier Deliveries', 'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.supplier-deliveries'],
-        ['key' => 'bil.raw_materials.reports.warehouse_entry',     'label' => 'Warehouse Entry',     'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.warehouse-entry'],
-        ['key' => 'bil.raw_materials.reports.warehouse_exit',      'label' => 'Warehouse Exit',      'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.warehouse-exit'],
-        ['key' => 'bil.raw_materials.reports.factory_entrance',    'label' => 'Factory Entrance',    'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.factory-entrance'],
-        ['key' => 'bil.raw_materials.reports.consumption',         'label' => 'Consumption',         'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.consumption'],
-        ['key' => 'bil.raw_materials.reports.warehouse_stock',     'label' => 'Warehouse Stock',     'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.warehouse-stock'],
-        ['key' => 'bil.raw_materials.reports.factory_floor_stock', 'label' => 'Factory Floor Stock', 'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.factory-floor-stock'],
-        ['key' => 'bil.raw_materials.reports.factory_returns',     'label' => 'Factory Returns',     'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.factory-returns'],
-        ['key' => 'bil.raw_materials.reports.damaged_goods',       'label' => 'Damaged Goods',       'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.damaged-goods'],
+        ['key' => 'bil.raw_materials.reports.supplier_deliveries', 'label' => 'Supplier Deliveries', 'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.supplier-deliveries', 'abilities' => $report],
+        ['key' => 'bil.raw_materials.reports.warehouse_entry',     'label' => 'Warehouse Entry',     'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.warehouse-entry',     'abilities' => $report],
+        ['key' => 'bil.raw_materials.reports.warehouse_exit',      'label' => 'Warehouse Exit',      'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.warehouse-exit',      'abilities' => $report],
+        ['key' => 'bil.raw_materials.reports.factory_entrance',    'label' => 'Factory Entrance',    'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.factory-entrance',    'abilities' => $report],
+        ['key' => 'bil.raw_materials.reports.consumption',         'label' => 'Consumption',         'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.consumption',         'abilities' => $report],
+        ['key' => 'bil.raw_materials.reports.warehouse_stock',     'label' => 'Warehouse Stock',     'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.warehouse-stock',     'abilities' => $access],
+        ['key' => 'bil.raw_materials.reports.factory_floor_stock', 'label' => 'Factory Floor Stock', 'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.factory-floor-stock', 'abilities' => $access],
+        ['key' => 'bil.raw_materials.reports.factory_returns',     'label' => 'Factory Returns',     'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.factory-returns',     'abilities' => $report],
+        ['key' => 'bil.raw_materials.reports.damaged_goods',       'label' => 'Damaged Goods',       'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.damaged-goods',       'abilities' => $report],
 
         // BPL — Jumbo Rolls
-        ['key' => 'bpl.jumbo_rolls.grades',            'label' => 'Grades',              'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.grades'],
-        ['key' => 'bpl.jumbo_rolls.products.hardroll', 'label' => 'Products (Hardroll)', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.products.hardroll'],
-        ['key' => 'bpl.jumbo_rolls.products.softroll', 'label' => 'Products (Softroll)', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.products.softroll'],
+        ['key' => 'bpl.jumbo_rolls.grades',            'label' => 'Grades',              'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.grades',            'abilities' => $crud],
+        ['key' => 'bpl.jumbo_rolls.products.hardroll', 'label' => 'Products (Hardroll)', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.products.hardroll', 'abilities' => $crud],
+        ['key' => 'bpl.jumbo_rolls.products.softroll', 'label' => 'Products (Softroll)', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.products.softroll', 'abilities' => $crud],
+    ],
+
+    // Display labels for ability columns in the Role matrix (order matters).
+    'abilities' => [
+        'view' => 'View',
+        'create' => 'Create',
+        'edit' => 'Edit',
+        'delete' => 'Delete',
+        'backdate' => 'Backdate',
+        'approve' => 'Approve',
+        'bypass-shift' => 'Bypass shift',
     ],
 ];

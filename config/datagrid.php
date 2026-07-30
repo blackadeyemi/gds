@@ -10,7 +10,6 @@ return [
     'grids' => [
         \Modules\Core\Livewire\Admin\Companies::class,
         \Modules\Core\Livewire\Admin\Departments::class,
-        \Modules\Core\Livewire\Admin\Permissions::class,
         \Modules\Core\Livewire\Admin\Roles::class,
         \Modules\Core\Livewire\Admin\Users::class,
 

@@ -35,40 +35,43 @@ class User extends Authenticatable
         return $this->belongsTo(Department::class, 'department_id');
     }
 
-    /** Admin role (legacy_level 1) grants full page access. */
+    /** Admin role (legacy_level 1) grants every ability on every page. */
     public function isAdmin(): bool
     {
         return $this->roles->contains(fn ($r) => (int) $r->legacy_level === 1);
     }
 
-    /** @var array<int,string>|null memoized per request */
-    protected ?array $pageKeyCache = null;
+    /** @var array<int,string>|null memoized permission names for this request */
+    protected ?array $permNameCache = null;
 
-    /** Keys of pages this user may open (Admin = all, else via their permissions). */
-    public function accessiblePageKeys(): array
+    protected function permissionNames(): array
     {
-        if ($this->pageKeyCache !== null) {
-            return $this->pageKeyCache;
-        }
-
-        if ($this->isAdmin()) {
-            return $this->pageKeyCache = Page::pluck('key')->all();
-        }
-
-        $permissionIds = $this->getAllPermissions()->pluck('id');
-        if ($permissionIds->isEmpty()) {
-            return $this->pageKeyCache = [];
-        }
-
-        return $this->pageKeyCache = Page::whereHas(
-            'permissions',
-            fn ($q) => $q->whereIn('permissions.id', $permissionIds)
-        )->pluck('key')->all();
+        return $this->permNameCache ??= $this->getAllPermissions()->pluck('name')->all();
     }
 
+    /** Can the user perform an ability on a page? "{key}:{ability}" (Admin = all). */
+    public function canDo(string $pageKey, string $ability): bool
+    {
+        return $this->isAdmin() || in_array("$pageKey:$ability", $this->permissionNames(), true);
+    }
+
+    /** Access to a page = its `view` ability. */
     public function canAccessPage(string $key): bool
     {
-        return in_array($key, $this->accessiblePageKeys(), true);
+        return $this->canDo($key, 'view');
+    }
+
+    /** Keys of pages this user may open (Admin = all, else those with :view). */
+    public function accessiblePageKeys(): array
+    {
+        if ($this->isAdmin()) {
+            return Page::pluck('key')->all();
+        }
+
+        return array_map(
+            fn ($n) => substr($n, 0, -strlen(':view')),
+            array_filter($this->permissionNames(), fn ($n) => str_ends_with($n, ':view'))
+        );
     }
 
     /**

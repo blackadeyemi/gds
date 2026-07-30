@@ -4,7 +4,6 @@ use Illuminate\Support\Facades\Route;
 use Modules\Core\Controllers\AuthController;
 use Modules\Core\Livewire\Admin\Companies;
 use Modules\Core\Livewire\Admin\Departments;
-use Modules\Core\Livewire\Admin\Permissions;
 use Modules\Core\Livewire\Admin\Roles;
 use Modules\Core\Livewire\Admin\Users;
 use Modules\Core\Livewire\Settings\Appearance;
@@ -29,7 +28,6 @@ Route::middleware('auth')->group(function () {
     Route::prefix('admin')->group(function () {
         Route::get('/companies', Companies::class)->middleware('page:admin.companies')->name('admin.companies');
         Route::get('/departments', Departments::class)->middleware('page:admin.departments')->name('admin.departments');
-        Route::get('/permissions', Permissions::class)->middleware('page:admin.permissions')->name('admin.permissions');
         Route::get('/roles', Roles::class)->middleware('page:admin.roles')->name('admin.roles');
         Route::get('/users', Users::class)->middleware('page:admin.users')->name('admin.users');
 

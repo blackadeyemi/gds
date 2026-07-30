@@ -249,12 +249,6 @@
                         <span class="label">Role</span>
                     </a>
                     @endcanPage
-                    @canPage('admin.permissions')
-                    <a href="{{ url('/admin/permissions') }}" class="nav-link {{ $is('admin/permissions*') }}" title="Permissions">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                        <span class="label">Permissions</span>
-                    </a>
-                    @endcanPage
                     @canPage('admin.departments')
                     <a href="{{ url('/admin/departments') }}" class="nav-link {{ $is('admin/departments*') }}" title="Department">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"/><path d="M9 22v-4h6v4M9 6h.01M15 6h.01M9 10h.01M15 10h.01M9 14h.01M15 14h.01"/></svg>

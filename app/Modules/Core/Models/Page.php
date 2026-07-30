@@ -3,19 +3,21 @@
 namespace Modules\Core\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
- * A gated page — the unit of access control. Synced from config/pages.php.
- * Reachable when any of the current user's permissions include it.
+ * A gated page and the abilities it supports. Synced from config/pages.php.
+ * Access is granted per role as "{key}:{ability}" permissions (see the Role
+ * editor matrix); there is no page↔permission pivot anymore.
  */
 class Page extends Model
 {
     protected $connection = 'core';
-    protected $fillable = ['key', 'label', 'module', 'sort_order'];
+    protected $fillable = ['key', 'label', 'module', 'abilities', 'sort_order'];
+    protected $casts = ['abilities' => 'array'];
 
-    public function permissions(): BelongsToMany
+    /** Permission name for one of this page's abilities, e.g. "key:edit". */
+    public function permissionName(string $ability): string
     {
-        return $this->belongsToMany(Permission::class, 'permission_page');
+        return $this->key . ':' . $ability;
     }
 }

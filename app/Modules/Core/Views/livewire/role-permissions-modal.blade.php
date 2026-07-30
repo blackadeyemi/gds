@@ -14,24 +14,26 @@
             </div>
             <div class="modal-body">
                 <div class="flex items-center gap-2" style="margin-bottom:0.85rem;">
-                    <span class="text-sm text-muted">Permissions</span>
+                    <span class="text-sm text-muted">Abilities</span>
                     <span class="badge badge-muted">{{ $this->viewingRole['count'] }}</span>
                 </div>
 
-                @forelse ($this->viewingRole['grouped'] as $module => $perms)
+                @forelse ($this->viewingRole['groups'] as $module => $pages)
                     <div style="margin-bottom:0.8rem;">
                         <div class="text-sm" style="font-weight:700;color:var(--muted);text-transform:uppercase;font-size:0.7rem;letter-spacing:.05em;margin:0.3rem 0;">{{ $module }}</div>
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.3rem 1rem;">
-                            @foreach ($perms as $perm)
-                                <div style="display:flex;align-items:center;gap:0.45rem;font-size:0.88rem;">
-                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-                                    {{ $perm->name }}
-                                </div>
-                            @endforeach
-                        </div>
+                        @foreach ($pages as $page)
+                            <div style="display:flex;align-items:baseline;gap:0.5rem;font-size:0.88rem;padding:0.15rem 0;">
+                                <span style="min-width:150px;font-weight:500;">{{ $page['label'] }}</span>
+                                <span style="display:flex;flex-wrap:wrap;gap:0.3rem;">
+                                    @foreach ($page['abilities'] as $ability)
+                                        <span class="badge badge-success">{{ $ability }}</span>
+                                    @endforeach
+                                </span>
+                            </div>
+                        @endforeach
                     </div>
                 @empty
-                    <p class="text-muted text-sm mb-0">This role has no permissions assigned.</p>
+                    <p class="text-muted text-sm mb-0">This role has no abilities assigned.</p>
                 @endforelse
             </div>
             <div class="modal-foot">

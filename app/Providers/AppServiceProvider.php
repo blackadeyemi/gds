@@ -39,5 +39,9 @@ class AppServiceProvider extends ServiceProvider
             return collect(auth()->user()?->accessiblePageKeys() ?? [])
                 ->contains(fn ($k) => str_starts_with($k, $prefix));
         });
+
+        // @pageCan('bil.raw_materials.factory_entrance', 'backdate') — a specific
+        // ability on a page (mirrors User::canDo). For action buttons/fields.
+        Blade::if('pageCan', fn (string $key, string $ability) => (bool) auth()->user()?->canDo($key, $ability));
     }
 }
