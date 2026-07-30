@@ -5,6 +5,7 @@ namespace Modules\Core\Livewire;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
+use Modules\Core\Concerns\EnforcesShift;
 use Modules\Core\Models\DataPage;
 use Modules\Core\Support\GridExporter;
 
@@ -20,6 +21,7 @@ use Modules\Core\Support\GridExporter;
 abstract class DataGrid extends Component
 {
     use WithPagination;
+    use EnforcesShift;
 
     public string $view = '';
     public string $search = '';
@@ -177,7 +179,7 @@ abstract class DataGrid extends Component
 
     public function create(): void
     {
-        if (! $this->editable()) return;
+        if (! $this->editable() || ! $this->ensureShiftOpen()) return;
         $this->editingId = null;
         $this->resetForm();
         $this->resetValidation();
@@ -186,7 +188,7 @@ abstract class DataGrid extends Component
 
     public function edit(int $id): void
     {
-        if (! $this->editable()) return;
+        if (! $this->editable() || ! $this->ensureShiftOpen()) return;
         $this->editingId = $id;
         $this->fillForm($id);
         $this->resetValidation();

@@ -88,4 +88,7 @@
             </button>
         </div>
     </div>
+
+    {{-- Shift window guard: closed outside the Factory Entrance shift --}}
+    @include('core::partials.shift-guard')
 </div>

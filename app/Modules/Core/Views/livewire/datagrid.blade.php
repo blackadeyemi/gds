@@ -178,4 +178,7 @@
     @if ($this->extraView())
         @include($this->extraView())
     @endif
+
+    {{-- Shift window guard (blocks the page outside its active shift) --}}
+    @include('core::partials.shift-guard')
 </div>

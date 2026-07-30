@@ -10,6 +10,7 @@ use Livewire\Component;
 use Modules\Bil\Models\RawMaterialFactoryEntrance;
 use Modules\Bil\Models\RawMaterialItem;
 use Modules\Bil\Models\RawMaterialWarehouseExit;
+use Modules\Core\Concerns\EnforcesShift;
 
 /**
  * Raw Materials → Factory Entrance. Rebuilt from the legacy
@@ -23,6 +24,14 @@ use Modules\Bil\Models\RawMaterialWarehouseExit;
  */
 class FactoryEntrance extends Component
 {
+    use EnforcesShift;
+
+    /** This entry page is gated by the Factory Entrance shift window. */
+    public function shiftKey(): ?string
+    {
+        return 'bil.factory_entrance';
+    }
+
     /** Factory lines not offered for raw-material entrance (legacy exclusions). */
     protected const EXCLUDED = ['PM2', 'PM3', 'Oregun Store'];
 
@@ -152,7 +161,7 @@ class FactoryEntrance extends Component
     /** Record each scanned barcode's factory entrance. */
     public function save(): void
     {
-        if ($this->items === [] || $this->locationId === null) {
+        if ($this->items === [] || $this->locationId === null || ! $this->ensureShiftOpen()) {
             return;
         }
 
