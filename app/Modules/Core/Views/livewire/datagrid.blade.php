@@ -47,7 +47,7 @@
                     <input type="text" class="form-control" placeholder="Search…" wire:model.live.debounce.300ms="search">
                 </div>
 
-                @if ($this->editable())
+                @if ($this->editable() && $this->mayDo('create'))
                     <button class="btn btn-primary btn-sm" wire:click="create">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
                         New
@@ -95,7 +95,7 @@
                                 @if ($sortable) @include('core::partials.sort-caret', ['field' => $col[1]]) @endif
                             </th>
                         @endforeach
-                        @if ($this->editable() && ($gridView['type'] ?? 'table') === 'table')
+                        @if ($this->rowActionsVisible() && ($gridView['type'] ?? 'table') === 'table')
                             <th class="col-actions">Actions</th>
                         @endif
                     </tr>
@@ -107,11 +107,14 @@
                             @foreach ($columns as $col)
                                 <td>{!! isset($col[2]) && is_callable($col[2]) ? $col[2]($row) : e(data_get($row, $col[1]) ?? '—') !!}</td>
                             @endforeach
-                            @if ($this->editable() && ($gridView['type'] ?? 'table') === 'table')
+                            @if ($this->rowActionsVisible() && ($gridView['type'] ?? 'table') === 'table')
                                 <td class="col-actions">
+                                    @if ($this->mayDo('edit'))
                                     <button class="btn btn-ghost btn-icon btn-sm" wire:click="edit({{ $row->id }})" title="Edit">
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                     </button>
+                                    @endif
+                                    @if ($this->mayDo('delete'))
                                     @php $blockReason = $this->deleteGuard($row); @endphp
                                     @if ($blockReason)
                                         <button class="btn btn-danger btn-icon btn-sm" disabled title="{{ $blockReason }}" style="opacity:.35;cursor:not-allowed;">
@@ -122,11 +125,12 @@
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
                                         </button>
                                     @endif
+                                    @endif
                                 </td>
                             @endif
                         </tr>
                     @empty
-                        <tr><td colspan="{{ count($columns) + ($this->editable() ? 2 : 1) }}" class="empty-row">No records found.</td></tr>
+                        <tr><td colspan="{{ count($columns) + ($this->rowActionsVisible() ? 2 : 1) }}" class="empty-row">No records found.</td></tr>
                     @endforelse
                 </tbody>
             </table>

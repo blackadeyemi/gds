@@ -177,9 +177,31 @@ abstract class DataGrid extends Component
 
     /* ---------------- CRUD (editable grids) ---------------- */
 
+    /**
+     * Page key used for ability checks. pageKey() is the dashed form (also used
+     * for the data-views config); the page registry / permissions use the
+     * underscored form (aligned with route names).
+     */
+    protected function pageAccessKey(): string
+    {
+        return str_replace('-', '_', $this->pageKey());
+    }
+
+    /** May the current user perform an ability on this grid's page? */
+    public function mayDo(string $ability): bool
+    {
+        return (bool) auth()->user()?->canDo($this->pageAccessKey(), $ability);
+    }
+
+    /** Whether the row actions column should show (edit and/or delete allowed). */
+    public function rowActionsVisible(): bool
+    {
+        return $this->editable() && ($this->mayDo('edit') || $this->mayDo('delete'));
+    }
+
     public function create(): void
     {
-        if (! $this->editable() || ! $this->ensureShiftOpen()) return;
+        if (! $this->editable() || ! $this->mayDo('create') || ! $this->ensureShiftOpen()) return;
         $this->editingId = null;
         $this->resetForm();
         $this->resetValidation();
@@ -188,7 +210,7 @@ abstract class DataGrid extends Component
 
     public function edit(int $id): void
     {
-        if (! $this->editable() || ! $this->ensureShiftOpen()) return;
+        if (! $this->editable() || ! $this->mayDo('edit') || ! $this->ensureShiftOpen()) return;
         $this->editingId = $id;
         $this->fillForm($id);
         $this->resetValidation();
@@ -197,7 +219,7 @@ abstract class DataGrid extends Component
 
     public function deleteConfirmed(): void
     {
-        if ($this->editable() && $this->confirmingDelete) {
+        if ($this->editable() && $this->mayDo('delete') && $this->confirmingDelete) {
             $row = $this->findRow($this->confirmingDelete);
             $reason = $row ? $this->deleteGuard($row) : null;
             if ($reason) {
