@@ -29,7 +29,7 @@ class Consumption extends Component
     /** Gated by the Consumption shift window. */
     public function shiftKey(): ?string
     {
-        return 'bil.consumption';
+        return 'bil.raw_materials.consumption';
     }
 
     public const MAX_SCAN = 10; // barcodes per submit

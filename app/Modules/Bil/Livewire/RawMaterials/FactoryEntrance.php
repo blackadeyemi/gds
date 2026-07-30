@@ -29,7 +29,7 @@ class FactoryEntrance extends Component
     /** This entry page is gated by the Factory Entrance shift window. */
     public function shiftKey(): ?string
     {
-        return 'bil.factory_entrance';
+        return 'bil.raw_materials.factory_entrance';
     }
 
     /** Factory lines not offered for raw-material entrance (legacy exclusions). */

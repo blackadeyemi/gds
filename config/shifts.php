@@ -20,7 +20,7 @@ $dayNight = [
 
 return [
     'contexts' => [
-        ['key' => 'bil.factory_entrance', 'label' => 'BIL Raw Materials Factory Entrance', 'module' => 'BIL', 'windows' => $dayNight],
-        ['key' => 'bil.consumption',      'label' => 'BIL Raw Materials Consumption',      'module' => 'BIL', 'windows' => $dayNight],
+        ['key' => 'bil.raw_materials.factory_entrance', 'label' => 'BIL Raw Materials Factory Entrance', 'module' => 'BIL', 'windows' => $dayNight],
+        ['key' => 'bil.raw_materials.consumption',      'label' => 'BIL Raw Materials Consumption',      'module' => 'BIL', 'windows' => $dayNight],
     ],
 ];
