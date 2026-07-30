@@ -9,6 +9,8 @@
 |
 | A context is ungated (open anytime) until an admin flips is_active on in the
 | Shift Settings UI. Windows may wrap midnight (start after end).
+|
+| Add a context here when the page that uses it is built.
 */
 
 $dayNight = [
@@ -18,13 +20,7 @@ $dayNight = [
 
 return [
     'contexts' => [
-        // BIL
-        ['key' => 'bil.factory_entrance', 'label' => 'Factory Entrance', 'module' => 'BIL', 'windows' => $dayNight],
-        ['key' => 'bil.production',       'label' => 'Factory Production', 'module' => 'BIL', 'windows' => $dayNight],
-        ['key' => 'bil.consumption',      'label' => 'Consumption',       'module' => 'BIL', 'windows' => $dayNight],
-
-        // BPL
-        ['key' => 'bpl.production',       'label' => 'BPL Production',    'module' => 'BPL', 'windows' => $dayNight],
-        ['key' => 'bpl.store_exit',       'label' => 'BPL Store Exit',    'module' => 'BPL', 'windows' => $dayNight],
+        ['key' => 'bil.factory_entrance', 'label' => 'BIL Raw Materials Factory Entrance', 'module' => 'BIL', 'windows' => $dayNight],
+        ['key' => 'bil.consumption',      'label' => 'BIL Raw Materials Consumption',      'module' => 'BIL', 'windows' => $dayNight],
     ],
 ];
