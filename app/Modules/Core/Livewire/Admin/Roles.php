@@ -78,7 +78,7 @@ class Roles extends DataGrid
             'count' => $role->permissions->count(),
             'grouped' => $role->permissions
                 ->sortBy('name')
-                ->groupBy(fn ($p) => $p->module?->name ?? 'Unassigned'),
+                ->groupBy(fn ($p) => $p->module?->label() ?? 'Unassigned'),
         ];
     }
 
@@ -87,7 +87,7 @@ class Roles extends DataGrid
     public function groupedPermissions()
     {
         return Permission::with('module')->orderBy('name')->get()
-            ->groupBy(fn ($p) => $p->module?->name ?? 'Unassigned');
+            ->groupBy(fn ($p) => $p->module?->label() ?? 'Unassigned');
     }
 
     protected function rules(): array

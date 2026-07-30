@@ -22,7 +22,17 @@ class MigrateLegacyAuth extends Command
     protected $signature = 'gds:migrate-legacy-auth';
     protected $description = 'Seed roles/permissions from legacy userlevels and assign all users';
 
-    protected array $modules = ['Admin', 'Factory', 'Raw Materials', 'Store', 'Sales', 'Quality', 'Jumbo Rolls', 'Reports'];
+    /** Functional-area modules, qualified by company (null = cross-cutting). */
+    protected array $modules = [
+        ['name' => 'Admin', 'company' => null],
+        ['name' => 'Factory', 'company' => 'BIL'],
+        ['name' => 'Raw Materials', 'company' => 'BIL'],
+        ['name' => 'Store', 'company' => 'BIL'],
+        ['name' => 'Sales', 'company' => 'BIL'],
+        ['name' => 'Quality', 'company' => 'BIL'],
+        ['name' => 'Jumbo Rolls', 'company' => 'BPL'],
+        ['name' => 'Reports', 'company' => null],
+    ];
     protected array $resources = ['user', 'role', 'permission', 'department', 'company', 'module'];
     protected array $actions = ['view', 'create', 'edit', 'delete'];
 
@@ -43,10 +53,11 @@ class MigrateLegacyAuth extends Command
 
     protected function seedModules(): void
     {
-        foreach ($this->modules as $i => $name) {
+        foreach ($this->modules as $i => $m) {
+            $slug = str(trim(($m['company'] ? $m['company'] . ' ' : '') . $m['name']))->slug()->value();
             ApplicationModule::firstOrCreate(
-                ['slug' => str($name)->slug()->value()],
-                ['name' => $name, 'sort_order' => $i, 'is_active' => true]
+                ['slug' => $slug],
+                ['name' => $m['name'], 'company' => $m['company'], 'sort_order' => $i, 'is_active' => true]
             );
         }
         $this->line('  modules seeded (' . count($this->modules) . ')');
@@ -95,7 +106,7 @@ class MigrateLegacyAuth extends Command
      */
     protected function seedRawMaterialsPermissions(): void
     {
-        $module = ApplicationModule::where('slug', 'raw-materials')->first();
+        $module = ApplicationModule::where('slug', 'bil-raw-materials')->first();
         $created = [];
         foreach ($this->actions as $act) {
             $name = "$act-raw-materials";
@@ -130,7 +141,7 @@ class MigrateLegacyAuth extends Command
      */
     protected function seedBplPermissions(): void
     {
-        $module = ApplicationModule::where('slug', 'jumbo-rolls')->first();
+        $module = ApplicationModule::where('slug', 'bpl-jumbo-rolls')->first();
         $created = [];
         foreach ($this->actions as $act) {
             $name = "$act-bpl";
@@ -156,7 +167,7 @@ class MigrateLegacyAuth extends Command
      */
     protected function seedBackdatePermission(): void
     {
-        $module = ApplicationModule::where('slug', 'raw-materials')->first();
+        $module = ApplicationModule::where('slug', 'bil-raw-materials')->first();
         $perm = Permission::firstOrNew(['name' => 'backdate', 'guard_name' => 'web']);
         $perm->description = 'Change/backdate the date on entry forms';
         $perm->module_id = $perm->module_id ?: $module?->id;
