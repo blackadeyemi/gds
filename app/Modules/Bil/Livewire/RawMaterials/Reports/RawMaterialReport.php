@@ -246,9 +246,10 @@ abstract class RawMaterialReport extends Component
     /* ---------------- Date display ---------------- */
 
     /**
-     * The standard report date display: DD/Mon/YYYY (e.g. 03/Jul/2026). Used by
-     * every report so dates read the same on screen, in print, and in exports
-     * (all of which run each cell through the column closure via mapRow). Pass
+     * The standard report date display, using the browser's chosen date format
+     * (Appearance → Date format; default 03/Jul/2026). Used by every report so
+     * dates read the same on screen, in print, and in exports (all of which run
+     * each cell through the column closure via mapRow). Pass
      * $format when the stored value isn't year-first/ISO — e.g. the legacy
      * `d/m/y` text in return_approval, which Carbon would otherwise misread as
      * m/d/y. Blank / zero dates render empty; anything unparseable is left as-is.
@@ -264,7 +265,7 @@ abstract class RawMaterialReport extends Component
                 ? \Carbon\Carbon::createFromFormat($format, $value)
                 : \Carbon\Carbon::parse($value);
 
-            return $dt ? $dt->format('d/M/Y') : $value;
+            return $dt ? $dt->format(\Modules\Core\Support\Prefs::dateFormat()) : $value;
         } catch (\Throwable $e) {
             return $value;
         }

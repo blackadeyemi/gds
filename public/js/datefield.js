@@ -9,6 +9,15 @@
  * injected input; the value is read from $wire on init, and flows back out on change.
  */
 (function () {
+    // The user's chosen display format (Appearance → Date format), shared with
+    // server-rendered reports via the gds_date_format cookie. Storage stays ISO.
+    var DATE_FORMATS = ['d/M/Y', 'd/m/Y', 'Y-m-d', 'm/d/Y', 'd M Y', 'M j, Y'];
+    function displayFormat() {
+        var m = document.cookie.match(/(?:^|;\s*)gds_date_format=([^;]+)/);
+        var v = m ? decodeURIComponent(m[1]) : '';
+        return DATE_FORMATS.indexOf(v) !== -1 ? v : 'd/M/Y';
+    }
+
     document.addEventListener('alpine:init', () => {
         if (!window.Alpine) {
             return;
@@ -26,7 +35,7 @@
                 this.fp = window.flatpickr(this.$refs.input, {
                     dateFormat: 'Y-m-d',           // what the app stores / submits
                     altInput: true,
-                    altFormat: 'd/m/Y',            // what the user sees / types
+                    altFormat: displayFormat(),    // what the user sees / types
                     altInputClass: 'form-control',
                     allowInput: !o.disabled,
                     clickOpens: !o.disabled,

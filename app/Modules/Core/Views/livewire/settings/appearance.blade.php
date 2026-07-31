@@ -1,7 +1,7 @@
 <div>
     <div class="page-head">
         <h1>Appearance</h1>
-        <p>Personalize the theme and text size. Saved to this browser.</p>
+        <p>Personalize the theme, text size, and date format. Saved to this browser.</p>
     </div>
 
     <div class="card card-pad" style="max-width:560px;">
@@ -23,12 +23,25 @@
             </div>
         </div>
 
-        <div class="form-group mb-0">
+        <div class="form-group">
             <label class="form-label">Text size</label>
             <div class="seg" role="group" aria-label="Text size" style="max-width:320px;">
                 <button type="button" class="fs-s" data-font-opt="small" title="Small">A <span style="font-weight:500;font-size:12px;">Small</span></button>
                 <button type="button" class="fs-m" data-font-opt="medium" title="Medium">A <span style="font-weight:500;font-size:12px;">Medium</span></button>
                 <button type="button" class="fs-l" data-font-opt="large" title="Large">A <span style="font-weight:500;font-size:12px;">Large</span></button>
+            </div>
+        </div>
+
+        <div class="form-group mb-0">
+            <label class="form-label">Date format</label>
+            <p class="text-muted text-sm" style="margin:-0.2rem 0 0.6rem;">How dates appear in forms, reports, and exports. Dates are always stored the same way — this only changes the display.</p>
+            <div class="date-opts" data-default-dateformat="{{ $defaultDateFormat }}" role="group" aria-label="Date format">
+                @foreach ($dateFormats as $f)
+                    <button type="button" class="date-opt" data-dateformat-opt="{{ $f['value'] }}">
+                        <span class="date-opt-example">{{ $f['example'] }}</span>
+                        <span class="date-opt-tokens">{{ $f['value'] }}</span>
+                    </button>
+                @endforeach
             </div>
         </div>
     </div>

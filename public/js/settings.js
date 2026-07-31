@@ -25,6 +25,28 @@
         sync('[data-theme-opt]', 'data-theme-opt', mode);
     }
 
+    // Date format is stored in a cookie (not localStorage) so server-rendered
+    // reports and exports can read it too. Display-only — never affects storage.
+    function currentDateFormat() {
+        var m = document.cookie.match(/(?:^|;\s*)gds_date_format=([^;]+)/);
+        if (m) { return decodeURIComponent(m[1]); }
+        var host = document.querySelector('[data-default-dateformat]');
+        return (host && host.getAttribute('data-default-dateformat')) || 'd/M/Y';
+    }
+    function applyDateFormat(fmt) {
+        document.cookie = 'gds_date_format=' + encodeURIComponent(fmt) + '; path=/; max-age=31536000; SameSite=Lax';
+        sync('[data-dateformat-opt]', 'data-dateformat-opt', fmt);
+        // Re-render any flatpickr fields on the page so the change shows at once
+        // (re-applying the selected date forces the altInput text to repaint).
+        document.querySelectorAll('.datefield-wrap input').forEach(function (i) {
+            var fp = i._flatpickr;
+            if (fp) {
+                fp.set('altFormat', fmt);
+                fp.setDate(fp.selectedDates[0] || null, false);
+            }
+        });
+    }
+
     function wire() {
         document.querySelectorAll('[data-font-opt]').forEach(function (b) {
             b.addEventListener('click', function () { applyFont(b.getAttribute('data-font-opt')); });
@@ -32,6 +54,10 @@
         document.querySelectorAll('[data-theme-opt]').forEach(function (b) {
             b.addEventListener('click', function () { applyTheme(b.getAttribute('data-theme-opt')); });
         });
+        document.querySelectorAll('[data-dateformat-opt]').forEach(function (b) {
+            b.addEventListener('click', function () { applyDateFormat(b.getAttribute('data-dateformat-opt')); });
+        });
+        sync('[data-dateformat-opt]', 'data-dateformat-opt', currentDateFormat());
         sync('[data-font-opt]', 'data-font-opt', root.getAttribute('data-font') || 'small');
         sync('[data-theme-opt]', 'data-theme-opt', root.getAttribute('data-theme-mode') || 'system');
     }

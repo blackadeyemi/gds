@@ -16,6 +16,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'page' => \Modules\Core\Http\Middleware\EnsurePageAccess::class,
         ]);
+
+        // Display-only date-format preference is set client-side (settings.js)
+        // and must be read server-side (reports/exports), so it stays plaintext.
+        $middleware->encryptCookies(except: [
+            \Modules\Core\Support\Prefs::COOKIE,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

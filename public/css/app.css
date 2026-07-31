@@ -179,6 +179,18 @@ table.data .col-actions { text-align: right; white-space: nowrap; }
 .dropdown-item:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
 .dropdown-sep { height: 1px; background: var(--line); margin: 5px 2px; }
 
+/* ---- Date-format picker (Appearance) ---- */
+.date-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.6rem; max-width: 480px; }
+.date-opt {
+    display: flex; flex-direction: column; gap: 0.2rem; align-items: flex-start;
+    padding: 0.6em 0.8em; background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 10px; cursor: pointer; text-align: left; color: var(--ink);
+}
+.date-opt:hover { border-color: var(--brand); }
+.date-opt.active { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); background: var(--surface); }
+.date-opt-example { font-weight: 600; font-size: 0.95rem; }
+.date-opt-tokens { font-family: ui-monospace, monospace; font-size: 0.72rem; color: var(--muted); }
+
 /* ---- Searchable select ---- */
 .ss { position: relative; }
 .ss-trigger { display: flex; align-items: center; justify-content: space-between; gap: 0.5em; width: 100%; text-align: left; cursor: pointer; }
