@@ -179,6 +179,36 @@ table.data .col-actions { text-align: right; white-space: nowrap; }
 .dropdown-item:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
 .dropdown-sep { height: 1px; background: var(--line); margin: 5px 2px; }
 
+/* ---- Searchable select ---- */
+.ss { position: relative; }
+.ss-trigger { display: flex; align-items: center; justify-content: space-between; gap: 0.5em; width: 100%; text-align: left; cursor: pointer; }
+.ss-trigger:disabled { opacity: 0.55; cursor: not-allowed; }
+.ss-trigger .ss-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ss-placeholder { color: var(--muted); }
+.ss-caret { flex: none; color: var(--muted); }
+.ss-menu {
+    position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 40;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 10px 30px var(--shadow-lg); padding: 6px; overflow: hidden;
+}
+.ss-search { position: relative; margin-bottom: 4px; }
+.ss-search svg { position: absolute; left: 0.7em; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--muted); pointer-events: none; }
+.ss-search input {
+    width: 100%; padding: 0.5em 0.7em 0.5em 2.2em; font: inherit; font-size: 0.9rem;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 7px; color: var(--ink);
+}
+.ss-search input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); background: var(--surface); }
+.ss-list { max-height: 220px; overflow-y: auto; }
+.ss-option {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.6em; width: 100%;
+    padding: 0.5em 0.7em; border: 0; background: transparent; color: var(--ink-soft);
+    font: inherit; font-size: 0.9rem; border-radius: 7px; cursor: pointer; text-align: left;
+}
+.ss-option:hover { background: var(--surface-2); color: var(--ink); }
+.ss-option.ss-selected { color: var(--ink); font-weight: 600; }
+.ss-check { flex: none; color: var(--brand); }
+.ss-empty { padding: 0.7em; text-align: center; color: var(--muted); font-size: 0.88rem; }
+
 /* ---- Modal (Alpine) ---- */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 1rem; overflow-y: auto; }
 .modal-card { width: 100%; max-width: 480px; background: var(--surface); border-radius: 14px; box-shadow: 0 20px 60px var(--shadow-lg); }

@@ -348,5 +348,6 @@
 <script src="{{ asset('js/flatpickr.min.js') }}"></script>
 <script src="{{ asset('js/datefield.js') }}"></script>
 <script src="{{ asset('js/settings.js') }}"></script>
+@stack('scripts')
 </body>
 </html>

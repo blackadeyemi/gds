@@ -15,33 +15,34 @@
 </div>
 <div class="form-group">
     <label class="form-label">Role</label>
-    <select class="form-control" wire:model.live="role_id">
-        <option value="">— Select role —</option>
-        @foreach ($this->roles as $r)
-            <option value="{{ $r->id }}">{{ $r->name }}</option>
-        @endforeach
-    </select>
+    @include('core::partials.searchable-select', [
+        'field' => 'role_id',
+        'options' => $this->roles,
+        'placeholder' => '— Select role —',
+        'live' => true,
+    ])
     @error('role_id') <div class="form-error">{{ $message }}</div> @enderror
 </div>
 @if (! $this->isAdminRole())
     <div class="form-group">
         <label class="form-label">Company</label>
-        <select class="form-control" wire:model.live="company_id">
-            <option value="">— Select company —</option>
-            @foreach ($this->companies as $c)
-                <option value="{{ $c->id }}">{{ $c->name }}</option>
-            @endforeach
-        </select>
+        @include('core::partials.searchable-select', [
+            'field' => 'company_id',
+            'options' => $this->companies,
+            'placeholder' => '— Select company —',
+            'live' => true,
+        ])
         @error('company_id') <div class="form-error">{{ $message }}</div> @enderror
     </div>
     <div class="form-group">
         <label class="form-label">Department</label>
-        <select class="form-control" wire:model="department_id" @disabled(! $this->company_id)>
-            <option value="">{{ $this->company_id ? '— Select department —' : 'Select a company first' }}</option>
-            @foreach ($this->departmentsForCompany as $d)
-                <option value="{{ $d->id }}">{{ $d->name }}</option>
-            @endforeach
-        </select>
+        @include('core::partials.searchable-select', [
+            'field' => 'department_id',
+            'options' => $this->departmentsForCompany,
+            'placeholder' => $this->company_id ? '— Select department —' : 'Select a company first',
+            'disabled' => ! $this->company_id,
+            'key' => 'dept-' . ($this->company_id ?? 'none'),
+        ])
         @error('department_id') <div class="form-error">{{ $message }}</div> @enderror
     </div>
 @endif
