@@ -46,11 +46,15 @@ abstract class DataGrid extends Component
      * key => [
      *   'label'      => string,
      *   'type'       => 'table'|'summary',
-     *   'columns'    => [[label, field], …],
+     *   'columns'    => [[label, field, ?fn($row) => html], …],
      *   'query'      => fn() => Builder,     // base query, no search/sort/paginate
      *   'searchable' => [col, …],            // optional
      *   'sortable'   => [col, …],            // optional (table only)
      * ]
+     *
+     * A column may supply a closure to render its cell as HTML. A column whose
+     * field is null renders a control rather than a value (e.g. a Restore
+     * button) and is left out of exports and print — see exportColumns().
      */
     abstract public function views(): array;
 
@@ -236,10 +240,21 @@ abstract class DataGrid extends Component
 
     /* ---------------- Export / print ---------------- */
 
+    /**
+     * The columns an export/print should carry. Action columns declare a null
+     * field — they render a button, not a value, so there is nothing to write
+     * into a spreadsheet.
+     */
+    protected function exportColumns(array $view): array
+    {
+        return array_values(array_filter($view['columns'], fn ($c) => ($c[1] ?? null) !== null));
+    }
+
     protected function rowsForExport(array $view): array
     {
+        $columns = $this->exportColumns($view);
         $rows = $this->buildQuery($view)->get();
-        return $rows->map(fn ($r) => array_map(fn ($c) => (string) data_get($r, $c[1]), $view['columns']))->all();
+        return $rows->map(fn ($r) => array_map(fn ($c) => (string) data_get($r, $c[1]), $columns))->all();
     }
 
     public function export(string $format = 'xlsx')
@@ -247,7 +262,7 @@ abstract class DataGrid extends Component
         abort_unless($this->mayDo('export'), 403);
 
         $view = $this->currentView();
-        $headings = array_map(fn ($c) => $c[0], $view['columns']);
+        $headings = array_map(fn ($c) => $c[0], $this->exportColumns($view));
         $base = str_replace('.', '-', $this->pageKey());
         $rows = $this->rowsForExport($view);
 
@@ -267,7 +282,7 @@ abstract class DataGrid extends Component
 
         return [
             'label' => $this->pageLabel(),
-            'headings' => array_map(fn ($c) => $c[0], $view['columns']),
+            'headings' => array_map(fn ($c) => $c[0], $this->exportColumns($view)),
             'rows' => $this->rowsForExport($view),
         ];
     }

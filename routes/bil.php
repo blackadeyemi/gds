@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Modules\Bil\Livewire\FinishedGoods\Products as FinishedGoodsProducts;
 use Modules\Bil\Livewire\RawMaterials\DamagedGoods;
 use Modules\Bil\Livewire\RawMaterials\FactoryEntrance;
 use Modules\Bil\Livewire\RawMaterials\Consumption;
@@ -28,6 +29,17 @@ use Modules\Bil\Livewire\RawMaterials\WarehouseExit;
 | Served under the /bil URL prefix (see ModuleServiceProvider).
 | Pages are added here as they are rebuilt from production screenshots.
 */
+
+/*
+| Finished Goods — the products BIL makes, starting with the QC-controlled
+| product specifications.
+*/
+Route::middleware('auth')
+    ->prefix('finished-goods')->name('finished-goods.')
+    ->group(function () {
+        Route::get('/products', FinishedGoodsProducts::class)
+            ->middleware('page:bil.finished_goods.products')->name('products');
+    });
 
 /*
 | Raw Materials — the flow of raw material from supplier, through the

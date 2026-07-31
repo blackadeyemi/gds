@@ -16,5 +16,8 @@ return [
         // BIL — Raw Materials
         \Modules\Bil\Livewire\RawMaterials\Products::class,
         \Modules\Bil\Livewire\RawMaterials\Suppliers::class,
+
+        // BIL — Finished Goods
+        \Modules\Bil\Livewire\FinishedGoods\Products::class,
     ],
 ];

@@ -63,9 +63,13 @@
                     open: false,
                     search: '',
                     current() {
-                        // Reactive read: $wire[prop] is tracked so the trigger
-                        // label updates when the bound value changes.
-                        return this.$wire[this.field];
+                        // Reactive read, so the trigger label updates when the
+                        // bound value changes. $wire.get() (not $wire[prop])
+                        // because the field may be a nested path such as
+                        // 'form.mach' — bracket access on the $wire proxy falls
+                        // through to its action-calling fallback for those and
+                        // returns a function instead of the value.
+                        return this.$wire.get(this.field);
                     },
                     selectedLabel() {
                         const v = this.current();
