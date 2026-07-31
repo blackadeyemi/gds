@@ -11,11 +11,17 @@
 (function () {
     // The user's chosen display format (Appearance → Date format), shared with
     // server-rendered reports via the gds_date_format cookie. Storage stays ISO.
+    //
+    // The fallback (no cookie) is the numeric d/m/Y this field has always used —
+    // NOT the reports' d/M/Y default. A month-name format can't be parsed from
+    // numeric typing, so defaulting entry to d/M/Y silently dropped typed dates
+    // (e.g. a report's date range stayed on today → "only one page"). Entry only
+    // follows a month-name format when the user explicitly picks one.
     var DATE_FORMATS = ['d/M/Y', 'd/m/Y', 'Y-m-d', 'm/d/Y', 'd M Y', 'M j, Y'];
     function displayFormat() {
         var m = document.cookie.match(/(?:^|;\s*)gds_date_format=([^;]+)/);
         var v = m ? decodeURIComponent(m[1]) : '';
-        return DATE_FORMATS.indexOf(v) !== -1 ? v : 'd/M/Y';
+        return DATE_FORMATS.indexOf(v) !== -1 ? v : 'd/m/Y';
     }
 
     document.addEventListener('alpine:init', () => {
