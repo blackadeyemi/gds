@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\Bpl\Livewire\Products;
+namespace Modules\Bpl\Livewire\JumboRolls\Products;
 
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -20,7 +20,7 @@ class Softroll extends DataGrid
     public string $grammage = '';
     public string $diameter = '';
 
-    public function pageKey(): string { return 'bpl.products.softroll'; }
+    public function pageKey(): string { return 'bpl.jumbo-rolls.products.softroll'; }
     public function pageLabel(): string { return 'BPL Softroll Products'; }
     public function pageSubtitle(): string { return 'Softroll product master — grade, grammage and diameter.'; }
     public function editable(): bool { return true; }

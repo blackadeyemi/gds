@@ -35,6 +35,9 @@ return [
         ['key' => 'settings.data_views', 'label' => 'Data Views',     'module' => 'Settings', 'route' => 'settings.data-views', 'abilities' => $access],
         ['key' => 'settings.shifts',     'label' => 'Shift Settings', 'module' => 'Settings', 'route' => 'settings.shifts',     'abilities' => $access],
 
+        // BIL — Finished Goods
+        ['key' => 'bil.finished_goods.products', 'label' => 'Products', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.products', 'abilities' => $crud],
+
         // BIL — Raw Materials
         ['key' => 'bil.raw_materials.statistics',          'label' => 'Statistics',          'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.statistics',          'abilities' => $snapshot],
         ['key' => 'bil.raw_materials.products',            'label' => 'Products',            'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.products',            'abilities' => $crud],
@@ -63,6 +66,9 @@ return [
         ['key' => 'bpl.jumbo_rolls.grades',            'label' => 'Grades',              'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.grades',            'abilities' => $crud],
         ['key' => 'bpl.jumbo_rolls.products.hardroll', 'label' => 'Products (Hardroll)', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.products.hardroll', 'abilities' => $crud],
         ['key' => 'bpl.jumbo_rolls.products.softroll', 'label' => 'Products (Softroll)', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.products.softroll', 'abilities' => $crud],
+
+        // BPL — Jumbo Rolls / Sales
+        ['key' => 'bpl.jumbo_rolls.sales.customers', 'label' => 'Customers', 'module' => 'BPL / Jumbo Rolls / Sales', 'route' => 'bpl.jumbo-rolls.sales.customers', 'abilities' => $crud],
     ],
 
     // Display labels for ability columns in the Role matrix (order matters).

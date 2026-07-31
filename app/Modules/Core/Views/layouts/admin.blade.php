@@ -9,8 +9,10 @@
     $onBil = request()->is('bil/*');
     $onRawMaterials = request()->is('bil/raw-materials/*');
     $onRmReports = request()->is('bil/raw-materials/reports/*');
+    $onFinishedGoods = request()->is('bil/finished-goods/*');
     $onBpl = request()->is('bpl/*');
     $onJumboRolls = request()->is('bpl/jumbo-rolls/*');
+    $onBplSales = request()->is('bpl/jumbo-rolls/sales/*');
 @endphp
 <!DOCTYPE html>
 <html lang="en" data-theme="light" data-font="small">
@@ -53,13 +55,15 @@
         bilOpen: {{ $onBil ? 'true' : 'false' }},
         rawMaterialsOpen: {{ $onRawMaterials ? 'true' : 'false' }},
         rmReportsOpen: {{ $onRmReports ? 'true' : 'false' }},
+        finishedGoodsOpen: {{ $onFinishedGoods ? 'true' : 'false' }},
         bplOpen: {{ $onBpl ? 'true' : 'false' }},
         jumboRollsOpen: {{ $onJumboRolls ? 'true' : 'false' }},
+        bplSalesOpen: {{ $onBplSales ? 'true' : 'false' }},
         toggleSidebar() {
             if (window.innerWidth <= 900) { this.mobileOpen = !this.mobileOpen; return; }
             this.collapsed = !this.collapsed;
             localStorage.setItem('gds_sidebar_collapsed', JSON.stringify(this.collapsed));
-            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; this.bplOpen = false; this.jumboRollsOpen = false; }
+            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; this.finishedGoodsOpen = false; this.bplOpen = false; this.jumboRollsOpen = false; this.bplSalesOpen = false; }
         },
         openGroup(group) {
             if (this.collapsed) {
@@ -88,7 +92,7 @@
                 <span class="label">Dashboard</span>
             </a>
 
-            @canPrefix('bil.raw_materials.')
+            @canPrefix('bil.')
             <div class="nav-group" :class="{ open: bilOpen }">
                 <button type="button" class="nav-link" :class="{ active: {{ $onBil ? 'true' : 'false' }} && collapsed }" @click="openGroup('bilOpen')" title="BIL">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M6 21V8l6-4 6 4v13M10 21v-5h4v5"/><path d="M9 11h.01M15 11h.01"/></svg>
@@ -96,6 +100,7 @@
                     <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
                 </button>
                 <div class="nav-sub" x-show="bilOpen">
+                    @canPrefix('bil.raw_materials.')
                     <div class="nav-group" :class="{ open: rawMaterialsOpen }">
                         <button type="button" class="nav-link" :class="{ active: {{ $onRawMaterials ? 'true' : 'false' }} && collapsed }" @click="openGroup('rawMaterialsOpen')" title="Raw Materials">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg>
@@ -192,6 +197,25 @@
                             @endcanPrefix
                         </div>
                     </div>
+                    @endcanPrefix
+
+                    @canPrefix('bil.finished_goods.')
+                    <div class="nav-group" :class="{ open: finishedGoodsOpen }">
+                        <button type="button" class="nav-link" :class="{ active: {{ $onFinishedGoods ? 'true' : 'false' }} && collapsed }" @click="openGroup('finishedGoodsOpen')" title="Finished Goods">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="1"/><path d="M3 8l2-5h14l2 5M12 8v13M8 12h2M14 12h2"/></svg>
+                            <span class="label">Finished Goods</span>
+                            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                        </button>
+                        <div class="nav-sub" x-show="finishedGoodsOpen">
+                            @canPage('bil.finished_goods.products')
+                            <a href="{{ route('bil.finished-goods.products') }}" class="nav-link {{ $is('bil/finished-goods/products*') }}" title="Products">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7l-8-4-8 4 8 4 8-4zM4 7v10l8 4 8-4V7M12 11v10"/></svg>
+                                <span class="label">Products</span>
+                            </a>
+                            @endcanPage
+                        </div>
+                    </div>
+                    @endcanPrefix
                 </div>
             </div>
             @endcanPrefix
@@ -223,6 +247,24 @@
                                 <span class="label">Products</span>
                             </a>
                             @endcanPage
+
+                            @canPrefix('bpl.jumbo_rolls.sales.')
+                            <div class="nav-group" :class="{ open: bplSalesOpen }">
+                                <button type="button" class="nav-link" :class="{ active: {{ $onBplSales ? 'true' : 'false' }} && collapsed }" @click="openGroup('bplSalesOpen')" title="Sales">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                                    <span class="label">Sales</span>
+                                    <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                                </button>
+                                <div class="nav-sub" x-show="bplSalesOpen">
+                                    @canPage('bpl.jumbo_rolls.sales.customers')
+                                    <a href="{{ route('bpl.jumbo-rolls.sales.customers') }}" class="nav-link {{ $is('bpl/jumbo-rolls/sales/customers*') }}" title="Customers">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                        <span class="label">Customers</span>
+                                    </a>
+                                    @endcanPage
+                                </div>
+                            </div>
+                            @endcanPrefix
                         </div>
                     </div>
                 </div>

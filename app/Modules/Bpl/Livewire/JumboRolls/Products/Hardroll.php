@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\Bpl\Livewire\Products;
+namespace Modules\Bpl\Livewire\JumboRolls\Products;
 
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -24,7 +24,7 @@ class Hardroll extends DataGrid
     public ?float $diameter = null;
     public ?int $slice = null;
 
-    public function pageKey(): string { return 'bpl.products.hardroll'; }
+    public function pageKey(): string { return 'bpl.jumbo-rolls.products.hardroll'; }
     public function pageLabel(): string { return 'BPL Hardroll Products'; }
     public function pageSubtitle(): string { return 'Hardroll product master — grade type, gsm, ply, width, diameter, slice.'; }
     public function editable(): bool { return true; }

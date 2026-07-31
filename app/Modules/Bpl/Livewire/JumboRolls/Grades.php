@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\Bpl\Livewire;
+namespace Modules\Bpl\Livewire\JumboRolls;
 
 use Livewire\Attributes\Title;
 use Modules\Bpl\Models\BplGrade;
@@ -19,7 +19,7 @@ class Grades extends DataGrid
     public string $type = '';
     public string $grade = '';
 
-    public function pageKey(): string { return 'bpl.grades'; }
+    public function pageKey(): string { return 'bpl.jumbo-rolls.grades'; }
     public function pageLabel(): string { return 'BPL Grades'; }
     public function pageSubtitle(): string { return 'Grade master — parent to hardroll and softroll products.'; }
     public function editable(): bool { return true; }
