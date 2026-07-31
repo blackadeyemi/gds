@@ -25,3 +25,14 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Database dumps & backups — NEVER commit. They are large (1 GB+) and hold real
+# production data (customers, invoices, users). Keep them as offline backups.
+*.sql
+*.sql.gz
+*.dump
+/database/backups/
+/db_backups/
+# Exception: reviewed, structure-only (no data) legacy schema documentation.
+!/database/schema/
+!/database/schema/*.sql
