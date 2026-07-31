@@ -310,6 +310,12 @@
         <img src="{{ $image->temporaryUrl() }}" alt="New picture" style="max-height:110px;border-radius:8px;border:1px solid var(--line);">
     @elseif ($this->currentImageUri)
         <img src="{{ $this->currentImageUri }}" alt="Current picture" style="max-height:110px;border-radius:8px;border:1px solid var(--line);">
+    @elseif ($currentImage !== '')
+        {{-- Recorded but unreachable — say so, so it isn't mistaken for "no picture". --}}
+        <p class="text-muted text-sm" style="max-width:220px;margin:0;">
+            Current picture ({{ $currentImage }}) isn't available in this environment.
+            Uploading a new one replaces it.
+        </p>
     @endif
 </div>
 

@@ -112,10 +112,19 @@
                     </div>
                 @endforeach
 
+                {{-- A recorded-but-unresolvable picture is called out rather than
+                     just omitted: otherwise a wrong BIL_QC_PICS_PATH looks
+                     exactly like "this product has no photo". --}}
                 @if ($this->specsImage)
                     <div class="form-label" style="margin:0 0 0.6rem;padding-top:0.75rem;border-top:1px solid var(--line);">Product Picture</div>
                     <img src="{{ $this->specsImage }}" alt="{{ $spec['productname'] ?? '' }}"
                          style="max-height:240px;max-width:100%;border-radius:8px;border:1px solid var(--line);">
+                @elseif (trim((string) ($spec['imagepath'] ?? '')) !== '')
+                    <div class="form-label" style="margin:0 0 0.6rem;padding-top:0.75rem;border-top:1px solid var(--line);">Product Picture</div>
+                    <p class="text-muted text-sm" style="margin:0;">
+                        A picture is recorded for this revision ({{ $spec['imagepath'] }}) but is not available in this
+                        environment — the quality-control picture folder isn't reachable from this server.
+                    </p>
                 @endif
             @endif
         </div>

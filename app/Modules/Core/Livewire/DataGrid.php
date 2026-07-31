@@ -241,6 +241,25 @@ abstract class DataGrid extends Component
     /* ---------------- Export / print ---------------- */
 
     /**
+     * Row cap for the PDF format. dompdf loads the whole document into memory
+     * and is slow per row (~15ms, superlinear); at ~450 rows × 10 columns it
+     * nears 512M and the php-cgi worker OOM-crashes (empty 500, nothing logged
+     * — it dies before flushing). 300 stays well inside that even though
+     * GridExporter::pdf() also lifts memory to 1024M.
+     *
+     * Matches Bil\...\RawMaterialReport, which hit this first; xlsx/csv are
+     * left uncapped because they stream.
+     */
+    public const PRINT_ROW_CAP = 300;
+
+    /**
+     * Above this the PDF menu item is disabled and export('pdf') refuses, so a
+     * big grid can't be turned into a doomed dompdf run. Print (browser-
+     * rendered, no dompdf) and Excel/CSV (streamed) stay available at any size.
+     */
+    public const PDF_MAX_ROWS = 150;
+
+    /**
      * The columns an export/print should carry. Action columns declare a null
      * field — they render a button, not a value, so there is nothing to write
      * into a spreadsheet.
@@ -250,11 +269,30 @@ abstract class DataGrid extends Component
         return array_values(array_filter($view['columns'], fn ($c) => ($c[1] ?? null) !== null));
     }
 
-    protected function rowsForExport(array $view): array
+    protected function rowsForExport(array $view, ?int $limit = null): array
     {
         $columns = $this->exportColumns($view);
-        $rows = $this->buildQuery($view)->get();
-        return $rows->map(fn ($r) => array_map(fn ($c) => (string) data_get($r, $c[1]), $columns))->all();
+        $query = $this->buildQuery($view);
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        return $query->get()
+            ->map(fn ($r) => array_map(fn ($c) => (string) data_get($r, $c[1]), $columns))
+            ->all();
+    }
+
+    /**
+     * Count the current view's rows but stop at $cap — a `LIMIT $cap` subquery
+     * wrapped in a COUNT, so it returns min(actual, $cap) without scanning the
+     * whole set.
+     */
+    protected function cappedCount(array $view, int $cap): int
+    {
+        $connection = $this->buildQuery($view)->getModel()->getConnection();
+        $sub = $this->buildQuery($view)->reorder()->limit($cap);
+
+        return $connection->query()->fromSub($sub, 't')->count();
     }
 
     public function export(string $format = 'xlsx')
@@ -264,13 +302,20 @@ abstract class DataGrid extends Component
         $view = $this->currentView();
         $headings = array_map(fn ($c) => $c[0], $this->exportColumns($view));
         $base = str_replace('.', '-', $this->pageKey());
-        $rows = $this->rowsForExport($view);
 
         if (strtolower($format) === 'pdf') {
-            return GridExporter::pdf($base, $this->pageLabel(), $headings, $rows);
+            // Refused server-side as well as disabled in the menu: export() is
+            // reachable directly, and an oversized dompdf run takes the worker
+            // down with it rather than failing cleanly.
+            if ($this->cappedCount($view, self::PDF_MAX_ROWS + 1) > self::PDF_MAX_ROWS) {
+                abort(422, 'This view has more than ' . self::PDF_MAX_ROWS
+                    . ' rows — use Print, or export to Excel/CSV for the full data.');
+            }
+
+            return GridExporter::pdf($base, $this->pageLabel(), $headings, $this->rowsForExport($view, self::PRINT_ROW_CAP));
         }
 
-        return GridExporter::download($format, $base, $headings, $rows);
+        return GridExporter::download($format, $base, $headings, $this->rowsForExport($view));
     }
 
     /** Used by the generic print controller (plain call, no Livewire lifecycle). */
@@ -292,6 +337,7 @@ abstract class DataGrid extends Component
     public function render()
     {
         $view = $this->currentView();
+        $rows = $this->buildQuery($view)->paginate($this->perPage);
 
         return view('core::livewire.datagrid', [
             'gridView' => $view,
@@ -299,8 +345,12 @@ abstract class DataGrid extends Component
                 fn ($k) => ['key' => $k, 'label' => $this->views()[$k]['label']],
                 $this->enabledViewKeys()
             ),
-            'rows' => $this->buildQuery($view)->paginate($this->perPage),
+            'rows' => $rows,
             'columns' => $view['columns'],
+            // Every grid view paginates, so the total is already to hand — no
+            // extra count needed to decide whether PDF is offered.
+            'pdfBlocked' => $rows->total() > self::PDF_MAX_ROWS,
+            'pdfMaxRows' => self::PDF_MAX_ROWS,
         ]);
     }
 }

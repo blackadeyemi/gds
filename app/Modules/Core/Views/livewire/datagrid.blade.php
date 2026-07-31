@@ -69,10 +69,20 @@
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
                             Export CSV
                         </button>
-                        <button class="dropdown-item" wire:click="export('pdf')">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h6M9 18h6M9 12h2"/></svg>
-                            Export PDF
-                        </button>
+                        {{-- PDF is capped: dompdf builds the whole document in
+                             memory. Print and Excel/CSV stay available. --}}
+                        @if ($pdfBlocked)
+                            <button class="dropdown-item" disabled style="opacity:.45;cursor:not-allowed;"
+                                    title="Over {{ $pdfMaxRows }} rows — use Print, or Excel/CSV for the full data.">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h6M9 18h6M9 12h2"/></svg>
+                                Export PDF <span class="text-muted text-sm">(over {{ $pdfMaxRows }} rows)</span>
+                            </button>
+                        @else
+                            <button class="dropdown-item" wire:click="export('pdf')">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h6M9 18h6M9 12h2"/></svg>
+                                Export PDF
+                            </button>
+                        @endif
                         <div class="dropdown-sep"></div>
                         <a class="dropdown-item" target="_blank"
                            href="{{ url('/admin/grid/' . $this->pageKey() . '/print') }}?view={{ $gridView['key'] }}&search={{ urlencode($this->search) }}">
