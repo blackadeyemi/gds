@@ -244,6 +244,8 @@ abstract class DataGrid extends Component
 
     public function export(string $format = 'xlsx')
     {
+        abort_unless($this->mayDo('export'), 403);
+
         $view = $this->currentView();
         $headings = array_map(fn ($c) => $c[0], $view['columns']);
         $base = str_replace('.', '-', $this->pageKey());

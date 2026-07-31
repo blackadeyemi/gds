@@ -57,6 +57,7 @@
                 @endif
 
                 {{-- 3-dots: export + print --}}
+                @if ($this->mayDo('export'))
                 <div class="dropdown" x-data="{ open: false }" @click.outside="open = false">
                     <button class="btn btn-ghost btn-icon btn-sm" @click="open = !open" title="Export / Print">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
@@ -93,6 +94,7 @@
                         </a>
                     </div>
                 </div>
+                @endif
             </div>
         </div>
 

@@ -52,6 +52,11 @@ class Statistics extends StatisticsPage
         return 'bil.raw-materials.statistics.export';
     }
 
+    protected function exportPageKey(): ?string
+    {
+        return 'bil.raw_materials.statistics';
+    }
+
     public function sections(): array
     {
         return [

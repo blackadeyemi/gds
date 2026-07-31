@@ -13,12 +13,14 @@
 | Keep page keys aligned with route names ('-' -> '_').
 */
 
-$crud = ['view', 'create', 'edit', 'delete'];
+$crud = ['view', 'create', 'edit', 'delete', 'export'];
 $access = ['view'];
 // Entry forms: access IS the create action, so no separate create/edit/delete —
 // just view plus the special abilities that page supports.
 $entry = ['view', 'backdate'];
-$report = ['view', 'edit', 'delete'];
+$report = ['view', 'edit', 'delete', 'export'];
+// Read-only reports / dashboards: viewable and exportable, nothing to edit.
+$snapshot = ['view', 'export'];
 
 return [
     'pages' => [
@@ -34,7 +36,7 @@ return [
         ['key' => 'settings.shifts',     'label' => 'Shift Settings', 'module' => 'Settings', 'route' => 'settings.shifts',     'abilities' => $access],
 
         // BIL — Raw Materials
-        ['key' => 'bil.raw_materials.statistics',          'label' => 'Statistics',          'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.statistics',          'abilities' => $access],
+        ['key' => 'bil.raw_materials.statistics',          'label' => 'Statistics',          'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.statistics',          'abilities' => $snapshot],
         ['key' => 'bil.raw_materials.products',            'label' => 'Products',            'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.products',            'abilities' => $crud],
         ['key' => 'bil.raw_materials.suppliers',           'label' => 'Suppliers',           'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.suppliers',           'abilities' => $crud],
         ['key' => 'bil.raw_materials.supplier_deliveries', 'label' => 'Supplier Deliveries', 'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.supplier-deliveries', 'abilities' => $entry],
@@ -52,8 +54,8 @@ return [
         ['key' => 'bil.raw_materials.reports.warehouse_exit',      'label' => 'Warehouse Exit',      'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.warehouse-exit',      'abilities' => $report],
         ['key' => 'bil.raw_materials.reports.factory_entrance',    'label' => 'Factory Entrance',    'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.factory-entrance',    'abilities' => $report],
         ['key' => 'bil.raw_materials.reports.consumption',         'label' => 'Consumption',         'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.consumption',         'abilities' => $report],
-        ['key' => 'bil.raw_materials.reports.warehouse_stock',     'label' => 'Warehouse Stock',     'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.warehouse-stock',     'abilities' => $access],
-        ['key' => 'bil.raw_materials.reports.factory_floor_stock', 'label' => 'Factory Floor Stock', 'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.factory-floor-stock', 'abilities' => $access],
+        ['key' => 'bil.raw_materials.reports.warehouse_stock',     'label' => 'Warehouse Stock',     'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.warehouse-stock',     'abilities' => $snapshot],
+        ['key' => 'bil.raw_materials.reports.factory_floor_stock', 'label' => 'Factory Floor Stock', 'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.factory-floor-stock', 'abilities' => $snapshot],
         ['key' => 'bil.raw_materials.reports.factory_returns',     'label' => 'Factory Returns',     'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.factory-returns',     'abilities' => $report],
         ['key' => 'bil.raw_materials.reports.damaged_goods',       'label' => 'Damaged Goods',       'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.damaged-goods',       'abilities' => $report],
 
@@ -69,6 +71,7 @@ return [
         'create' => 'Create',
         'edit' => 'Edit',
         'delete' => 'Delete',
+        'export' => 'Export',
         'backdate' => 'Backdate',
         'approve' => 'Approve',
         'bypass-shift' => 'Bypass shift',

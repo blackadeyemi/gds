@@ -181,9 +181,24 @@ abstract class StatisticsPage extends Component
         return null;
     }
 
+    /**
+     * The page-registry key gating this dashboard's export (e.g.
+     * 'bil.raw_materials.statistics'). Null = not access-gated (export follows
+     * page view only).
+     */
+    protected function exportPageKey(): ?string
+    {
+        return null;
+    }
+
     public function canExport(): bool
     {
-        return $this->exportRouteName() !== null;
+        if ($this->exportRouteName() === null) {
+            return false;
+        }
+        $key = $this->exportPageKey();
+
+        return $key === null || (bool) auth()->user()?->canDo($key, 'export');
     }
 
     /** Print prints the dashboard cards in-browser (window.print + @media print). */

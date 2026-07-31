@@ -42,6 +42,8 @@ Route::middleware('auth')
             ->middleware('page:bil.raw_materials.statistics')->name('statistics');
         // Direct download of the current statistics section as xlsx/csv/pdf.
         Route::get('/statistics/export', function () {
+            abort_unless((bool) request()->user()?->canDo('bil.raw_materials.statistics', 'export'), 403);
+
             $format = strtolower((string) request('format', 'xlsx'));
             abort_unless(in_array($format, ['xlsx', 'csv', 'pdf'], true), 404);
 
@@ -127,7 +129,7 @@ Route::middleware('auth')
                     'damaged-goods' => DamagedGoodsReport::class,
                 ];
                 abort_unless(isset($map[$report]), 404);
-                abort_unless((bool) request()->user()?->canAccessPage('bil.raw_materials.reports.' . str_replace('-', '_', $report)), 403);
+                abort_unless((bool) request()->user()?->canDo('bil.raw_materials.reports.' . str_replace('-', '_', $report), 'export'), 403);
 
                 $c = new $map[$report]();
                 $c->view = (string) request('view', '');
@@ -157,7 +159,7 @@ Route::middleware('auth')
                     'damaged-goods' => DamagedGoodsReport::class,
                 ];
                 abort_unless(isset($map[$report]), 404);
-                abort_unless((bool) request()->user()?->canAccessPage('bil.raw_materials.reports.' . str_replace('-', '_', $report)), 403);
+                abort_unless((bool) request()->user()?->canDo('bil.raw_materials.reports.' . str_replace('-', '_', $report), 'export'), 403);
 
                 $format = strtolower((string) request('format', 'xlsx'));
                 abort_unless(in_array($format, ['xlsx', 'csv', 'pdf'], true), 404);

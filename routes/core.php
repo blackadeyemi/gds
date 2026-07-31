@@ -37,6 +37,10 @@ Route::middleware('auth')->group(function () {
             $class = collect(config('datagrid.grids'))
                 ->first(fn ($c) => (new $c)->pageKey() === $page);
             abort_unless($class, 404);
+            abort_unless(
+                (bool) request()->user()?->canDo(str_replace('-', '_', $page), 'export'),
+                403
+            );
 
             $payload = (new $class)->printPayload(request('view'), (string) request('search', ''));
 
