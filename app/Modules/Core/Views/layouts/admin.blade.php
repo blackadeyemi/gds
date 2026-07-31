@@ -276,6 +276,12 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="19" cy="13" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="M12 2a10 10 0 1 0 0 20c1 0 1.5-.8 1.5-1.6 0-1.2-1-1.9-1-3 0-.8.7-1.4 1.5-1.4H16a4 4 0 0 0 4-4c0-4.4-3.6-8-8-8z" opacity=".35"/></svg>
                         <span class="label">Appearance</span>
                     </a>
+                    @canPage('settings.pages')
+                    <a href="{{ url('/settings/pages') }}" class="nav-link {{ $is('settings/pages*') }}" title="Pages">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 9v11"/></svg>
+                        <span class="label">Pages</span>
+                    </a>
+                    @endcanPage
                     @canPage('settings.data_views')
                     <a href="{{ url('/settings/data-views') }}" class="nav-link {{ $is('settings/data-views*') }}" title="Data Views">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>

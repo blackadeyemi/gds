@@ -8,6 +8,7 @@ use Modules\Core\Livewire\Admin\Roles;
 use Modules\Core\Livewire\Admin\Users;
 use Modules\Core\Livewire\Settings\Appearance;
 use Modules\Core\Livewire\Settings\DataViews;
+use Modules\Core\Livewire\Settings\Pages;
 use Modules\Core\Livewire\Settings\ShiftSettings;
 
 /*
@@ -46,6 +47,7 @@ Route::middleware('auth')->group(function () {
     // Appearance is a personal preference — any authenticated user. Data Views
     // is admin configuration — gated.
     Route::get('/settings/appearance', Appearance::class)->name('settings.appearance');
+    Route::get('/settings/pages', Pages::class)->middleware('page:settings.pages')->name('settings.pages');
     Route::get('/settings/data-views', DataViews::class)->middleware('page:settings.data_views')->name('settings.data-views');
 
     // Shift windows — access granted per page (settings.shifts). Give the

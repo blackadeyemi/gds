@@ -29,6 +29,7 @@ return [
         ['key' => 'admin.companies',   'label' => 'Companies',   'module' => 'Admin', 'route' => 'admin.companies',   'abilities' => $crud],
 
         // Settings
+        ['key' => 'settings.pages',      'label' => 'Pages',          'module' => 'Settings', 'route' => 'settings.pages',      'abilities' => $access],
         ['key' => 'settings.data_views', 'label' => 'Data Views',     'module' => 'Settings', 'route' => 'settings.data-views', 'abilities' => $access],
         ['key' => 'settings.shifts',     'label' => 'Shift Settings', 'module' => 'Settings', 'route' => 'settings.shifts',     'abilities' => $access],
 

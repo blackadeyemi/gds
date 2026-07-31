@@ -3,60 +3,24 @@
 namespace Modules\Core\Console;
 
 use Illuminate\Console\Command;
-use Modules\Core\Models\Page;
-use Modules\Core\Models\Permission;
+use Modules\Core\Support\PageSyncer;
 
 /**
- * Syncs the page registry (config/pages.php) into the `pages` table and
- * materializes every page+ability as a "{key}:{ability}" permission. Pages and
- * ability-permissions dropped from the registry are removed (role grants
- * cascade). Run whenever pages or their abilities change.
+ * Reconcile the pages table + "{key}:{ability}" permissions with the code
+ * registry (config/pages.php). Adds new pages, prunes removed ones, and
+ * regenerates permissions — preserving admin-edited abilities (see PageSyncer).
+ * Day-to-day, abilities are managed in the Pages settings UI.
  */
 class SyncPages extends Command
 {
     protected $signature = 'gds:sync-pages';
-    protected $description = 'Sync gated pages + their abilities into pages/permissions';
+    protected $description = 'Sync gated pages + their ability permissions from config/pages.php';
 
-    public function handle(): int
+    public function handle(PageSyncer $syncer): int
     {
-        $declared = config('pages.pages', []);
-        $keys = [];
-        $abilityPerms = [];
+        $result = $syncer->sync();
 
-        foreach ($declared as $i => $def) {
-            $keys[] = $def['key'];
-            $abilities = $def['abilities'] ?? ['view'];
-
-            $page = Page::firstOrNew(['key' => $def['key']]);
-            $page->label = $def['label'];
-            $page->module = $def['module'] ?? null;
-            $page->abilities = array_values($abilities);
-            $page->sort_order = $i;
-            $page->save();
-
-            foreach ($abilities as $ability) {
-                $name = $def['key'] . ':' . $ability;
-                $abilityPerms[] = $name;
-                Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
-            }
-        }
-
-        // Prune pages and ability-permissions no longer declared.
-        Page::whereNotIn('key', $keys)->delete();
-
-        $stale = Permission::query()
-            ->where('name', 'like', '%:%')
-            ->whereNotIn('name', $abilityPerms)
-            ->get();
-        foreach ($stale as $perm) {
-            $perm->delete(); // role_has_permissions cascades
-        }
-
-        if (app()->bound(\Spatie\Permission\PermissionRegistrar::class)) {
-            app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
-        }
-
-        $this->info('Pages synced (' . count($keys) . ' pages, ' . count($abilityPerms) . ' ability permissions).');
+        $this->info("Pages synced ({$result['total']} pages, {$result['added']} new).");
         return self::SUCCESS;
     }
 }
