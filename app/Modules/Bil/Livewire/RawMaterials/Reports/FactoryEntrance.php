@@ -64,6 +64,30 @@ class FactoryEntrance extends RawMaterialReport
         ];
     }
 
+    /** Only group/sub-group come off the joined products table; the rest are base columns. */
+    protected function joinedFilterKeys(): array
+    {
+        return ['group', 'subgroup'];
+    }
+
+    /**
+     * Fast total: the entrance table alone, with the date range and its
+     * base-column filters (factory, product, status). Same number as the joined
+     * count — 2ms against 4.9s at all-time.
+     */
+    protected function countQuery()
+    {
+        $q = DB::connection('bil')->table('factory_entrance_rawmaterials as f');
+        $this->applyDate($q, 'f.entrance_date');
+        $this->applyFilters($q, [
+            'factory' => 'f.location_id',
+            'product' => 'f.product_id',
+            'status' => 'f.status',
+        ]);
+
+        return $q;
+    }
+
     protected function base()
     {
         $q = DB::connection('bil')->table('factory_entrance_rawmaterials as f')

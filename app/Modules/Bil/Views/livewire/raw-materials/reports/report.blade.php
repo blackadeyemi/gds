@@ -98,6 +98,18 @@
             </div>
         </div>
 
+        {{-- Only shown for the one combination whose total can't be counted
+             cheaply: a joined-column filter (group / sub-group / product) or a
+             search, over a multi-year range. Everything else totals instantly. --}}
+        @if ($slowCount = $this->slowCountNotice())
+            <div class="card-head" style="border-bottom:0;padding-top:0;">
+                <span class="text-muted text-sm" style="display:flex;gap:.5rem;align-items:flex-start;">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto;margin-top:.15em;"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                    <span>{{ $slowCount }}</span>
+                </span>
+            </div>
+        @endif
+
         @php $showActions = $this->hasActions() && ($gridView['type'] ?? 'table') === 'table'; @endphp
 
         <div class="table-wrap">

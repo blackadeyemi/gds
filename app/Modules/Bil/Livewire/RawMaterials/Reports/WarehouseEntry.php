@@ -62,6 +62,28 @@ class WarehouseEntry extends RawMaterialReport
         ];
     }
 
+    /**
+     * Exact total without the display joins. Unlike Warehouse Exit / Consumption
+     * there is no barcode join here — products/groups/sub-groups all join on
+     * primary keys, so they cannot fan out and dropping them can't change the
+     * count. Every filter is on the base table too, so this covers all of them.
+     *
+     * Worth having: over a 7-year range the joined count took ~22s (the date
+     * predicate makes MySQL read full rows), against ~1ms here.
+     */
+    protected function countQuery()
+    {
+        $q = DB::connection('bil')->table('rawmaterials_warehouse_entry as r');
+        $this->applyDate($q, 'r.dateofcreation');
+        $this->applyFilters($q, [
+            'supplier' => 'r.suppliercode',
+            'location' => 'r.location_id',
+            'product' => 'r.productid',
+        ]);
+
+        return $q;
+    }
+
     protected function base()
     {
         // No store-location join here: on a LIMIT query it forces a hash join

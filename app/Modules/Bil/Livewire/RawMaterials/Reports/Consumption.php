@@ -71,6 +71,42 @@ class Consumption extends RawMaterialReport
         ];
     }
 
+    /** The barcode join can't be dropped without making the total wrong. */
+    protected function countIsSlowOverWideRange(): bool
+    {
+        return true;
+    }
+
+    /** sub-group lives on the products table, which the count omits. */
+    protected function joinedFilterKeys(): array
+    {
+        return ['subgroup'];
+    }
+
+    /**
+     * Cheaper total that is still EXACT. As on Warehouse Exit, the barcode join
+     * has to stay — it fans 120,277 usage rows out to 123,804 displayed rows
+     * all-time — but the products → groups → sub-groups chain joins on primary
+     * keys and can be dropped. 1.3s here against 4.8s, same number.
+     */
+    protected function countQuery()
+    {
+        $q = DB::connection('bil')->table('factory_usage_rawmaterials as f')
+            ->leftJoin('rawmaterials_warehouse_entry as r', function ($j) {
+                $j->whereRaw('r.barcode = CONVERT(f.barcode USING latin1)');
+            })
+            ->where('f.is_deleted', 0);
+        $this->applyDate($q, 'f.dateofuse', slash: true);
+        $this->applyFilters($q, [
+            'factory' => 'f.location',
+            'machine' => 'f.linename',
+            'shift' => 'f.shift',
+            'product' => 'r.productid',
+        ]);
+
+        return $q;
+    }
+
     protected function base()
     {
         $q = DB::connection('bil')->table('factory_usage_rawmaterials as f')

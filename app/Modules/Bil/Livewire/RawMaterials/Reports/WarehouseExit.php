@@ -65,48 +65,41 @@ class WarehouseExit extends RawMaterialReport
         ];
     }
 
-    /**
-     * Whether the current filters need the display joins in order to be counted.
-     * Group / sub-group / product are joined columns, and so is everything the
-     * search hits (productname, groupname, subgroupname) — with any of those
-     * active the join-free total below would be wrong.
-     */
-    private function countNeedsJoins(): bool
+    /** The barcode join can't be dropped without making the total wrong. */
+    protected function countIsSlowOverWideRange(): bool
     {
-        return ($this->filters['group'] ?? '') !== ''
-            || ($this->filters['subgroup'] ?? '') !== ''
-            || ($this->filters['product'] ?? '') !== ''
-            || $this->search !== '';
+        return true;
+    }
+
+    /** group/sub-group live on the products table, which the count omits. */
+    protected function joinedFilterKeys(): array
+    {
+        return ['group', 'subgroup'];
     }
 
     /**
-     * Keep numbered pagination on any span when the total can be counted without
-     * the joins; fall back to count-free only when a joined predicate is active.
-     * This is the report whose joined count is genuinely slow — 3.1s over a year
-     * against ~30ms join-free — so it opts out of the base span rule entirely.
+     * Cheaper total that is still EXACT.
+     *
+     * The barcode join is kept, because it is not cardinality-preserving: a
+     * barcode can match several warehouse-entry rows, and all-time that fans
+     * 310,842 exits out to 316,836 displayed rows. Counting the exit table alone
+     * would under-report by ~6k. What is safe to drop is the products → groups →
+     * sub-groups chain, which joins on primary keys and cannot fan out.
+     *
+     * All-time: 2.0s here against 9.3s through the full display chain, same
+     * number. The product filter lives on the entry table so it comes along.
      */
-    public function usesSimplePagination(): bool
+    protected function countQuery()
     {
-        return $this->countNeedsJoins();
-    }
-
-    /**
-     * Fast total for the default view: count the exit table alone with the date
-     * range and location filter applied, both indexed base columns. The display
-     * joins are all LEFT joins, so they can't change the row count — dropping
-     * them yields exactly the same number, ~100x quicker.
-     */
-    protected function paginationTotal(array $view): ?int
-    {
-        if (($view['type'] ?? 'table') !== 'table' || $this->countNeedsJoins()) {
-            return null;
-        }
-
-        $q = DB::connection('bil')->table('rawmaterials_warehouse_exit as we');
+        $q = DB::connection('bil')->table('rawmaterials_warehouse_exit as we')
+            ->leftJoin('rawmaterials_warehouse_entry as r', 'we.barcode', '=', 'r.barcode');
         $this->applyDate($q, 'we.dateofcreation');
-        $this->applyFilters($q, ['location' => 'we.location_id']);
+        $this->applyFilters($q, [
+            'location' => 'we.location_id',
+            'product' => 'r.productid',
+        ]);
 
-        return $q->count();
+        return $q;
     }
 
     protected function base()

@@ -63,51 +63,118 @@ abstract class RawMaterialReport extends Component
     }
 
     /**
-     * Widest date span (days) for which a full COUNT is still affordable.
-     *
-     * Was 92, which meant anything past a quarter silently lost its total and
-     * page numbers — a 4-month range is an ordinary thing to ask for, and it
-     * read as a bug. Measured counts over the default view (dev data) say 92 was
-     * far too conservative:
-     *
-     *   report                1 month   4 months   12 months
-     *   supplier-deliveries     15ms       29ms        69ms
-     *   warehouse-entry         58ms      335ms       831ms
-     *   warehouse-exit         210ms      871ms      3146ms   <- see below
-     *   factory-entrance        44ms      240ms       830ms
-     *   consumption             27ms      273ms      1083ms
-     *   machines/services       57ms       55ms        46ms
-     *
-     * A year is comfortably affordable everywhere, so the cutoff is a year.
-     * Warehouse Exit was the one outlier and now supplies a join-free
-     * paginationTotal(), which counts the same rows in ~30ms at any span.
-     * Beyond a year (or with no range at all) it still goes count-free — that is
-     * where the original ~10s all-time count lived.
-     */
-    protected int $countableSpanDays = 366;
-
-    /**
      * Whether to use count-free simple pagination (prev/next only) instead of
      * full pagination (which shows a total + page numbers).
      *
-     * Full pagination runs a `SELECT COUNT(*)` over the whole filtered set, and
-     * because the reports join products/groups/etc. for display, that count gets
-     * expensive on the big legacy tables over a very wide range. Showing
-     * "Showing 1–25 of 655" + page numbers is what users expect, so prefer it
-     * wherever the count is affordable.
+     * Reports used to drop to count-free past a fixed date span, on the grounds
+     * that the display-joined COUNT gets expensive. That cost is real but
+     * avoidable: the display joins are all LEFT joins, so they cannot change the
+     * row count, and counting the base table alone returns the identical number.
+     * Measured at all-time on dev — joined vs join-free:
      *
-     * So: full pagination for a bounded range (≤ countableSpanDays), count-free
-     * for a very wide or absent range. Snapshot reports with no date filter keep
-     * it count-free by overriding this.
+     *   warehouse-exit    316,836 rows   9135ms  ->    1ms
+     *   factory-entrance  178,114 rows   4913ms  ->    2ms
+     *   consumption       123,804 rows   4783ms  ->  100ms
+     *   everything else                  <170ms
+     *
+     * So the default is now full pagination on ANY range, including all-time.
+     * A report whose joined count is slow supplies countQuery() below and pays
+     * nothing. The one case that still costs (~5s) is a joined-column predicate
+     * over a multi-year range, where the join-free count would be wrong — that
+     * is what slowCountNotice() warns about rather than silently dropping the
+     * total. Snapshot reports override this.
      */
     public function usesSimplePagination(): bool
     {
+        return false;
+    }
+
+    /**
+     * Filter keys whose predicate lives on a joined table, so a join-free count
+     * would be wrong. Reports with such filters declare them here.
+     */
+    protected function joinedFilterKeys(): array
+    {
+        return [];
+    }
+
+    /**
+     * A join-free equivalent of base() used only for counting: the base table
+     * with the date range and base-column filters applied, and none of the
+     * display joins. Null when the report doesn't need one (its joined count is
+     * already cheap).
+     */
+    protected function countQuery()
+    {
+        return null;
+    }
+
+    /**
+     * Whether the current filters force the count to go through the joins.
+     * Search counts too — the searchable columns include joined ones on the
+     * reports that have joined filters at all.
+     */
+    protected function countNeedsJoins(): bool
+    {
+        foreach ($this->joinedFilterKeys() as $key) {
+            if (($this->filters[$key] ?? '') !== '') {
+                return true;
+            }
+        }
+
+        return $this->search !== '';
+    }
+
+    /**
+     * Whether an exact total for this report costs seconds once the range gets
+     * wide. True for the reports whose count has to go through the barcode →
+     * warehouse-entry join: that join is not cardinality-preserving (a barcode
+     * can match several entry rows), so it can't be dropped without making the
+     * total wrong, and 300k fan-out lookups take ~7s however it's indexed.
+     */
+    protected function countIsSlowOverWideRange(): bool
+    {
+        return false;
+    }
+
+    /** Whether the current range is wide enough for that cost to bite (> ~1 year). */
+    protected function hasWideRange(): bool
+    {
         if (! $this->hasDateRange() || $this->dateFrom === '' || $this->dateTo === '') {
-            return true;
+            return true; // unbounded / all-time
         }
         $span = strtotime($this->dateTo) - strtotime($this->dateFrom);
 
-        return $span === false || $span > $this->countableSpanDays * 86400;
+        return $span === false || $span > 366 * 86400;
+    }
+
+    /**
+     * A message for the UI when the exact total for the current combination is
+     * going to take seconds, or null when it's cheap. Shown inline rather than
+     * blocking: the report still loads with a real total and page numbers, the
+     * user just gets told why it's taking a moment.
+     */
+    public function slowCountNotice(): ?string
+    {
+        if (! $this->hasWideRange()) {
+            return null;
+        }
+
+        // A joined-column filter forces the count through the product/group
+        // chain as well, which is slower still.
+        if ($this->countQuery() !== null && $this->countNeedsJoins()) {
+            return 'Counting every matching row over this range has to go through the '
+                . 'product and group lookup, which takes several seconds. Narrowing the '
+                . 'dates, or clearing the group / sub-group / search filters, makes it quicker.';
+        }
+
+        if ($this->countIsSlowOverWideRange()) {
+            return 'This report resolves each row back to its raw material by barcode, so '
+                . 'an exact total over a range this wide takes a few seconds. Narrowing the '
+                . 'dates makes it immediate.';
+        }
+
+        return null;
     }
 
     /**
@@ -118,7 +185,18 @@ abstract class RawMaterialReport extends Component
      */
     protected function paginationTotal(array $view): ?int
     {
-        return null;
+        // Only the row-listing views paginate; summaries are fetched whole.
+        if (($view['type'] ?? 'table') !== 'table') {
+            return null;
+        }
+
+        // A joined predicate is active, so the join-free count would be wrong —
+        // return null and let paginate() run the accurate (slower) count.
+        if ($this->countNeedsJoins()) {
+            return null;
+        }
+
+        return $this->countQuery()?->count();
     }
 
     /**

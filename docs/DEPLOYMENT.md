@@ -54,7 +54,12 @@ Observed dev timings (total ≈ **10 minutes**):
 | `140000_add_hierarchy_ids_to_consumer_tables` | **8m 32s** |
 | `150000_add_factory_id_to_bpl_production` (276k rows) | 31s |
 | `200000_add_division_staff_ids_to_maintenance` (43k rows) | 37s |
+| `230000_index_warehouse_exit_date_barcode` (310k rows) | allow a few minutes |
 | all others combined | < 3s |
+
+`230000` builds a covering index on `rawmaterials_warehouse_exit`; it is
+idempotent (skips if the index exists) but locks the table while it builds, so it
+belongs inside the same window.
 
 That migration is written to be **resumable** — it skips columns that already
 exist — so if it dies part-way you can re-run `php artisan migrate` rather than
