@@ -62,19 +62,39 @@ abstract class RawMaterialReport extends Component
         return true;
     }
 
-    /** Widest date span (days) for which a full COUNT is still affordable. */
-    protected int $countableSpanDays = 92;
+    /**
+     * Widest date span (days) for which a full COUNT is still affordable.
+     *
+     * Was 92, which meant anything past a quarter silently lost its total and
+     * page numbers — a 4-month range is an ordinary thing to ask for, and it
+     * read as a bug. Measured counts over the default view (dev data) say 92 was
+     * far too conservative:
+     *
+     *   report                1 month   4 months   12 months
+     *   supplier-deliveries     15ms       29ms        69ms
+     *   warehouse-entry         58ms      335ms       831ms
+     *   warehouse-exit         210ms      871ms      3146ms   <- see below
+     *   factory-entrance        44ms      240ms       830ms
+     *   consumption             27ms      273ms      1083ms
+     *   machines/services       57ms       55ms        46ms
+     *
+     * A year is comfortably affordable everywhere, so the cutoff is a year.
+     * Warehouse Exit was the one outlier and now supplies a join-free
+     * paginationTotal(), which counts the same rows in ~30ms at any span.
+     * Beyond a year (or with no range at all) it still goes count-free — that is
+     * where the original ~10s all-time count lived.
+     */
+    protected int $countableSpanDays = 366;
 
     /**
      * Whether to use count-free simple pagination (prev/next only) instead of
      * full pagination (which shows a total + page numbers).
      *
      * Full pagination runs a `SELECT COUNT(*)` over the whole filtered set, and
-     * because the reports join products/groups/etc. for display, that count is
-     * expensive on the big legacy tables over a wide range (e.g. Warehouse Exit
-     * all-time = 316k joined rows → ~10s, historically a 30s timeout). But over
-     * a bounded range the same count is trivial (~0.1s for a month), and showing
-     * "Showing 1–25 of 655" + page numbers is what users expect.
+     * because the reports join products/groups/etc. for display, that count gets
+     * expensive on the big legacy tables over a very wide range. Showing
+     * "Showing 1–25 of 655" + page numbers is what users expect, so prefer it
+     * wherever the count is affordable.
      *
      * So: full pagination for a bounded range (≤ countableSpanDays), count-free
      * for a very wide or absent range. Snapshot reports with no date filter keep
