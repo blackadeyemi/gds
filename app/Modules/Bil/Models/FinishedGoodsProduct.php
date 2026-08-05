@@ -3,6 +3,7 @@
 namespace Modules\Bil\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Finished-goods product, i.e. one QC specification sheet (bil.products).
@@ -22,6 +23,17 @@ class FinishedGoodsProduct extends Model
     protected $primaryKey = 'productid';
     public $timestamps = false;
     protected $guarded = [];
+
+    /**
+     * The machines this product is made on (Factory → Line → Project). A
+     * product may run on several; `mach` keeps a readable summary of them for
+     * the legacy screens.
+     */
+    public function machines(): HasMany
+    {
+        return $this->hasMany(FinishedGoodsProductMachine::class, 'product_id', 'productid')
+            ->orderBy('sort_order')->orderBy('id');
+    }
 
     /** Live products (the grid's default). */
     public function scopeActive($query)

@@ -52,59 +52,9 @@
     @endunless
 </div>
 
-@once
-    @push('scripts')
-        <script>
-            document.addEventListener('alpine:init', () => {
-                Alpine.data('searchableSelect', (config) => ({
-                    field: config.field,
-                    options: config.options || [],
-                    live: config.live || false,
-                    open: false,
-                    search: '',
-                    current() {
-                        // Reactive read, so the trigger label updates when the
-                        // bound value changes. $wire.get() (not $wire[prop])
-                        // because the field may be a nested path such as
-                        // 'form.mach' — bracket access on the $wire proxy falls
-                        // through to its action-calling fallback for those and
-                        // returns a function instead of the value.
-                        return this.$wire.get(this.field);
-                    },
-                    selectedLabel() {
-                        const v = this.current();
-                        if (v === null || v === undefined || v === '') return '';
-                        const o = this.options.find((o) => String(o.value) === String(v));
-                        return o ? o.label : '';
-                    },
-                    isSelected(v) {
-                        return String(this.current() ?? '') === String(v);
-                    },
-                    filtered() {
-                        const s = this.search.trim().toLowerCase();
-                        if (!s) return this.options;
-                        return this.options.filter((o) => o.label.toLowerCase().includes(s));
-                    },
-                    toggle() {
-                        this.open = !this.open;
-                        if (this.open) {
-                            this.$nextTick(() => this.$refs.q && this.$refs.q.focus());
-                        }
-                    },
-                    close() {
-                        this.open = false;
-                        this.search = '';
-                    },
-                    choose(v) {
-                        this.$wire.set(this.field, v, this.live);
-                        this.close();
-                    },
-                    chooseFirst() {
-                        const f = this.filtered();
-                        if (f.length) this.choose(f[0].value);
-                    },
-                }));
-            });
-        </script>
-    @endpush
-@endonce
+{{-- The Alpine component lives in public/js/searchable-select.js, loaded by the
+     admin layout. It must NOT be pushed from here: this partial can render
+     conditionally (inside a modal, behind a ply count), and a page that loads
+     without any instance would then never register it — every control added
+     later by a Livewire re-render would throw "searchableSelect is not
+     defined". --}}

@@ -23,5 +23,7 @@ class BplCustomer extends Model
 
     protected $casts = [
         'products' => 'array',
+        'latitude' => 'float',
+        'longitude' => 'float',
     ];
 }

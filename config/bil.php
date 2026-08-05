@@ -6,6 +6,13 @@
 
 return [
     /*
+    | The company this module's data belongs to, matched on companies.code.
+    | Scopes the factory hierarchy so BIL screens never offer another company's
+    | factories (PM2/PM3 are Belpapyrus).
+    */
+    'company_code' => 'BIL',
+
+    /*
     | Where quality-control product photos live. The legacy Quality Control
     | dashboard writes them to <STORAGE_PATH>/QC/Pics (production STORAGE_PATH
     | is E:/), and products.imagepath holds only the bare filename. Point this

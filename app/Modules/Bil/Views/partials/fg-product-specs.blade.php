@@ -58,11 +58,16 @@
                             ['Revision Date', $val('revdate')],
                             ['Product Group', $val('productgroup')],
                             ['Product Grade', $this->gradeNameFor($spec['basepaper'] ?? '') ?: '—'],
-                            ['Production Machine', $val('mach')],
                             ['Number of Ply', $val('ply')],
-                            ['Production Waste (%)', $val('waste')],
+                            ['Expected Production Waste (%)', $val('waste')],
                             ['Embossing', $val('embossing')],
                             ['Lam / Edge', $val('lamedge')],
+                        ],
+                        // Full Factory → Line → Project paths. Older revisions
+                        // carry the labels captured when they were archived;
+                        // before machines were structured they have only `mach`.
+                        'Production' => [
+                            ['Machine(s)', $val('machines') !== '—' ? $val('machines') : $val('mach')],
                         ],
                         'Hardroll' => [
                             ['Hardroll Grade Type', $val('basepaper')],

@@ -12,8 +12,13 @@ use Modules\Bil\Models\FinishedGoodsProduct;
 use Modules\Bil\Support\GradeType;
 use Modules\Bil\Support\QcProductImages;
 use Modules\Bil\Support\QcRevisionArchive;
+use Modules\Bil\Models\FinishedGoodsProductMachine;
 use Modules\Bpl\Models\BplGrade;
 use Modules\Core\Livewire\DataGrid;
+use Modules\Core\Models\Company;
+use Modules\Core\Models\Factory;
+use Modules\Core\Models\MachineLine;
+use Modules\Core\Models\MachineProject;
 
 /**
  * Finished Goods → Products. Rebuilt from the legacy Quality Control dashboard
@@ -36,13 +41,32 @@ class Products extends DataGrid
         'Toilet', 'Toilet Jumbo', 'Towel', 'Unwrapped', 'Waste Bag',
     ];
 
-    public const LAM_EDGE = ['N/A', 'Edge', 'Lam', 'Plain Lam', 'Coloured Lam'];
+    /** No "N/A" member: not applicable is an empty choice, stored as NULL. */
+    public const LAM_EDGE = ['Edge', 'Lam', 'Plain Lam', 'Coloured Lam'];
 
-    /** Spec fields stored as text. */
+    /**
+     * Spec fields stored as text. `mach` and `hardrollsource` are absent: both
+     * are summaries derived from structured references, not typed in.
+     */
     protected const TEXT = [
-        'productname', 'productcode', 'productbundles', 'productgroup', 'basepaper', 'mach',
-        'embossing', 'lamedge', 'hardrollsource', 'hardrollgsm', 'waste', 'bundlespertonne',
+        'productname', 'productcode', 'productbundles', 'productgroup', 'basepaper',
+        'embossing', 'lamedge', 'hardrollgsm', 'waste', 'bundlespertonne',
     ];
+
+    /**
+     * Where the hardroll comes from: one of our companies (optionally narrowed
+     * to a plant), or an outside mill named as free text.
+     */
+    protected const HARDROLL = ['hardroll_company_id', 'hardroll_factory_id', 'hardroll_source_text'];
+
+    /** Sentinel for the "outside mill" choice in the source-company select. */
+    public const HARDROLL_EXTERNAL = 'external';
+
+    /** Columns that store "nothing" as NULL rather than an empty string. */
+    protected const NULLABLE_TEXT = ['lamedge'];
+
+    /** Upper bound on ply count — plies are added one at a time from the form. */
+    public const MAX_PLIES = 12;
 
     /** Spec fields stored as numbers; a blank means 0, as in the legacy form. */
     protected const NUMERIC = [
@@ -68,6 +92,19 @@ class Products extends DataGrid
     /** One BPL grade type per ply, plus which plies share a hardroll. */
     public array $gradeTypes = ['', '', ''];
     public string $gradeGrouping = 'none';
+
+    /**
+     * Machines the product is made on: one row per Factory → Line → Project
+     * path. Several rows = several machines.
+     */
+    public array $machineRows = [];
+
+    /**
+     * Free-text `mach` carried over from the legacy app that matched no machine
+     * in the hierarchy — shown so it isn't silently lost while unconverted.
+     */
+    public string $legacyMachine = '';
+
 
     /** Pending product photo upload, and the filename already on the product. */
     public $image = null;
@@ -109,7 +146,9 @@ class Products extends DataGrid
                     ['Product Name', 'productname'],
                     ['Product Group', 'productgroup'],
                     ['Ply', 'ply'],
-                    ['Machine', 'mach'],
+                    // The summary kept on the product; the spec sheet shows the
+                    // full Factory → Line → Project path of each assignment.
+                    ['Machine(s)', 'mach'],
                     ['Hardroll Grade Type', 'basepaper'],
                     ['Revision', 'revnumber'],
                 ],
@@ -134,13 +173,25 @@ class Products extends DataGrid
                 'label' => 'Summary (by machine)',
                 'type' => 'summary',
                 'columns' => [
-                    ['Machine', 'mach'],
+                    ['Factory', 'factory'],
+                    ['Machine', 'machine'],
                     ['Products', 'total'],
                 ],
-                'query' => fn () => FinishedGoodsProduct::query()->active()
-                    ->selectRaw("COALESCE(NULLIF(products.mach, ''), '—') as mach, COUNT(*) as total")
-                    ->groupBy('products.mach')
-                    ->orderByRaw('COUNT(*) DESC'),
+                // Counted from the assignments, so a product made on three
+                // machines counts under each of them.
+                'query' => function () {
+                    $core = config('database.connections.core.database');
+
+                    return FinishedGoodsProductMachine::query()
+                        ->join('products as p', 'product_machines.product_id', '=', 'p.productid')
+                        ->leftJoin("{$core}.machine_projects as mp", 'product_machines.project_id', '=', 'mp.id')
+                        ->leftJoin("{$core}.machine_lines as ml", 'product_machines.line_id', '=', 'ml.id')
+                        ->leftJoin("{$core}.factories as f", 'product_machines.factory_id', '=', 'f.id')
+                        ->where('p.is_deleted', 0)
+                        ->selectRaw("COALESCE(f.name, '—') as factory, COALESCE(mp.name, ml.name, '—') as machine, COUNT(DISTINCT p.productid) as total")
+                        ->groupBy('factory', 'machine')
+                        ->orderByRaw('COUNT(DISTINCT p.productid) DESC');
+                },
             ],
             'trash' => [
                 'label' => 'Trash',
@@ -212,22 +263,164 @@ class Products extends DataGrid
         return BplGrade::withTrashed()->pluck('grade', 'type')->all();
     }
 
-    /** The machine names already in use on finished-goods products. */
+    /* -- Machine hierarchy: Factory → Line → Project ------------------------ */
+
+    /**
+     * Factories a BIL product can be made in — this module's company only, so
+     * the list never offers another company's plants (PM2/PM3 are Belpapyrus).
+     */
     #[Computed]
-    public function machines(): array
+    public function factories()
     {
-        return FinishedGoodsProduct::query()
-            ->whereNotNull('mach')->where('mach', '<>', '')
-            ->distinct()->orderBy('mach')->pluck('mach')->all();
+        return Factory::query()->whereIn('id', $this->allowedFactoryIds())
+            ->orderBy('name')->get()
+            ->map(fn ($f) => ['id' => (string) $f->id, 'label' => $f->name]);
     }
 
-    /** The hardroll sources already in use (BPL, Imported, …). */
-    #[Computed]
-    public function hardrollSources(): array
+    /** Ids of the factories this module may assign, by company code. */
+    protected function allowedFactoryIds(): array
     {
-        return FinishedGoodsProduct::query()
-            ->whereNotNull('hardrollsource')->where('hardrollsource', '<>', '')
-            ->distinct()->orderBy('hardrollsource')->pluck('hardrollsource')->all();
+        return $this->allowedFactoryIds ??= Factory::query()
+            ->whereIn(
+                'company_id',
+                Company::query()->where('code', config('bil.company_code'))->pluck('id')
+            )
+            ->pluck('id')->all();
+    }
+
+    protected ?array $allowedFactoryIds = null;
+
+    /**
+     * Lines in a factory, parents and sub-lines together (sub-lines carry their
+     * own factory_id), each parent immediately above its children.
+     */
+    public function linesFor($factoryId): array
+    {
+        $factoryId = (int) $factoryId;
+        if (! $factoryId || ! in_array($factoryId, $this->allowedFactoryIds(), true)) {
+            return [];
+        }
+
+        return $this->lineCache[$factoryId] ??= MachineLine::query()
+            ->where('factory_id', $factoryId)->treeOrder()->get()
+            ->map(fn ($l) => [
+                'id' => (string) $l->id,
+                // Indent sub-lines so the two levels read apart in the list.
+                'label' => ($l->parent_id ? '— ' : '') . $l->name,
+            ])->all();
+    }
+
+    /**
+     * Projects on a line. Includes those hanging off its sub-lines, so picking
+     * a parent line still offers everything under it.
+     */
+    public function projectsFor($lineId): array
+    {
+        $lineId = (int) $lineId;
+        if (! $lineId) {
+            return [];
+        }
+
+        return $this->projectCache[$lineId] ??= (function () use ($lineId) {
+            $lineIds = MachineLine::query()
+                ->where('id', $lineId)->orWhere('parent_id', $lineId)
+                ->pluck('id')->all();
+
+            return MachineProject::query()->whereIn('line_id', $lineIds)->treeOrder()->get()
+                ->map(fn ($p) => [
+                    'id' => (string) $p->id,
+                    'label' => ($p->parent_id ? '— ' : '') . $p->name,
+                ])->all();
+        })();
+    }
+
+    /** Per-render memo so a form with several rows doesn't re-query per row. */
+    protected array $lineCache = [];
+    protected array $projectCache = [];
+
+    public function addMachineRow(): void
+    {
+        $this->machineRows[] = ['factory_id' => '', 'line_id' => '', 'project_id' => ''];
+    }
+
+    public function removeMachineRow(int $index): void
+    {
+        unset($this->machineRows[$index]);
+        $this->machineRows = array_values($this->machineRows);
+    }
+
+    /** Always show one row, so the form opens ready to fill in. */
+    protected function ensureMachineRow(): void
+    {
+        if ($this->machineRows === []) {
+            $this->addMachineRow();
+        }
+    }
+
+    /**
+     * Drop rows the user never filled in. The cascade means line and project
+     * can't be set without a factory, so a factory-less row is simply blank —
+     * an untouched row shouldn't block the save.
+     */
+    protected function pruneEmptyMachineRows(): void
+    {
+        $this->machineRows = array_values(array_filter(
+            $this->machineRows,
+            fn ($row) => trim((string) ($row['factory_id'] ?? '')) !== ''
+        ));
+    }
+
+    /* -- Hardroll source: Company → Factory --------------------------------- */
+
+    /**
+     * Companies a hardroll can come from — every company EXCEPT this module's
+     * own: BIL is where the hardroll is converted, never where it comes from.
+     */
+    #[Computed]
+    public function companies()
+    {
+        return Company::query()
+            ->where(fn ($q) => $q->where('code', '<>', config('bil.company_code'))->orWhereNull('code'))
+            ->orderBy('name')->get()
+            ->map(fn ($c) => ['id' => (string) $c->id, 'label' => $c->code ? "{$c->code} — {$c->name}" : $c->name]);
+    }
+
+    /** Whether the form currently names an outside mill. */
+    public function hardrollIsExternal(): bool
+    {
+        return ($this->form['hardroll_company_id'] ?? '') === self::HARDROLL_EXTERNAL;
+    }
+
+    /** A company's plants, for narrowing the source (optional). */
+    public function hardrollFactoriesFor($companyId): array
+    {
+        $companyId = (int) $companyId;
+        if (! $companyId) {
+            return [];
+        }
+
+        return $this->hardrollFactoryCache[$companyId] ??= Factory::query()
+            ->where('company_id', $companyId)->orderBy('name')->get()
+            ->map(fn ($f) => ['id' => (string) $f->id, 'label' => $f->name])->all();
+    }
+
+    protected array $hardrollFactoryCache = [];
+
+    /**
+     * The readable summary kept in `hardrollsource`: the company code, plus the
+     * plant when one is named — "BPL", "BPL PM3".
+     */
+    protected function hardrollSummary(array $form): string
+    {
+        $company = Company::find($form['hardroll_company_id'] ?? null);
+        if (! $company) {
+            return '';
+        }
+
+        $factory = Factory::find($form['hardroll_factory_id'] ?? null);
+        $name = $company->code ?: $company->name;
+
+        return mb_substr($factory ? "{$name} {$factory->name}" : $name, 0, 50);
     }
 
     /** The human grade names behind a basepaper string, e.g. "Premium-Premium". */
@@ -247,22 +440,32 @@ class Products extends DataGrid
 
     protected function resetForm(): void
     {
-        $this->form = array_fill_keys([...self::TEXT, ...self::NUMERIC, ...self::SHEET_WIDTH], '');
+        $this->form = array_fill_keys([...self::TEXT, ...self::NUMERIC, ...self::SHEET_WIDTH, ...self::HARDROLL], '');
         $this->form['ply'] = '0';
-        $this->form['lamedge'] = 'N/A';
-        $this->gradeTypes = ['', '', ''];
+        $this->form['lamedge'] = '';
+        $this->gradeTypes = [];
         $this->gradeGrouping = 'none';
+        $this->machineRows = [];
+        $this->legacyMachine = '';
         $this->image = null;
         $this->currentImage = '';
+        $this->ensureMachineRow();
     }
 
     protected function fillForm(int $id): void
     {
-        $product = FinishedGoodsProduct::findOrFail($id);
+        $product = FinishedGoodsProduct::with('machines')->findOrFail($id);
         $this->resetForm();
 
-        foreach ([...self::TEXT, ...self::NUMERIC] as $field) {
+        foreach ([...self::TEXT, ...self::NUMERIC, ...self::HARDROLL] as $field) {
             $this->form[$field] = (string) ($product->{$field} ?? '');
+        }
+
+        // No company id but text on record = an outside mill; show it in the
+        // external branch so it can be edited rather than only preserved.
+        if (! $product->hardroll_company_id && trim((string) $product->hardrollsource) !== '') {
+            $this->form['hardroll_company_id'] = self::HARDROLL_EXTERNAL;
+            $this->form['hardroll_source_text'] = (string) $product->hardrollsource;
         }
 
         $parts = array_pad(explode(':', (string) $product->sheetwidth), 3, '0');
@@ -271,10 +474,62 @@ class Products extends DataGrid
         }
 
         $grade = GradeType::parse($product->basepaper);
-        $this->gradeTypes = array_slice(array_pad($grade['types'], 3, ''), 0, 3);
+        $plies = max((int) $product->ply, count($grade['types']));
+        $this->gradeTypes = array_slice(array_pad($grade['types'], $plies, ''), 0, $plies);
         $this->gradeGrouping = $grade['grouping'];
 
+        $this->machineRows = $product->machines->map(fn ($m) => [
+            'factory_id' => (string) ($m->factory_id ?: ''),
+            'line_id' => (string) ($m->line_id ?: ''),
+            'project_id' => (string) ($m->project_id ?: ''),
+        ])->all();
+
+        // Only surface the legacy text when nothing structured replaced it yet.
+        $this->legacyMachine = $product->machines->isEmpty() ? (string) $product->mach : '';
+
+        $this->ensureMachineRow();
+
         $this->currentImage = (string) $product->imagepath;
+    }
+
+    /* -- Ply count ---------------------------------------------------------- */
+
+    /** Add a ply (and its grade-type slot). Plies are added one at a time. */
+    public function addPly(): void
+    {
+        $plies = (int) ($this->form['ply'] ?? 0);
+        if ($plies >= self::MAX_PLIES) {
+            return;
+        }
+
+        $this->form['ply'] = (string) ($plies + 1);
+        $this->syncPlies();
+    }
+
+    /** Drop one ply, keeping the grade types of the plies around it. */
+    public function removePly(int $index): void
+    {
+        unset($this->gradeTypes[$index]);
+        $this->gradeTypes = array_values($this->gradeTypes);
+        $this->form['ply'] = (string) count($this->gradeTypes);
+        $this->syncPlies();
+    }
+
+    /** Keep the grade-type slots and the grouping consistent with the count. */
+    protected function syncPlies(): void
+    {
+        $plies = max(0, min((int) ($this->form['ply'] ?? 0), self::MAX_PLIES));
+        $this->form['ply'] = (string) $plies;
+
+        $this->gradeTypes = array_slice(array_pad($this->gradeTypes, $plies, ''), 0, $plies);
+
+        // Bracket groupings only mean anything up to three plies.
+        if (! GradeType::groupable($plies)) {
+            $this->gradeGrouping = 'none';
+        }
+
+        $this->syncGradeType();
+        $this->recompute();
     }
 
     /** The picture already on the product being edited, for the form preview. */
@@ -301,12 +556,30 @@ class Products extends DataGrid
                 Rule::unique('bil.products', 'productname')->ignore($this->editingId, 'productid'),
             ],
             'form.productgroup' => ['required', 'string', 'max:50'],
-            'form.ply' => ['required', 'integer', 'min:0', 'max:3'],
-            'form.lamedge' => ['nullable', 'string', 'max:50'],
-            'form.mach' => ['nullable', 'string', 'max:255'],
+            'form.ply' => ['required', 'integer', 'min:0', 'max:' . self::MAX_PLIES],
+            // Optional: a product with no lamination/edge finish stores NULL.
+            'form.lamedge' => ['nullable', 'string', 'max:50', Rule::in(self::LAM_EDGE)],
             'form.embossing' => ['nullable', 'string', 'max:255'],
+            // A machine row must at least name its factory; line and project
+            // narrow it down and are optional.
+            'machineRows' => ['array'],
+            // Restricted to this module's company, not just any factory row —
+            // the select is filtered, but the id still arrives from the client.
+            'machineRows.*.factory_id' => ['required', 'integer', Rule::in($this->allowedFactoryIds())],
+            'machineRows.*.line_id' => ['nullable', 'integer', 'exists:core.machine_lines,id'],
+            'machineRows.*.project_id' => ['nullable', 'integer', 'exists:core.machine_projects,id'],
             'form.basepaper' => ['nullable', 'string', 'max:255'],
-            'form.hardrollsource' => ['nullable', 'string', 'max:50'],
+            // Either a company id or the "outside mill" sentinel.
+            'form.hardroll_company_id' => [
+                'nullable',
+                Rule::in([self::HARDROLL_EXTERNAL, ...array_column($this->companies->all(), 'id')]),
+            ],
+            'form.hardroll_factory_id' => ['nullable', 'integer', 'exists:core.factories,id'],
+            // Required only when an outside mill is chosen; 50 = the column width.
+            'form.hardroll_source_text' => [
+                Rule::requiredIf(fn () => $this->hardrollIsExternal()),
+                'nullable', 'string', 'max:50',
+            ],
             // Narrow legacy columns — validate to the width so a save can't be
             // rejected by strict mode with a raw SQL error.
             'form.hardrollgsm' => ['nullable', 'string', 'max:5'],
@@ -334,11 +607,16 @@ class Products extends DataGrid
             'form.productname' => 'product name',
             'form.productgroup' => 'product group',
             'form.ply' => 'number of ply',
-            'form.mach' => 'production machine',
             'form.basepaper' => 'hardroll grade type',
             'form.hardrollgsm' => 'hardroll GSM',
-            'form.waste' => 'production waste',
+            'form.waste' => 'expected production waste',
+            'form.lamedge' => 'lam / edge',
+            'form.hardroll_company_id' => 'hardroll source company',
+            'form.hardroll_factory_id' => 'hardroll source factory',
             'image' => 'product picture',
+            'machineRows.*.factory_id' => 'factory',
+            'machineRows.*.line_id' => 'line',
+            'machineRows.*.project_id' => 'project',
         ];
 
         foreach ([...self::TEXT, ...self::NUMERIC, ...self::SHEET_WIDTH] as $field) {
@@ -364,7 +642,15 @@ class Products extends DataGrid
             }
 
             if ($field === 'ply') {
-                $this->syncGradeType();
+                $this->syncPlies();
+            }
+
+            // Switching the source invalidates whichever branch is now unused.
+            if ($field === 'hardroll_company_id') {
+                $this->form['hardroll_factory_id'] = '';
+                if (! $this->hardrollIsExternal()) {
+                    $this->form['hardroll_source_text'] = '';
+                }
             }
 
             return;
@@ -372,6 +658,19 @@ class Products extends DataGrid
 
         if ($name === 'gradeGrouping' || str_starts_with($name, 'gradeTypes')) {
             $this->syncGradeType();
+
+            return;
+        }
+
+        // A machine row narrows Factory → Line → Project, so changing a level
+        // clears the ones below it rather than leaving a mismatched path.
+        if (preg_match('/^machineRows\.(\d+)\.(factory_id|line_id)$/', $name, $m)) {
+            $index = (int) $m[1];
+
+            if ($m[2] === 'factory_id') {
+                $this->machineRows[$index]['line_id'] = '';
+            }
+            $this->machineRows[$index]['project_id'] = '';
         }
     }
 
@@ -434,7 +733,12 @@ class Products extends DataGrid
 
     public function save(): void
     {
+        $this->pruneEmptyMachineRows();
         $validated = $this->validate();
+
+        if (! $this->machinePathsAreConsistent()) {
+            return;
+        }
         $spec = $this->specPayload($validated['form']);
         $isNew = $this->editingId === null;
 
@@ -442,24 +746,37 @@ class Products extends DataGrid
         // leave a stray file, and a failed file write should not lose the spec.
         $picture = $this->image ? QcProductImages::store($this->image) : null;
 
+        $rows = $this->machineRowsToSave();
+
         try {
-            DB::connection('bil')->transaction(function () use ($spec, $isNew, $picture) {
+            DB::connection('bil')->transaction(function () use ($spec, $isNew, $picture, $rows) {
                 if ($isNew) {
                     $spec['revnumber'] = 0;
                     $spec['imagepath'] = $picture ?? '';
-                    FinishedGoodsProduct::create($spec);
+                    $spec['mach'] = $this->machSummary($rows);
+                    $product = FinishedGoodsProduct::create($spec);
+                    $this->saveMachines((int) $product->productid, $rows);
                     return;
                 }
 
                 $product = FinishedGoodsProduct::query()->lockForUpdate()->findOrFail($this->editingId);
 
                 // Archive the spec exactly as stored, not as the client last saw
-                // it, then move the product on to its next revision.
-                QcRevisionArchive::archive((int) $product->productid, $product->getAttributes());
+                // it, then move the product on to its next revision. Machines
+                // ride along so an old revision still says what it ran on.
+                QcRevisionArchive::archive(
+                    (int) $product->productid,
+                    $product->getAttributes() + ['machines' => $this->machineLabels((int) $product->productid)]
+                );
 
                 $spec['revnumber'] = (int) $product->revnumber + 1;
                 $spec['imagepath'] = $picture ?? (string) $product->imagepath;
+                // With no rows the legacy free-text machine is kept rather than
+                // blanked — 19 products still carry one that matched no machine.
+                $spec['mach'] = $rows === [] ? (string) $product->mach : $this->machSummary($rows);
+
                 $product->update($spec);
+                $this->saveMachines((int) $product->productid, $rows);
             });
         } catch (QueryException $e) {
             // Product code and name are both UNIQUE. The Rule::unique checks
@@ -476,13 +793,132 @@ class Products extends DataGrid
         session()->flash('ok', $isNew ? 'Product added.' : 'Product updated — previous revision archived.');
     }
 
+    /* -- Machine assignments ------------------------------------------------ */
+
+    /**
+     * Check each row is a real path down the hierarchy: the line belongs to the
+     * chosen factory and the project to the chosen line. The cascade keeps this
+     * true in normal use, so a mismatch means a stale or hand-crafted request —
+     * refuse it rather than storing a path that doesn't exist.
+     */
+    protected function machinePathsAreConsistent(): bool
+    {
+        $ok = true;
+
+        // Same rule for the hardroll source: the plant must be the company's.
+        // An outside mill has no plant to check.
+        $sourceFactory = (string) ($this->form['hardroll_factory_id'] ?? '');
+        if (! $this->hardrollIsExternal() && $sourceFactory !== '' && ! in_array(
+            $sourceFactory,
+            array_column($this->hardrollFactoriesFor($this->form['hardroll_company_id'] ?? ''), 'id'),
+            true
+        )) {
+            $this->addError('form.hardroll_factory_id', 'That factory does not belong to the selected company.');
+            $ok = false;
+        }
+
+        foreach ($this->machineRows as $i => $row) {
+            $line = (string) ($row['line_id'] ?? '');
+            $project = (string) ($row['project_id'] ?? '');
+
+            if ($line !== '' && ! in_array($line, array_column($this->linesFor($row['factory_id'] ?? ''), 'id'), true)) {
+                $this->addError("machineRows.{$i}.line_id", 'That line is not in the selected factory.');
+                $ok = false;
+                continue;
+            }
+
+            if ($project !== '' && ! in_array($project, array_column($this->projectsFor($line), 'id'), true)) {
+                $this->addError("machineRows.{$i}.project_id", 'That project is not on the selected line.');
+                $ok = false;
+            }
+        }
+
+        return $ok;
+    }
+
+    /** The form's machine rows, cleaned up and de-duplicated, ready to store. */
+    protected function machineRowsToSave(): array
+    {
+        $rows = [];
+        $seen = [];
+
+        foreach ($this->machineRows as $row) {
+            $factory = (int) ($row['factory_id'] ?? 0);
+            if (! $factory) {
+                continue;
+            }
+
+            $key = $factory . ':' . (int) ($row['line_id'] ?? 0) . ':' . (int) ($row['project_id'] ?? 0);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+
+            $rows[] = [
+                'factory_id' => $factory,
+                'line_id' => ((int) ($row['line_id'] ?? 0)) ?: null,
+                'project_id' => ((int) ($row['project_id'] ?? 0)) ?: null,
+                'sort_order' => count($rows),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /** Replace a product's assignments with the given rows. */
+    protected function saveMachines(int $productId, array $rows): void
+    {
+        FinishedGoodsProductMachine::where('product_id', $productId)->delete();
+
+        foreach ($rows as $row) {
+            FinishedGoodsProductMachine::create($row + ['product_id' => $productId]);
+        }
+    }
+
+    /**
+     * The readable summary kept in `products.mach` for the legacy QC screens:
+     * the most specific machine of each assignment, comma separated and clipped
+     * to the column width.
+     */
+    protected function machSummary(array $rows): string
+    {
+        $names = [];
+
+        foreach ($rows as $row) {
+            $name = $row['project_id']
+                ? MachineProject::find($row['project_id'])?->name
+                : ($row['line_id']
+                    ? MachineLine::find($row['line_id'])?->name
+                    : Factory::find($row['factory_id'])?->name);
+
+            if ($name) {
+                $names[] = $name;
+            }
+        }
+
+        return mb_substr(implode(', ', array_unique($names)), 0, 255);
+    }
+
+    /** A product's stored assignments as display strings, for the archive. */
+    protected function machineLabels(int $productId): array
+    {
+        return FinishedGoodsProductMachine::with(['factory', 'line', 'project'])
+            ->where('product_id', $productId)
+            ->orderBy('sort_order')->orderBy('id')
+            ->get()->map(fn ($m) => $m->label())->all();
+    }
+
     /** Map the validated form onto the products table's columns. */
     protected function specPayload(array $form): array
     {
         $spec = [];
 
         foreach (self::TEXT as $field) {
-            $spec[$field] = trim((string) ($form[$field] ?? ''));
+            $value = trim((string) ($form[$field] ?? ''));
+            // Columns where "nothing" is NULL, not an empty string.
+            $spec[$field] = ($value === '' && in_array($field, self::NULLABLE_TEXT, true))
+                ? null
+                : $value;
         }
 
         foreach (self::NUMERIC as $field) {
@@ -495,6 +931,20 @@ class Products extends DataGrid
             fn ($field) => (string) round((float) ($form[$field] ?? 0), 2),
             self::SHEET_WIDTH
         ));
+
+        // Hardroll source. One of our companies (ids are the record and
+        // `hardrollsource` a generated summary), or an outside mill (no ids,
+        // the typed name IS the record).
+        $external = ($form['hardroll_company_id'] ?? '') === self::HARDROLL_EXTERNAL;
+        $companyId = $external ? null : (((int) ($form['hardroll_company_id'] ?? 0)) ?: null);
+        $factoryId = ((int) ($form['hardroll_factory_id'] ?? 0)) ?: null;
+
+        $spec['hardroll_company_id'] = $companyId;
+        // A plant without a company is meaningless; drop it rather than store it.
+        $spec['hardroll_factory_id'] = $companyId ? $factoryId : null;
+        $spec['hardrollsource'] = $external
+            ? mb_substr(trim((string) ($form['hardroll_source_text'] ?? '')), 0, 50)
+            : ($companyId ? $this->hardrollSummary($form) : '');
 
         $spec['revdate'] = now()->format('Y/m/d');
         $spec['timestamp'] = now()->getTimestamp();
@@ -557,7 +1007,12 @@ class Products extends DataGrid
             return [];
         }
 
-        return QcRevisionArchive::history($this->specsId, $product->getAttributes());
+        // The current revision's machines come from the assignment table;
+        // earlier ones carry the labels captured when they were archived.
+        return QcRevisionArchive::history(
+            $this->specsId,
+            $product->getAttributes() + ['machines' => $this->machineLabels($this->specsId)]
+        );
     }
 
     /** The revision currently selected in the spec sheet. */

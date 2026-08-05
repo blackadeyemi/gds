@@ -50,6 +50,9 @@ class QcRevisionArchive
      * the form's [min, mid, max] array rather than the "min:mid:max" string the
      * table stores (506 of the entries currently on record). Anything else that
      * arrives structured is rendered rather than left to blow up a view.
+     *
+     * `machines` (a list of "Factory → Line → Project" labels) is flattened the
+     * same way, so a revision always presents flat, printable values.
      */
     protected static function normalise(array $revision): array
     {
@@ -71,7 +74,9 @@ class QcRevisionArchive
     public static function history(int $productId, array $current): array
     {
         $all = self::archived($productId);
-        $all[] = $current;
+        // Normalised too, so every entry in the history has the same shape —
+        // notably `machines`, which is passed in as a list of labels.
+        $all[] = self::normalise($current);
 
         // Revision numbers are the user-facing ordering and are not always
         // dense (the legacy Revision form could insert one), so sort on them

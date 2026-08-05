@@ -6,7 +6,7 @@
 
 /* ---- Sidebar ---- */
 .sidebar {
-    width: 250px; flex: 0 0 250px; background: var(--side-bg); color: var(--side-ink);
+    width: 280px; flex: 0 0 280px; background: var(--side-bg); color: var(--side-ink);
     display: flex; flex-direction: column; position: fixed; inset: 0 auto 0 0; z-index: 40;
     transition: width .18s ease, transform .2s ease; overflow: hidden;
     border-right: 1px solid var(--side-line);
@@ -48,7 +48,7 @@
 .app.collapsed .nav-sub { display: none !important; }
 
 /* ---- Main column ---- */
-.main { flex: 1; margin-left: 250px; min-width: 0; display: flex; flex-direction: column; transition: margin-left .18s ease; }
+.main { flex: 1; margin-left: 280px; min-width: 0; display: flex; flex-direction: column; transition: margin-left .18s ease; }
 .app.collapsed .main { margin-left: 70px; }
 
 .topbar {
@@ -87,7 +87,7 @@
 /* Responsive: below 900px the sidebar is an off-canvas overlay */
 .sidebar-backdrop { display: none; }
 @media (max-width: 900px) {
-    .sidebar { transform: translateX(-100%); width: 250px !important; flex-basis: 250px !important; }
+    .sidebar { transform: translateX(-100%); width: 280px !important; flex-basis: 280px !important; }
     .app.mobile-open .sidebar { transform: translateX(0); }
     .app.mobile-open .sidebar .brand-text,
     .app.mobile-open .sidebar .nav-link .label,
