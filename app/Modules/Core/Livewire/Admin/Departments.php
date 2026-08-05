@@ -33,9 +33,11 @@ class Departments extends DataGrid
                     ['Name', 'name'],
                     ['Company', 'company.name', fn ($r) => e($r->company?->name ?? '—')],
                     ['Status', 'status', fn ($r) => '<span class="badge ' . ($r->status === 'active' ? 'badge-success' : 'badge-muted') . '">' . $r->status . '</span>'],
+                    ['Divisions', 'divisions_count'],
+                    ['Staff', 'staff_count'],
                     ['Users', 'users_count'],
                 ],
-                'query' => fn () => Department::query()->with('company')->withCount('users'),
+                'query' => fn () => Department::query()->with('company')->withCount(['users', 'divisions', 'staff']),
                 'searchable' => ['name'],
                 'sortable' => ['name', 'status'],
             ],
@@ -84,19 +86,22 @@ class Departments extends DataGrid
         $this->status = $d->status;
     }
 
-    /** A department can't be removed while users still belong to it. */
+    /** A department can't be removed while anything still hangs off it. */
     public function deleteGuard($row): ?string
     {
-        $c = $row->users_count ?? 0;
+        $parts = [];
+        foreach (['users' => 'user', 'divisions' => 'division', 'staff' => 'staff member'] as $count => $noun) {
+            if (($row->{$count . '_count'} ?? 0) > 0) {
+                $parts[] = $row->{$count . '_count'} . ' ' . Str::plural($noun, $row->{$count . '_count'});
+            }
+        }
 
-        return $c > 0
-            ? 'In use by ' . $c . ' ' . Str::plural('user', $c) . ' — cannot delete.'
-            : null;
+        return $parts ? 'In use by ' . implode(', ', $parts) . ' — cannot delete.' : null;
     }
 
     protected function findRow(int $id)
     {
-        return Department::withCount('users')->find($id);
+        return Department::withCount(['users', 'divisions', 'staff'])->find($id);
     }
 
     protected function performDelete(int $id): void

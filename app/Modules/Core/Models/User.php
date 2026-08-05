@@ -35,6 +35,12 @@ class User extends Authenticatable
         return $this->belongsTo(Department::class, 'department_id');
     }
 
+    /** Division within that department. Optional — not every department has any. */
+    public function division(): BelongsTo
+    {
+        return $this->belongsTo(Division::class, 'division_id');
+    }
+
     /** Admin role (legacy_level 1) grants every ability on every page. */
     public function isAdmin(): bool
     {

@@ -9,6 +9,7 @@ use Livewire\Attributes\Title;
 use Modules\Core\Livewire\DataGrid;
 use Modules\Core\Models\Company;
 use Modules\Core\Models\Department;
+use Modules\Core\Models\Division;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 
@@ -21,6 +22,7 @@ class Users extends DataGrid
     public ?int $role_id = null;
     public ?int $company_id = null;
     public ?int $department_id = null;
+    public ?int $division_id = null;
     public ?string $password = null;
 
     public function pageKey(): string { return 'admin.users'; }
@@ -44,8 +46,9 @@ class Users extends DataGrid
                     ['Role', 'role', fn ($r) => e($r->roles->first()?->name ?? '—')],
                     ['Company', 'company.name', fn ($r) => e($r->company?->name ?? '—')],
                     ['Department', 'department.name', fn ($r) => e($r->department?->name ?? '—')],
+                    ['Division', 'division.name', fn ($r) => e($r->division?->name ?? '—')],
                 ],
-                'query' => fn () => User::query()->with('roles', 'company', 'department'),
+                'query' => fn () => User::query()->with('roles', 'company', 'department', 'division'),
                 'searchable' => ['username', 'fullname', 'email'],
                 'sortable' => ['username', 'fullname', 'email'],
             ],
@@ -89,10 +92,26 @@ class Users extends DataGrid
             : collect();
     }
 
-    /** Changing company invalidates the previously-picked department. */
+    /** Divisions within the chosen department — the third cascade step. */
+    #[Computed]
+    public function divisionsForDepartment()
+    {
+        return $this->department_id
+            ? Division::where('department_id', $this->department_id)->orderBy('name')->get()
+            : collect();
+    }
+
+    /** Changing company invalidates the department, and with it the division. */
     public function updatedCompanyId(): void
     {
         $this->department_id = null;
+        $this->division_id = null;
+    }
+
+    /** Changing department invalidates the previously-picked division. */
+    public function updatedDepartmentId(): void
+    {
+        $this->division_id = null;
     }
 
     /** Admin users span all companies, so company/department don't apply. */
@@ -118,6 +137,11 @@ class Users extends DataGrid
                 'nullable',
                 Rule::exists('departments', 'id')->where('company_id', $this->company_id),
             ],
+            // Optional third level; must sit under the chosen department.
+            'division_id' => [
+                'nullable',
+                Rule::exists('divisions', 'id')->where('department_id', $this->department_id),
+            ],
             'password' => [$this->editingId ? 'nullable' : 'required', 'nullable', 'string', 'min:4'],
         ];
     }
@@ -130,6 +154,7 @@ class Users extends DataGrid
         $this->role_id = null;
         $this->company_id = null;
         $this->department_id = null;
+        $this->division_id = null;
         $this->password = null;
     }
 
@@ -142,6 +167,7 @@ class Users extends DataGrid
         $this->role_id = optional(Role::where('name', $u->roles->first()?->name)->first())->id;
         $this->company_id = $u->company_id;
         $this->department_id = $u->department_id;
+        $this->division_id = $u->division_id;
         $this->password = null;
     }
 
@@ -167,6 +193,7 @@ class Users extends DataGrid
         $scoped = ! $this->isAdminRole();
         $u->company_id = $scoped ? $this->company_id : null;
         $u->department_id = $scoped ? $this->department_id : null;
+        $u->division_id = $scoped ? $this->division_id : null;
         // Keep the legacy NOT NULL columns valid: userlevel mirrors the role's
         // legacy level; new rows get a default landing page.
         $u->userlevel = $role?->legacy_level ?? 1;

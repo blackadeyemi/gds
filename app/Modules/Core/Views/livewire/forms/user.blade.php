@@ -45,6 +45,17 @@
         ])
         @error('department_id') <div class="form-error">{{ $message }}</div> @enderror
     </div>
+    <div class="form-group">
+        <label class="form-label">Division <span style="font-weight:400">(optional)</span></label>
+        @include('core::partials.searchable-select', [
+            'field' => 'division_id',
+            'options' => $this->divisionsForDepartment,
+            'placeholder' => $this->department_id ? '— No division —' : 'Select a department first',
+            'disabled' => ! $this->department_id,
+            'key' => 'div-' . ($this->department_id ?? 'none'),
+        ])
+        @error('division_id') <div class="form-error">{{ $message }}</div> @enderror
+    </div>
 @endif
 <div class="form-group">
     <label class="form-label">Password @if ($editingId)<span class="text-muted">(leave blank to keep)</span>@endif</label>

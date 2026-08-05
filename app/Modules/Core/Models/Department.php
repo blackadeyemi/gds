@@ -20,4 +20,14 @@ class Department extends Model
     {
         return $this->hasMany(User::class, 'department_id');
     }
+
+    public function divisions(): HasMany
+    {
+        return $this->hasMany(Division::class);
+    }
+
+    public function staff(): HasMany
+    {
+        return $this->hasMany(Staff::class);
+    }
 }

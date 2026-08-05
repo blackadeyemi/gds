@@ -12,6 +12,14 @@ return [
         \Modules\Core\Livewire\Admin\Departments::class,
         \Modules\Core\Livewire\Admin\Roles::class,
         \Modules\Core\Livewire\Admin\Users::class,
+        \Modules\Core\Livewire\Admin\Factories::class,
+        \Modules\Core\Livewire\Admin\Divisions::class,
+        \Modules\Core\Livewire\Admin\Staffs::class,
+        \Modules\Core\Livewire\Settings\ServiceTypes::class,
+
+        // BIL — Machines
+        \Modules\Bil\Livewire\Machines\Lines::class,
+        \Modules\Bil\Livewire\Machines\Projects::class,
 
         // BIL — Raw Materials
         \Modules\Bil\Livewire\RawMaterials\Products::class,

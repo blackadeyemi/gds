@@ -139,6 +139,7 @@ a:hover { text-decoration: underline; }
 .form-control:focus { border-color: var(--brand); box-shadow: 0 0 0 4px var(--brand-ring); background: var(--surface); }
 select.form-control { appearance: none; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D'12'%20height%3D'8'%20viewBox%3D'0%200%2012%208'%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%3E%3Cpath%20d%3D'M1%201l5%205%205-5'%20stroke%3D'%236b7280'%20stroke-width%3D'2'%20fill%3D'none'%20fill-rule%3D'evenodd'%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 0.8em center; padding-right: 2.2em; }
 .form-error { color: var(--danger); font-size: 0.8rem; margin-top: 0.35em; }
+.form-hint { color: var(--muted); font-size: 0.78rem; margin-top: 0.35em; }
 
 /* ---- Badges ---- */
 .badge { display: inline-flex; align-items: center; font-size: 0.72rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: 0.28em 0.6em; border-radius: 999px; }

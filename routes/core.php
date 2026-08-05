@@ -4,10 +4,14 @@ use Illuminate\Support\Facades\Route;
 use Modules\Core\Controllers\AuthController;
 use Modules\Core\Livewire\Admin\Companies;
 use Modules\Core\Livewire\Admin\Departments;
+use Modules\Core\Livewire\Admin\Factories;
+use Modules\Core\Livewire\Admin\Divisions;
 use Modules\Core\Livewire\Admin\Roles;
+use Modules\Core\Livewire\Admin\Staffs;
 use Modules\Core\Livewire\Admin\Users;
 use Modules\Core\Livewire\Settings\Appearance;
 use Modules\Core\Livewire\Settings\DataViews;
+use Modules\Core\Livewire\Settings\ServiceTypes;
 use Modules\Core\Livewire\Settings\Pages;
 use Modules\Core\Livewire\Settings\ShiftSettings;
 
@@ -29,6 +33,12 @@ Route::middleware('auth')->group(function () {
     Route::prefix('admin')->group(function () {
         Route::get('/companies', Companies::class)->middleware('page:admin.companies')->name('admin.companies');
         Route::get('/departments', Departments::class)->middleware('page:admin.departments')->name('admin.departments');
+        // Factories sit with the rest of the organisation structure (company,
+        // department, division, staff); the lines and projects beneath them
+        // live under BIL > Machines.
+        Route::get('/factories', Factories::class)->middleware('page:admin.factories')->name('admin.factories');
+        Route::get('/divisions', Divisions::class)->middleware('page:admin.divisions')->name('admin.divisions');
+        Route::get('/staff', Staffs::class)->middleware('page:admin.staff')->name('admin.staff');
         Route::get('/roles', Roles::class)->middleware('page:admin.roles')->name('admin.roles');
         Route::get('/users', Users::class)->middleware('page:admin.users')->name('admin.users');
 
@@ -53,6 +63,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/appearance', Appearance::class)->name('settings.appearance');
     Route::get('/settings/pages', Pages::class)->middleware('page:settings.pages')->name('settings.pages');
     Route::get('/settings/data-views', DataViews::class)->middleware('page:settings.data_views')->name('settings.data-views');
+
+    Route::get('/settings/service-types', ServiceTypes::class)->middleware('page:settings.service_types')->name('settings.service-types');
 
     // Shift windows — access granted per page (settings.shifts). Give the
     // Shift Settings page to Admin + an Operations Manager role, etc.

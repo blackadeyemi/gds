@@ -3,6 +3,10 @@
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Modules\Bil\Livewire\FinishedGoods\Products as FinishedGoodsProducts;
+use Modules\Bil\Livewire\Machines\Lines as MachineLines;
+use Modules\Bil\Livewire\Machines\Projects as MachineProjects;
+use Modules\Bil\Livewire\Machines\Reports\Services as ServicesReport;
+use Modules\Bil\Livewire\Machines\Services as MachineServices;
 use Modules\Bil\Livewire\RawMaterials\DamagedGoods;
 use Modules\Bil\Livewire\RawMaterials\FactoryEntrance;
 use Modules\Bil\Livewire\RawMaterials\Consumption;
@@ -204,5 +208,58 @@ Route::middleware('auth')
                 ->middleware('page:bil.raw_materials.reports.factory_returns')->name('factory-returns');
             Route::get('/damaged-goods', DamagedGoodsReport::class)
                 ->middleware('page:bil.raw_materials.reports.damaged_goods')->name('damaged-goods');
+        });
+    });
+
+/*
+| Machines — the Company > Factory > Line > Project spine. Factories live under
+| Settings (they belong to a company, not to BIL); the machines beneath them are
+| BIL's, so Lines and Projects sit here.
+*/
+Route::middleware('auth')
+    ->prefix('machines')->name('machines.')
+    ->group(function () {
+        Route::get('/lines', MachineLines::class)
+            ->middleware('page:bil.machines.lines')->name('lines');
+        Route::get('/projects', MachineProjects::class)
+            ->middleware('page:bil.machines.projects')->name('projects');
+        Route::get('/services', MachineServices::class)
+            ->middleware('page:bil.machines.services')->name('services');
+
+        // Reports — same print/download contract as the Raw Materials reports,
+        // but gated on bil.machines.reports.* keys.
+        Route::prefix('reports')->name('reports.')->group(function () {
+            Route::get('/services', ServicesReport::class)
+                ->middleware('page:bil.machines.reports.services')->name('services');
+
+            $reports = ['services' => ServicesReport::class];
+
+            $hydrate = function (string $class) {
+                $c = new $class();
+                $c->view = (string) request('view', '');
+                $c->search = (string) request('search', '');
+                $c->dateFrom = (string) request('dateFrom', now()->format('Y-m-d'));
+                $c->dateTo = (string) request('dateTo', now()->format('Y-m-d'));
+                $c->filters = array_map('strval', (array) request('filters', []));
+
+                return $c;
+            };
+
+            Route::get('/{report}/print', function (string $report) use ($reports, $hydrate) {
+                abort_unless(isset($reports[$report]), 404);
+                abort_unless((bool) request()->user()?->canDo('bil.machines.reports.' . str_replace('-', '_', $report), 'export'), 403);
+
+                return view('core::print.grid', $hydrate($reports[$report])->reportPayload());
+            })->name('print');
+
+            Route::get('/{report}/download', function (string $report) use ($reports, $hydrate) {
+                abort_unless(isset($reports[$report]), 404);
+                abort_unless((bool) request()->user()?->canDo('bil.machines.reports.' . str_replace('-', '_', $report), 'export'), 403);
+
+                $format = strtolower((string) request('format', 'xlsx'));
+                abort_unless(in_array($format, ['xlsx', 'csv', 'pdf'], true), 404);
+
+                return $hydrate($reports[$report])->export($format);
+            })->name('download');
         });
     });

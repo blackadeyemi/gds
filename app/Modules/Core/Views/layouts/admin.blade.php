@@ -10,6 +10,8 @@
     $onRawMaterials = request()->is('bil/raw-materials/*');
     $onRmReports = request()->is('bil/raw-materials/reports/*');
     $onFinishedGoods = request()->is('bil/finished-goods/*');
+    $onMachines = request()->is('bil/machines/*');
+    $onMachineReports = request()->is('bil/machines/reports/*');
     $onBpl = request()->is('bpl/*');
     $onJumboRolls = request()->is('bpl/jumbo-rolls/*');
     $onBplSales = request()->is('bpl/jumbo-rolls/sales/*');
@@ -56,6 +58,8 @@
         rawMaterialsOpen: {{ $onRawMaterials ? 'true' : 'false' }},
         rmReportsOpen: {{ $onRmReports ? 'true' : 'false' }},
         finishedGoodsOpen: {{ $onFinishedGoods ? 'true' : 'false' }},
+        machinesOpen: {{ $onMachines ? 'true' : 'false' }},
+        machineReportsOpen: {{ $onMachineReports ? 'true' : 'false' }},
         bplOpen: {{ $onBpl ? 'true' : 'false' }},
         jumboRollsOpen: {{ $onJumboRolls ? 'true' : 'false' }},
         bplSalesOpen: {{ $onBplSales ? 'true' : 'false' }},
@@ -63,7 +67,7 @@
             if (window.innerWidth <= 900) { this.mobileOpen = !this.mobileOpen; return; }
             this.collapsed = !this.collapsed;
             localStorage.setItem('gds_sidebar_collapsed', JSON.stringify(this.collapsed));
-            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; this.finishedGoodsOpen = false; this.bplOpen = false; this.jumboRollsOpen = false; this.bplSalesOpen = false; }
+            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; this.finishedGoodsOpen = false; this.machinesOpen = false; this.machineReportsOpen = false; this.bplOpen = false; this.jumboRollsOpen = false; this.bplSalesOpen = false; }
         },
         openGroup(group) {
             if (this.collapsed) {
@@ -216,6 +220,53 @@
                         </div>
                     </div>
                     @endcanPrefix
+
+                    @canPrefix('bil.machines.')
+                    <div class="nav-group" :class="{ open: machinesOpen }">
+                        <button type="button" class="nav-link" :class="{ active: {{ $onMachines ? 'true' : 'false' }} && collapsed }" @click="openGroup('machinesOpen')" title="Machines">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M19.1 4.9l-2.8 2.8M7.7 16.3l-2.8 2.8"/></svg>
+                            <span class="label">Machines</span>
+                            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                        </button>
+                        <div class="nav-sub" x-show="machinesOpen">
+                            @canPage('bil.machines.lines')
+                            <a href="{{ route('bil.machines.lines') }}" class="nav-link {{ $is('bil/machines/lines*') }}" title="Lines">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h10M4 19h6"/><circle cx="19" cy="12" r="1.6"/><circle cx="15" cy="19" r="1.6"/></svg>
+                                <span class="label">Lines</span>
+                            </a>
+                            @endcanPage
+                            @canPage('bil.machines.projects')
+                            <a href="{{ route('bil.machines.projects') }}" class="nav-link {{ $is('bil/machines/projects*') }}" title="Projects">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M6.5 10v5a2 2 0 0 0 2 2H14"/></svg>
+                                <span class="label">Projects</span>
+                            </a>
+                            @endcanPage
+                            @canPage('bil.machines.services')
+                            <a href="{{ route('bil.machines.services') }}" class="nav-link {{ $is('bil/machines/services*') }}" title="Services">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 0 5.4-5.4l-2.3 2.3-2-2 2.3-2.3z"/></svg>
+                                <span class="label">Services</span>
+                            </a>
+                            @endcanPage
+                            @canPrefix('bil.machines.reports.')
+                            <div class="nav-group" :class="{ open: machineReportsOpen }">
+                                <button type="button" class="nav-link" :class="{ active: {{ $onMachineReports ? 'true' : 'false' }} && collapsed }" @click="openGroup('machineReportsOpen')" title="Reports">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
+                                    <span class="label">Reports</span>
+                                    <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                                </button>
+                                <div class="nav-sub" x-show="machineReportsOpen">
+                                    @canPage('bil.machines.reports.services')
+                                    <a href="{{ route('bil.machines.reports.services') }}" class="nav-link {{ $is('bil/machines/reports/services*') }}" title="Services">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 0 5.4-5.4l-2.3 2.3-2-2 2.3-2.3z"/></svg>
+                                        <span class="label">Services</span>
+                                    </a>
+                                    @endcanPage
+                                </div>
+                            </div>
+                            @endcanPrefix
+                        </div>
+                    </div>
+                    @endcanPrefix
                 </div>
             </div>
             @endcanPrefix
@@ -291,6 +342,24 @@
                         <span class="label">Role</span>
                     </a>
                     @endcanPage
+                    @canPage('admin.factories')
+                    <a href="{{ url('/admin/factories') }}" class="nav-link {{ $is('admin/factories*') }}" title="Factories">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M3 21V10l5 3V10l5 3V10l5 3v8"/><path d="M18 13V5h3v16"/><path d="M7 17h.01M12 17h.01M17 17h.01"/></svg>
+                        <span class="label">Factories</span>
+                    </a>
+                    @endcanPage
+                    @canPage('admin.staff')
+                    <a href="{{ url('/admin/staff') }}" class="nav-link {{ $is('admin/staff*') }}" title="Staff">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <span class="label">Staff</span>
+                    </a>
+                    @endcanPage
+                    @canPage('admin.divisions')
+                    <a href="{{ url('/admin/divisions') }}" class="nav-link {{ $is('admin/divisions*') }}" title="Division">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="5" rx="1"/><rect x="2" y="16" width="6" height="5" rx="1"/><rect x="16" y="16" width="6" height="5" rx="1"/><path d="M12 7v4M5 16v-2h14v2"/></svg>
+                        <span class="label">Division</span>
+                    </a>
+                    @endcanPage
                     @canPage('admin.departments')
                     <a href="{{ url('/admin/departments') }}" class="nav-link {{ $is('admin/departments*') }}" title="Department">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"/><path d="M9 22v-4h6v4M9 6h.01M15 6h.01M9 10h.01M15 10h.01M9 14h.01M15 14h.01"/></svg>
@@ -328,6 +397,12 @@
                     <a href="{{ url('/settings/data-views') }}" class="nav-link {{ $is('settings/data-views*') }}" title="Data Views">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
                         <span class="label">Data Views</span>
+                    </a>
+                    @endcanPage
+                    @canPage('settings.service_types')
+                    <a href="{{ url('/settings/service-types') }}" class="nav-link {{ $is('settings/service-types*') }}" title="Service Types">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="18" cy="18" r="2.5"/></svg>
+                        <span class="label">Service Types</span>
                     </a>
                     @endcanPage
                     @canPage('settings.shifts')
@@ -389,6 +464,7 @@
 @livewireScripts
 <script src="{{ asset('js/flatpickr.min.js') }}"></script>
 <script src="{{ asset('js/datefield.js') }}"></script>
+<script src="{{ asset('js/searchable-select.js') }}"></script>
 <script src="{{ asset('js/settings.js') }}"></script>
 @stack('scripts')
 </body>

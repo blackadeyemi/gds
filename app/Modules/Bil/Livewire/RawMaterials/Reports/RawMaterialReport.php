@@ -456,10 +456,25 @@ abstract class RawMaterialReport extends Component
         return $q;
     }
 
+    /**
+     * Route names for print/download. Reports outside Raw Materials (e.g.
+     * Machines → Reports → Services) live under a different prefix and override
+     * these; everything else keeps the RM routes.
+     */
+    protected function printRouteName(): string
+    {
+        return 'bil.raw-materials.reports.print';
+    }
+
+    protected function downloadRouteName(): string
+    {
+        return 'bil.raw-materials.reports.download';
+    }
+
     /** URL to the print route carrying the current view + filters + search. */
     public function printUrl(): string
     {
-        return route('bil.raw-materials.reports.print', ['report' => $this->printKey()])
+        return route($this->printRouteName(), ['report' => $this->printKey()])
             . '?' . http_build_query($this->reportQueryParams());
     }
 
@@ -471,7 +486,7 @@ abstract class RawMaterialReport extends Component
      */
     public function downloadUrl(string $format): string
     {
-        return route('bil.raw-materials.reports.download', ['report' => $this->printKey()])
+        return route($this->downloadRouteName(), ['report' => $this->printKey()])
             . '?' . http_build_query(['format' => $format] + $this->reportQueryParams());
     }
 

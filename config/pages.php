@@ -19,6 +19,9 @@ $access = ['view'];
 // just view plus the special abilities that page supports.
 $entry = ['view', 'backdate'];
 $report = ['view', 'edit', 'delete', 'export'];
+// Entry form with no backdate concept: the dates ARE the record (a service job's
+// start and end), so there is nothing to lock to today.
+$entryPlain = ['view'];
 // Read-only reports / dashboards: viewable and exportable, nothing to edit.
 $snapshot = ['view', 'export'];
 
@@ -29,11 +32,23 @@ return [
         ['key' => 'admin.roles',       'label' => 'Roles',       'module' => 'Admin', 'route' => 'admin.roles',       'abilities' => $crud],
         ['key' => 'admin.departments', 'label' => 'Departments', 'module' => 'Admin', 'route' => 'admin.departments', 'abilities' => $crud],
         ['key' => 'admin.companies',   'label' => 'Companies',   'module' => 'Admin', 'route' => 'admin.companies',   'abilities' => $crud],
+        ['key' => 'admin.factories',   'label' => 'Factories',   'module' => 'Admin', 'route' => 'admin.factories',   'abilities' => $crud],
+        ['key' => 'admin.divisions',   'label' => 'Divisions',   'module' => 'Admin', 'route' => 'admin.divisions',   'abilities' => $crud],
+        ['key' => 'admin.staff',       'label' => 'Staff',       'module' => 'Admin', 'route' => 'admin.staff',       'abilities' => $crud],
 
         // Settings
         ['key' => 'settings.pages',      'label' => 'Pages',          'module' => 'Settings', 'route' => 'settings.pages',      'abilities' => $access],
         ['key' => 'settings.data_views', 'label' => 'Data Views',     'module' => 'Settings', 'route' => 'settings.data-views', 'abilities' => $access],
         ['key' => 'settings.shifts',     'label' => 'Shift Settings', 'module' => 'Settings', 'route' => 'settings.shifts',     'abilities' => $access],
+        ['key' => 'settings.service_types', 'label' => 'Service Types', 'module' => 'Settings', 'route' => 'settings.service-types', 'abilities' => $crud],
+
+        // BIL — Machines (Company > Factory > Line > Project)
+        ['key' => 'bil.machines.lines',    'label' => 'Lines',    'module' => 'BIL / Machines', 'route' => 'bil.machines.lines',    'abilities' => $crud],
+        ['key' => 'bil.machines.projects', 'label' => 'Projects', 'module' => 'BIL / Machines', 'route' => 'bil.machines.projects', 'abilities' => $crud],
+        ['key' => 'bil.machines.services', 'label' => 'Services', 'module' => 'BIL / Machines', 'route' => 'bil.machines.services', 'abilities' => $entryPlain],
+
+        // BIL — Machines Reports
+        ['key' => 'bil.machines.reports.services', 'label' => 'Services', 'module' => 'BIL / Machines Reports', 'route' => 'bil.machines.reports.services', 'abilities' => $report],
 
         // BIL — Finished Goods
         ['key' => 'bil.finished_goods.products', 'label' => 'Products', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.products', 'abilities' => $crud],
