@@ -70,10 +70,21 @@ class Staffs extends DataGrid
         ];
     }
 
+    /**
+     * Departments, qualified by company. Names repeat across companies —
+     * Belimpex and Belpapyrus both have a "Factory" — so an unqualified list is
+     * ambiguous. The company also makes it obvious when a department is an org
+     * unit rather than a factory-floor one (Belimpex has both an "Electrical"
+     * department for accounts and an "Electrical" division under Maintenance).
+     */
     #[Computed]
     public function departments()
     {
-        return Department::orderBy('name')->get();
+        return Department::with('company')->orderBy('name')->get()
+            ->map(fn ($d) => [
+                'id' => $d->id,
+                'name' => $d->name . ($d->company ? ' · ' . $d->company->name : ''),
+            ]);
     }
 
     /** Divisions within the chosen department — drives the dependent select. */
