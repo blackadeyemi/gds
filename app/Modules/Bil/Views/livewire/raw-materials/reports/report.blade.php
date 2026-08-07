@@ -115,7 +115,6 @@
             $showActions = $this->hasActions() && ($gridView['type'] ?? 'table') === 'table';
             // Summary views can drill into the records behind each group.
             $expandBy = ($gridView['type'] ?? 'table') === 'summary' ? $this->expandableBy() : null;
-            $detailCols = $expandBy ? $this->detailColumns() : [];
             $spanCount = count($columns) + 1 + ($showActions ? 1 : 0) + ($expandBy ? 1 : 0);
         @endphp
 
@@ -140,17 +139,10 @@
                         @php $rowKey = $expandBy ? (string) data_get($row, $expandBy) : null; @endphp
                         <tr wire:key="row-{{ $gridView['key'] }}-{{ $row->id ?? $i }}">
                             @if ($expandBy)
-                                @php $isOpen = $this->isRowExpanded($rowKey); @endphp
                                 <td>
                                     <button type="button" class="btn btn-ghost btn-icon btn-sm"
-                                            wire:click="toggleRowDetails(@js($rowKey))"
-                                            title="{{ $isOpen ? 'Hide details' : 'View details' }}"
-                                            aria-expanded="{{ $isOpen ? 'true' : 'false' }}">
-                                        @if ($isOpen)
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M1 1l22 22"/></svg>
-                                        @else
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                                        @endif
+                                            wire:click="openRowDetails(@js($rowKey))" title="View details">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                                     </button>
                                 </td>
                             @endif
@@ -188,39 +180,6 @@
                             @endif
                         </tr>
 
-                        {{-- The records behind this group, nested under it — the
-                             shape of the legacy grouped reports. Read-only. --}}
-                        @if ($expandBy && $this->isRowExpanded($rowKey))
-                            <tr wire:key="detail-{{ $gridView['key'] }}-{{ $rowKey }}" class="detail-row">
-                                <td colspan="{{ $spanCount }}">
-                                    @php $details = $this->detailRows($rowKey); @endphp
-                                    @if (count($details))
-                                        <div class="table-wrap detail-panel">
-                                            <table class="data">
-                                                <thead>
-                                                    <tr>
-                                                        @foreach ($detailCols as $dc)
-                                                            <th>{{ $dc[0] }}</th>
-                                                        @endforeach
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    @foreach ($details as $d)
-                                                        <tr>
-                                                            @foreach ($detailCols as $dc)
-                                                                <td>{!! isset($dc[2]) && is_callable($dc[2]) ? $dc[2]($d) : e(data_get($d, $dc[1]) ?? '—') !!}</td>
-                                                            @endforeach
-                                                        </tr>
-                                                    @endforeach
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    @else
-                                        <div class="text-muted text-sm detail-panel">Nothing to show for this row.</div>
-                                    @endif
-                                </td>
-                            </tr>
-                        @endif
                     @empty
                         <tr><td colspan="{{ $spanCount }}" class="empty-row">No records found.</td></tr>
                     @endforelse
@@ -243,6 +202,62 @@
             </div>
         @endif
     </div>
+
+    {{-- Drill-down: the records behind one summary row. Read-only — the legacy
+         grouped reports listed each group's records under a heading, and a modal
+         gives them the width to read without pushing the table around. --}}
+    @if ($this->expandableBy() && $detailOpen && $detailKey !== null)
+        @php
+            $details = $this->detailRows($detailKey);
+            $detailCols = $this->detailColumns();
+            $detailSub = $this->detailSubtitle($detailKey);
+        @endphp
+        <div class="modal-backdrop" x-data x-show="$wire.detailOpen" x-cloak
+             @keydown.escape.window="$wire.closeRowDetails()" style="display:none;">
+            <div class="modal-card" style="max-width:1180px;" @click.outside="$wire.closeRowDetails()">
+                <div class="modal-head">
+                    <div>
+                        <h3 class="modal-title">{{ $this->detailTitle($detailKey) }}</h3>
+                        @if ($detailSub)
+                            <span class="text-muted text-sm">{{ $detailSub }}</span>
+                        @endif
+                    </div>
+                    <button class="modal-close" wire:click="closeRowDetails">&times;</button>
+                </div>
+
+                <div class="modal-body">
+                    @if (count($details))
+                        <div class="table-wrap">
+                            <table class="data">
+                                <thead>
+                                    <tr>
+                                        @foreach ($detailCols as $dc)
+                                            <th>{{ $dc[0] }}</th>
+                                        @endforeach
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($details as $d)
+                                        <tr>
+                                            @foreach ($detailCols as $dc)
+                                                <td>{!! isset($dc[2]) && is_callable($dc[2]) ? $dc[2]($d) : e(data_get($d, $dc[1]) ?? '—') !!}</td>
+                                            @endforeach
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <p class="text-muted">Nothing to show for this row.</p>
+                    @endif
+                </div>
+
+                <div class="modal-foot">
+                    <button type="button" class="btn btn-ghost" wire:click="closeRowDetails">Close</button>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- Edit modal --}}
     @if ($this->canEdit())

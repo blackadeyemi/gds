@@ -150,10 +150,39 @@ class Services extends RawMaterialReport
         ];
     }
 
+    public function detailTitle(string $key): string
+    {
+        return $key;
+    }
+
+    /**
+     * The legacy screen headed each project block with its line, code and total
+     * stop time. Same three facts, on one line under the project name.
+     */
+    public function detailSubtitle(string $key): string
+    {
+        $row = $this->base()
+            ->where('m.project', $key)
+            ->selectRaw('m.linename, COUNT(*) as jobs, ' . self::MINUTES_SQL . ' as minutes')
+            ->groupBy('m.linename')
+            ->first();
+
+        if (! $row) {
+            return '';
+        }
+
+        $code = MachineProject::where('name', $key)->value('code');
+
+        return trim(($row->linename ?: '—')
+            . ($code ? ' · ' . $code : '')
+            . ' · ' . $row->jobs . ' ' . str($row->jobs === 1 ? 'job' : 'jobs')
+            . ' · total stop time ' . self::formatMinutes((int) $row->minutes));
+    }
+
     /**
      * The jobs behind one project row, under the same filters and date range as
-     * the summary it sits in — so the nested list always reconciles with the
-     * job count beside it.
+     * the summary it sits in — so the list always reconciles with the job count
+     * beside it.
      */
     public function detailRows(string $key): iterable
     {

@@ -161,15 +161,11 @@ table.data thead th.sortable { cursor: pointer; }
 table.data thead th.sortable:hover { color: var(--ink); }
 table.data tbody td { padding: 0.85rem 1rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
 
-/* ---- Expanded summary row: the records behind one group, nested under it ---- */
-table.data tbody tr.detail-row > td { padding: 0; background: var(--surface-2); }
-.detail-panel { padding: 0.5rem 1rem 0.9rem 3rem; }
-/* Inset and lighter than the row it hangs off, so it reads as belonging to it
-   rather than as more rows of the outer table. */
-.detail-panel table.data { font-size: 0.84rem; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
-.detail-panel table.data thead th { padding: 0.5rem 0.75rem; font-size: 0.66rem; }
-.detail-panel table.data tbody td { padding: 0.5rem 0.75rem; vertical-align: top; }
-.detail-panel table.data tbody tr:last-child td { border-bottom: 0; }
+/* ---- Drill-down modal: a group's records, denser than the main table ---- */
+.modal-body table.data { font-size: 0.84rem; }
+.modal-body table.data thead th { padding: 0.55rem 0.75rem; font-size: 0.66rem; }
+.modal-body table.data tbody td { padding: 0.55rem 0.75rem; vertical-align: top; }
+.modal-body table.data tbody tr:last-child td { border-bottom: 0; }
 table.data tbody tr:nth-child(even) { background: var(--surface-2); }
 table.data tbody tr:hover { background: var(--brand-ring); }
 table.data .col-actions { text-align: right; white-space: nowrap; }

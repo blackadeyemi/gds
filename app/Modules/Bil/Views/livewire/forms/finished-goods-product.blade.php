@@ -59,7 +59,7 @@
         @error('form.embossing') <div class="form-error">{{ $message }}</div> @enderror
     </div>
     <div class="form-group">
-        <label class="form-label">Lam / Edge <span class="text-muted">optional</span></label>
+        <label class="form-label">Lam / Edge <span class="text-muted">(optional)</span></label>
         <select class="form-control" wire:model="form.lamedge">
             <option value="">— None —</option>
             @foreach (\Modules\Bil\Livewire\FinishedGoods\Products::LAM_EDGE as $option)
@@ -104,7 +104,7 @@
         </div>
 
         <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Line <span class="text-muted">optional</span></label>
+            <label class="form-label">Line <span class="text-muted">(optional)</span></label>
             <select class="form-control" wire:model.live="machineRows.{{ $i }}.line_id"
                     @disabled(($row['factory_id'] ?? '') === '')>
                 <option value="">{{ ($row['factory_id'] ?? '') === '' ? 'Pick a factory first' : '— Whole factory —' }}</option>
@@ -116,7 +116,7 @@
         </div>
 
         <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">Project (Machine) <span class="text-muted">optional</span></label>
+            <label class="form-label">Project (Machine) <span class="text-muted">(optional)</span></label>
             <select class="form-control" wire:model="machineRows.{{ $i }}.project_id"
                     @disabled(($row['line_id'] ?? '') === '' || $projects === [])>
                 <option value="">
@@ -227,7 +227,7 @@
         </div>
     @else
         <div class="form-group">
-            <label class="form-label">Source Factory <span class="text-muted">optional</span></label>
+            <label class="form-label">Source Factory <span class="text-muted">(optional)</span></label>
             <select class="form-control" wire:model="form.hardroll_factory_id"
                     @disabled(($form['hardroll_company_id'] ?? '') === '' || $sourceFactories === [])>
                 <option value="">
