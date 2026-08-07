@@ -1,7 +1,12 @@
 <div>
-    <div class="page-head">
-        <h1>Factory Returns</h1>
-        <p>Return unused raw material from the factory back to the store, then approve it.</p>
+    <div class="page-head flex items-center justify-between">
+        <div>
+            <h1>Factory Returns</h1>
+            <p>Return unused raw material from the factory back to the store, then approve it.</p>
+        </div>
+        @canPage('bil.raw_materials.reports.factory_returns')
+            <a href="{{ route('bil.raw-materials.reports.factory-returns') }}" class="btn btn-ghost btn-sm">View Entries</a>
+        @endcanPage
     </div>
 
     @if (session('ok'))

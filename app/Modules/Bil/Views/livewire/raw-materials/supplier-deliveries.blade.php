@@ -1,7 +1,12 @@
 <div x-on:print-labels.window="window.open($event.detail.url, '_blank')">
-    <div class="page-head">
-        <h1>Supplier Deliveries</h1>
-        <p>Generate and print raw-material barcodes for goods received from a supplier.</p>
+    <div class="page-head flex items-center justify-between">
+        <div>
+            <h1>Supplier Deliveries</h1>
+            <p>Generate and print raw-material barcodes for goods received from a supplier.</p>
+        </div>
+        @canPage('bil.raw_materials.reports.supplier_deliveries')
+            <a href="{{ route('bil.raw-materials.reports.supplier-deliveries') }}" class="btn btn-ghost btn-sm">View Entries</a>
+        @endcanPage
     </div>
 
     @if (session('ok'))
