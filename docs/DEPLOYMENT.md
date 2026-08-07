@@ -5,6 +5,138 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-08-07 — Finished Goods module; BIL "production" renamed to "conversion"
+
+Three migrations, in this order:
+
+```
+2026_08_05_170000_create_product_machines_and_null_lamedge
+2026_08_05_180000_add_hardroll_source_to_products
+2026_08_07_100000_rename_bil_production_to_conversion
+```
+
+This entry covers the whole **BIL → Finished Goods** module, which had not been
+written up yet, as well as the rename.
+
+### Before you start
+
+Set **`BIL_QC_PICS_PATH=E:/QC/Pics`** in the production `.env`. Quality-control
+product photos live outside both apps, on the share the legacy app writes to
+(`<STORAGE_PATH>/QC/Pics`, and production `STORAGE_PATH` is `E:/`); 223 of 296
+products have one and `products.imagepath` stores only the bare filename. The
+config falls back to `storage/app/qc-pics` so a dev box works, and **leaving that
+default in production silently diverges the two apps** — gds writes new photos
+where the legacy app cannot see them and shows blanks for the existing 223. The
+path must be readable *and* writable by the web user. A wrong path fails quietly:
+images simply do not render.
+
+### The rename
+
+BIL does not produce paper — it *converts* hardroll made by BPL into finished
+goods. The BIL tables said production, which reads as if BIL and BPL do the same
+job:
+
+```
+factory_production            -> factory_conversion          (1.2M rows)
+factory_preproduction         -> conversion_setup            (1 row per line)
+factory_preproduction_history -> conversion_setup_history    (~25k rows)
+```
+
+`bpl_production` and `bpl_softroll_production` are deliberately **not** renamed;
+they record actual paper manufacture.
+
+`RENAME TABLE` is a metadata operation, so the 1.2M-row table renames instantly.
+Each old name is left behind as a compatibility **VIEW**.
+
+**Why the views are writable here when the `factory_lines` ones are not:** those
+are composed views and therefore read-only, but a straight one-table `SELECT *`
+view is insertable and updatable. The 30+ legacy pages keep both reading and
+writing through the old names. Verified live before shipping: the changeover
+`UPDATE factory_preproduction … WHERE linename`, an `INSERT` into
+`factory_preproduction_history`, and an `INSERT` into `factory_production` all
+succeeded, and the BEFORE INSERT/UPDATE name→id triggers travelled with the base
+tables and still fired (resolved `line_id`, `factory_id`).
+
+MySQL expands `SELECT *` when the view is created, so a view is frozen to today's
+columns. That is intentional — a gds-only column does not leak into the legacy
+app — but **a view must be recreated if the legacy app ever needs a new column**.
+
+⚠️ **Duplicate timestamp.** `2026_08_07_100000_rename_bil_production_to_conversion`
+shares its prefix with `2026_08_07_100000_repair_legacy_mojibake`. Laravel breaks
+the tie on filename, so `rename…` runs first. They touch disjoint tables (the
+mojibake repair only ALTERs `factory_machine_maintenance`), so the order is safe
+— but do not add a third migration at that timestamp that touches these tables.
+The rename is idempotent: it skips any name that is already a view.
+
+### Schema added to `products`
+
+`2026_08_05_170000` creates **`product_machines`** — one row per Factory → Line →
+Project path, so a product can name several machines instead of the single
+free-text `mach`. Backfilled 217 assignments by matching the existing text
+(**case-insensitively** — the stored `Rotomac` has to find `ROTOMAC`); 19
+products keep unmatched legacy text like `RW 9/10/GAMBINI`, which the form shows
+and preserves until someone replaces it. The same migration folds `lamedge`
+values `"N/A"` and `""` to NULL (171 rows).
+
+`2026_08_05_180000` adds `hardroll_company_id` / `hardroll_factory_id`, turning
+`"BPL PM 3"` into company BPL + factory PM3. The backfill is conservative on
+purpose: the value must *be* a company code, or a code followed by one of that
+company's factories. `PT Pindo/BPL` (24 rows) mentions BPL but is a combined
+external source, so it is left as text — external mills are typed in, not
+structured.
+
+`products.mach` and `products.hardrollsource` both stay, maintained as readable
+summaries: the legacy QC screens read them and the revision archive has years of
+history in them.
+
+### After deploying
+
+```
+php artisan migrate
+php artisan gds:sync-pages
+php artisan gds:sync-data-views
+```
+
+Then grant the new pages in the role matrix — like every new page they start with
+no access for anyone but Admin:
+
+| Page key | Where |
+| --- | --- |
+| `bil.finished_goods.products` | Finished Goods → Products |
+| `bil.finished_goods.conversion_output` | Finished Goods → Conversion Output |
+| `bil.finished_goods.reports.conversion_output` | Finished Goods → Reports |
+| `bil.machines.conversion_setup` | Machines → Conversion Setup |
+| `bil.machines.reports.conversion_history` | Machines → Reports |
+
+**Tell users to hard-refresh once.** `public/js/searchable-select.js` is a new
+file. Its Alpine component used to be pushed from the partial itself, which only
+emitted when an instance rendered — so a page whose only searchable-selects sit
+inside a modal loaded without the registration and every one of them threw
+`searchableSelect is not defined` the moment Livewire rendered it in. It is now
+loaded by the layout.
+
+### What to check afterwards
+
+- Legacy **Quality Control**, **factory production** and the pre-production
+  changeover screen still save. They write through the compatibility views.
+- **Finished Goods → Conversion Output** lists only lines active in Conversion
+  Setup, and a generated barcode continues the day's sequence. The sequence is
+  **global per day across factories**, not per factory — the live data confirms
+  it (one day's 78 pallets ran 001–078 with B1 and GB interleaved).
+- A QC spec sheet shows its product photo. If every photo is missing,
+  `BIL_QC_PICS_PATH` is wrong.
+
+### If it goes wrong
+
+`php artisan migrate:rollback` reverses the rename (drops each view, renames the
+base table back) and drops `product_machines` and the two hardroll columns.
+Two things it does **not** undo, both deliberate: `lamedge` stays normalised
+(`"N/A"` carried no information NULL does not, and restoring it would mean
+guessing which blanks were which), and `hardrollsource` keeps its normalised
+spelling (`"BPL PM3"`). Neither blocks the legacy app.
+
+---
+
 ## 2026-08-07 — Exports carry their filters; drill-down modal gets search, paging and export
 
 Code only — no migration, no schema change.
