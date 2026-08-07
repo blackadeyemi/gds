@@ -79,7 +79,7 @@
                             ['Rolls per Pack', $val('productrolls')],
                             ['Packs per Bundle', $val('productpacks')],
                             ['Rolls per Bundle', $val('rollsperbundle')],
-                            ['Bundles per Palette', $val('productbundles')],
+                            ['Bundles per Pallet', $val('productbundles')],
                             ['Bundles per Tonne', $val('bundlespertonne')],
                         ],
                         'Weights & Measurements' => [

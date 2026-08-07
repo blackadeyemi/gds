@@ -280,7 +280,7 @@
 
 <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:0.75rem;">
     <div class="form-group">
-        <label class="form-label">Bundles per Palette</label>
+        <label class="form-label">Bundles per Pallet</label>
         <input type="number" step="1" class="form-control" wire:model="form.productbundles">
         @error('form.productbundles') <div class="form-error">{{ $message }}</div> @enderror
     </div>
