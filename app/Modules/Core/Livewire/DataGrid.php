@@ -197,9 +197,31 @@ abstract class DataGrid extends Component
         return (bool) auth()->user()?->canDo($this->pageAccessKey(), $ability);
     }
 
-    /** Whether the row actions column should show (edit and/or delete allowed). */
+    /**
+     * Extra actions rendered at the START of the row-actions cell, before Edit
+     * and Delete. Return HTML (typically a wire:click button) or '' for none —
+     * for a view action that should sit with the other row controls rather than
+     * take a column of its own.
+     */
+    public function leadingRowActions($row): string { return ''; }
+
+    /**
+     * Whether this grid contributes leading actions in the current view. Kept
+     * separate from leadingRowActions() so the column can be decided once, not
+     * per row.
+     */
+    public function hasLeadingRowActions(): bool { return false; }
+
+    /**
+     * Whether the row actions column should show. Leading actions count: a
+     * view-only user with no edit or delete rights still needs the column.
+     */
     public function rowActionsVisible(): bool
     {
+        if ($this->hasLeadingRowActions()) {
+            return true;
+        }
+
         return $this->editable() && ($this->mayDo('edit') || $this->mayDo('delete'));
     }
 

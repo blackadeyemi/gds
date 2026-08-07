@@ -63,14 +63,14 @@
     --shadow: rgba(0, 0, 0, 0.4);
     --shadow-lg: rgba(0, 0, 0, 0.55);
 
-    /* Dark theme → light sidebar */
-    --side-bg: #ffffff;
-    --side-ink: #4b5563;
-    --side-ink-dim: #9ca3af;
-    --side-strong: #111827;
+    /* Dark theme → sidebar matches the main UI background (--bg) */
+    --side-bg: #0b1120;
+    --side-ink: #cbd5e1;
+    --side-ink-dim: #64748b;
+    --side-strong: #ffffff;
     --side-active: #2563eb;
-    --side-hover: #f1f5f9;
-    --side-line: rgba(0, 0, 0, 0.08);
+    --side-hover: #1e293b;
+    --side-line: rgba(255, 255, 255, 0.08);
 }
 
 /* Text scaling — root font-size only; text sizes use rem/em */

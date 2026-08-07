@@ -140,9 +140,7 @@ class Products extends DataGrid
                 'label' => 'Finished Goods Product List',
                 'type' => 'table',
                 'columns' => [
-                    // The code opens the read-only spec sheet; it still exports
-                    // as plain text because the column has a real field.
-                    ['Product Code', 'productcode', fn ($r) => $this->specsLink($r)],
+                    ['Product Code', 'productcode'],
                     ['Product Name', 'productname'],
                     ['Product Group', 'productgroup'],
                     ['Ply', 'ply'],
@@ -225,12 +223,24 @@ class Products extends DataGrid
         return parent::mayDo($ability);
     }
 
-    protected function specsLink($row): string
+    /**
+     * The spec sheet opens from a row action rather than a link on the code,
+     * so it sits with Edit and Delete. Not offered in Trash, which has its own
+     * Restore column.
+     */
+    public function hasLeadingRowActions(): bool
     {
-        return '<button type="button" wire:click="showSpecs(' . (int) $row->productid . ')"'
-            . ' title="View full specification"'
-            . ' style="background:none;border:0;padding:0;font:inherit;color:var(--brand);text-decoration:underline;cursor:pointer;">'
-            . e((string) $row->productcode) . '</button>';
+        return $this->view !== 'trash';
+    }
+
+    public function leadingRowActions($row): string
+    {
+        return '<button type="button" class="btn btn-ghost btn-icon btn-sm"'
+            . ' wire:click="showSpecs(' . (int) $row->productid . ')" title="View full specification">'
+            . '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+            . ' stroke-linecap="round" stroke-linejoin="round">'
+            . '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'
+            . '</svg></button>';
     }
 
     protected function restoreButton($row): string

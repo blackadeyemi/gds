@@ -118,11 +118,35 @@ class Services extends RawMaterialReport
             }));
     }
 
+    /**
+     * The legacy report_factory_machine screen led with the per-project grouping
+     * and nested each project's jobs underneath, so Summary (by project) is the
+     * default here and the job rows sit behind the details toggle.
+     */
+    public function detailsViewKey(): ?string
+    {
+        return 'details';
+    }
+
     public function views(): array
     {
         return [
-            'default' => [
-                'label' => 'Default',
+            'by_project' => [
+                'label' => 'Summary (by project)',
+                'type' => 'summary',
+                'columns' => [
+                    ['Line', 'linename'],
+                    ['Project', 'project'],
+                    ['Jobs', 'jobs'],
+                    ['Total stop time', 'minutes', fn ($r) => e(self::formatMinutes((int) $r->minutes))],
+                ],
+                'query' => fn () => $this->base()
+                    ->selectRaw('m.linename, m.project, COUNT(*) as jobs, ' . self::MINUTES_SQL . ' as minutes')
+                    ->groupBy('m.linename', 'm.project')
+                    ->orderByDesc('jobs'),
+            ],
+            'details' => [
+                'label' => 'Job Details',
                 'type' => 'table',
                 'columns' => [
                     ['Job ID', 'jobid'],
@@ -145,20 +169,6 @@ class Services extends RawMaterialReport
                     'm.division', 'm.staff', 'm.starttime', 'm.endtime', 'm.duration', 'm.note',
                     't.name as service_type',
                 ])->orderByDesc('m.id'),
-            ],
-            'by_project' => [
-                'label' => 'Summary (by project)',
-                'type' => 'summary',
-                'columns' => [
-                    ['Line', 'linename'],
-                    ['Project', 'project'],
-                    ['Jobs', 'jobs'],
-                    ['Total stop time', 'minutes', fn ($r) => e(self::formatMinutes((int) $r->minutes))],
-                ],
-                'query' => fn () => $this->base()
-                    ->selectRaw('m.linename, m.project, COUNT(*) as jobs, ' . self::MINUTES_SQL . ' as minutes')
-                    ->groupBy('m.linename', 'm.project')
-                    ->orderByDesc('jobs'),
             ],
             'by_staff' => [
                 'label' => 'Summary (by staff)',

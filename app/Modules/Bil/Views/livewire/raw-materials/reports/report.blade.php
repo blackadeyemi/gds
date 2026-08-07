@@ -44,6 +44,21 @@
                         @endforeach
                     </select>
                 @endif
+
+                {{-- Drill between the grouped figures and the rows behind them.
+                     Only rendered by reports that lead with a summary. --}}
+                @if ($this->detailsViewKey())
+                    <button type="button" class="btn btn-ghost" wire:click="toggleDetails"
+                            title="{{ $this->showingDetails() ? 'Back to the grouped summary' : 'Show the individual rows' }}">
+                        @if ($this->showingDetails())
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+                            Show summary
+                        @else
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+                            Show detailed
+                        @endif
+                    </button>
+                @endif
                 @if ($paginated)
                     <div class="flex items-center gap-2 text-sm text-muted">
                         <span>Show</span>

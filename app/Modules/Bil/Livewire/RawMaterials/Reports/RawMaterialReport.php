@@ -31,12 +31,14 @@ abstract class RawMaterialReport extends Component
     public string $dateTo = '';
     public string $view = '';
     public string $search = '';
-    public int $perPage = 25;
+    // Starts at 10, matching the DataGrid pages, so a report opens with a short
+    // page rather than a wall of rows.
+    public int $perPage = 10;
 
     /** Filter values keyed by name (see filterDefs()). */
     public array $filters = [];
 
-    public array $perPageOptions = [25, 50, 100, 250];
+    public array $perPageOptions = [10, 25, 50, 100, 250];
 
     // Row edit modal + delete confirmation.
     public bool $showEdit = false;
@@ -217,6 +219,33 @@ abstract class RawMaterialReport extends Component
      * ].
      */
     abstract public function views(): array;
+
+    /**
+     * Key of the row-level view, for reports whose default view is a summary.
+     * Non-null turns on a "Show detailed / Show summary" toggle beside the view
+     * picker, so drilling from the grouped figures into the underlying rows is
+     * one click rather than a hunt through the dropdown. Null = no toggle.
+     */
+    public function detailsViewKey(): ?string
+    {
+        return null;
+    }
+
+    public function showingDetails(): bool
+    {
+        return $this->detailsViewKey() !== null && $this->view === $this->detailsViewKey();
+    }
+
+    /** Flip between the detail rows and the report's default (summary) view. */
+    public function toggleDetails(): void
+    {
+        if (! $key = $this->detailsViewKey()) {
+            return;
+        }
+
+        $this->view = $this->showingDetails() ? array_key_first($this->views()) : $key;
+        $this->resetPage();
+    }
 
     /** Fields for the generic edit modal: name => ['label','step'?]. Empty = no edit. */
     public function editFields(): array
