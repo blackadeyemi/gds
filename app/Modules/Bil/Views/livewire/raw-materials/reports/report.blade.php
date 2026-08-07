@@ -214,7 +214,7 @@
         @endphp
         <div class="modal-backdrop" x-data x-show="$wire.detailOpen" x-cloak
              @keydown.escape.window="$wire.closeRowDetails()" style="display:none;">
-            <div class="modal-card" style="max-width:1180px;" @click.outside="$wire.closeRowDetails()">
+            <div class="modal-card modal-card-wide" @click.outside="$wire.closeRowDetails()">
                 <div class="modal-head">
                     <div>
                         <h3 class="modal-title">{{ $this->detailTitle($detailKey) }}</h3>

@@ -231,6 +231,9 @@ table.data .col-actions { text-align: right; white-space: nowrap; }
 /* ---- Modal (Alpine) ---- */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 1rem; overflow-y: auto; }
 .modal-card { width: 100%; max-width: 480px; background: var(--surface); border-radius: 14px; box-shadow: 0 20px 60px var(--shadow-lg); }
+/* Drill-down modal holds a ten-column table: give it the viewport, not a column. */
+.modal-card-wide { max-width: 1680px; }
+.modal-card-wide .modal-body { padding: 0.85rem 0.9rem; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--line); }
 .modal-title { font-size: 1.05rem; font-weight: 700; margin: 0; }
 .modal-body { padding: 1.4rem; }
