@@ -14,6 +14,29 @@ schemas** (`core`, `bil`, `bpl`), so the two deploys have to go out together.
 
 > **Read the two red flags below before scheduling.**
 
+### ⛔ Do before this ships
+
+Not blockers for the data migration, but agreed to land before production:
+
+**1. Make reports' data views configurable.** DataGrid pages read their enabled
+views, default view and page size from `data_pages` / `data_views`, managed in
+Settings → Data Views. Reports ignore all of it: `RawMaterialReport::mount()`
+takes `array_key_first(views())` as the default and always renders every view.
+So the choices made in code — Services leading with Summary (by project), page
+size starting at 10 — are hardcoded, and changing either needs a deploy.
+
+The fix is to give reports the same treatment as grids: register them where
+`gds:sync-data-views` can see them, and have the report base consult `DataPage`
+the way `Modules\Core\Livewire\DataGrid::config()` already does (per_page,
+default view, enabled views). Roughly an hour, and it removes a standing class
+of "can you change the default view / page size" requests. Do it before go-live
+so admins can tune reports without a release.
+
+**2. The legacy `bil` repo has no git remote.** It is a local-only repository, so
+the legacy-side changes in step 3 of the deploy order below cannot be shipped
+with `git pull`. Either add a remote and push it, or confirm how that app reaches
+the server, before scheduling.
+
 ### 🔴 Red flag 1 — production backups may be silently broken
 
 `scripts/db_backup.php` (in the `bil` repo) aborts if **any** view in
