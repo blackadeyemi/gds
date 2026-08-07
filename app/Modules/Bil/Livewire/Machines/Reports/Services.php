@@ -5,6 +5,7 @@ namespace Modules\Bil\Livewire\Machines\Reports;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Title;
 use Modules\Bil\Livewire\RawMaterials\Reports\RawMaterialReport;
+use Modules\Bil\Support\ServiceDuration;
 use Modules\Core\Models\Division;
 use Modules\Core\Models\MachineLine;
 use Modules\Core\Models\MachineProject;
@@ -286,47 +287,24 @@ class Services extends RawMaterialReport
     }
 
     /**
-     * `duration` is the legacy {"d":_,"h":_,"m":_} JSON, so totals are summed by
-     * pulling the parts out in SQL rather than re-deriving from the timestamps
-     * (which are varchars).
+     * Duration lives in a JSON column ({"d":_,"h":_,"m":_}) rather than a number
+     * of minutes, so totals are summed by pulling the parts out in SQL rather
+     * than re-deriving from the timestamps (which are varchars).
+     * Modules\Bil\Support\ServiceDuration
+     * owns both the SQL that totals it and the way it reads back, so this report
+     * and the statistics dashboard can't drift on what "stop time" means. These
+     * two stay as thin pass-throughs because the view closures call them.
      */
-    private const MINUTES_SQL = "SUM(
-        COALESCE(JSON_EXTRACT(m.duration, '$.d'), 0) * 1440
-      + COALESCE(JSON_EXTRACT(m.duration, '$.h'), 0) * 60
-      + COALESCE(JSON_EXTRACT(m.duration, '$.m'), 0)
-    )";
+    private const MINUTES_SQL = ServiceDuration::MINUTES_SQL;
 
-    /** Render the stored duration JSON the way the legacy report did. */
     public static function humanDuration(?string $json): string
     {
-        $d = json_decode((string) $json, true);
-        if (! is_array($d)) {
-            return '—';
-        }
-
-        return self::formatMinutes(
-            ((int) ($d['d'] ?? 0)) * 1440 + ((int) ($d['h'] ?? 0)) * 60 + (int) ($d['m'] ?? 0)
-        );
+        return ServiceDuration::human($json);
     }
 
     public static function formatMinutes(int $minutes): string
     {
-        if ($minutes <= 0) {
-            return '—';
-        }
-
-        $parts = [];
-        if ($days = intdiv($minutes, 1440)) {
-            $parts[] = $days . ' day' . ($days > 1 ? 's' : '');
-        }
-        if ($hours = intdiv($minutes % 1440, 60)) {
-            $parts[] = $hours . ' hour' . ($hours > 1 ? 's' : '');
-        }
-        if ($mins = $minutes % 60) {
-            $parts[] = $mins . ' minute' . ($mins > 1 ? 's' : '');
-        }
-
-        return implode(', ', $parts);
+        return ServiceDuration::format($minutes);
     }
 
     /* ---------------- Row edit / delete ---------------- */

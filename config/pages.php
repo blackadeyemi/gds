@@ -43,6 +43,7 @@ return [
         ['key' => 'settings.service_types', 'label' => 'Service Types', 'module' => 'Settings', 'route' => 'settings.service-types', 'abilities' => $crud],
 
         // BIL — Machines (Company > Factory > Line > Project)
+        ['key' => 'bil.machines.statistics', 'label' => 'Statistics', 'module' => 'BIL / Machines', 'route' => 'bil.machines.statistics', 'abilities' => $snapshot],
         ['key' => 'bil.machines.lines',    'label' => 'Lines',    'module' => 'BIL / Machines', 'route' => 'bil.machines.lines',    'abilities' => $crud],
         ['key' => 'bil.machines.projects', 'label' => 'Projects', 'module' => 'BIL / Machines', 'route' => 'bil.machines.projects', 'abilities' => $crud],
         ['key' => 'bil.machines.services', 'label' => 'Services', 'module' => 'BIL / Machines', 'route' => 'bil.machines.services', 'abilities' => $entryPlain],

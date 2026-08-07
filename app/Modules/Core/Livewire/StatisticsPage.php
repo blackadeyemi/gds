@@ -128,7 +128,7 @@ abstract class StatisticsPage extends Component
      * @param  string  $type   'donut' | 'bar' | 'hbar' | 'line'
      * @param  array   $labels x-axis / slice labels
      * @param  array   $series [['name' => string, 'data' => number[]], ...]
-     * @param  array   $opt    ['subtitle','height','span'(1|2),'valueFmt'('int'|'kg'|'pct')]
+     * @param  array   $opt    ['subtitle','height','span'(1|2),'valueFmt'('int'|'kg'|'hrs'|'pct')]
      */
     protected function chartSpec(string $id, string $type, string $title, array $labels, array $series, array $opt = []): array
     {
@@ -226,6 +226,7 @@ abstract class StatisticsPage extends Component
         return match ($kind) {
             'pct' => rtrim(rtrim(number_format($n, 1), '0'), '.') . '%',
             'kg' => number_format($n) . ' kg',
+            'hrs' => number_format($n) . ' h',
             default => number_format($n),
         };
     }

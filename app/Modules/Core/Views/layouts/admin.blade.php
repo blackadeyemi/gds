@@ -229,6 +229,12 @@
                             <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
                         </button>
                         <div class="nav-sub" x-show="machinesOpen">
+                            @canPage('bil.machines.statistics')
+                            <a href="{{ route('bil.machines.statistics') }}" class="nav-link {{ $is('bil/machines/statistics*') }}" title="Statistics">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/></svg>
+                                <span class="label">Statistics</span>
+                            </a>
+                            @endcanPage
                             @canPage('bil.machines.lines')
                             <a href="{{ route('bil.machines.lines') }}" class="nav-link {{ $is('bil/machines/lines*') }}" title="Lines">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h10M4 19h6"/><circle cx="19" cy="12" r="1.6"/><circle cx="15" cy="19" r="1.6"/></svg>

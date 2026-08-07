@@ -7,6 +7,7 @@ use Modules\Bil\Livewire\Machines\Lines as MachineLines;
 use Modules\Bil\Livewire\Machines\Projects as MachineProjects;
 use Modules\Bil\Livewire\Machines\Reports\Services as ServicesReport;
 use Modules\Bil\Livewire\Machines\Services as MachineServices;
+use Modules\Bil\Livewire\Machines\Statistics as MachineStatistics;
 use Modules\Bil\Livewire\RawMaterials\DamagedGoods;
 use Modules\Bil\Livewire\RawMaterials\FactoryEntrance;
 use Modules\Bil\Livewire\RawMaterials\Consumption;
@@ -219,6 +220,21 @@ Route::middleware('auth')
 Route::middleware('auth')
     ->prefix('machines')->name('machines.')
     ->group(function () {
+        Route::get('/statistics', MachineStatistics::class)
+            ->middleware('page:bil.machines.statistics')->name('statistics');
+        // Direct download of the current statistics section as xlsx/csv/pdf.
+        Route::get('/statistics/export', function () {
+            abort_unless((bool) request()->user()?->canDo('bil.machines.statistics', 'export'), 403);
+
+            $format = strtolower((string) request('format', 'xlsx'));
+            abort_unless(in_array($format, ['xlsx', 'csv', 'pdf'], true), 404);
+
+            $c = new MachineStatistics();
+            $c->section = (string) request('section', '');
+            $c->range = (string) request('range', '30d');
+
+            return $c->exportResponse($format);
+        })->middleware('page:bil.machines.statistics')->name('statistics.export');
         Route::get('/lines', MachineLines::class)
             ->middleware('page:bil.machines.lines')->name('lines');
         Route::get('/projects', MachineProjects::class)

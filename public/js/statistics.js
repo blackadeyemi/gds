@@ -50,7 +50,7 @@
         const n = Number(v);
         if (kind === 'pct') return n.toFixed(1) + '%';
         const base = compact ? compactNum(n) : n.toLocaleString(undefined, { maximumFractionDigits: 0 });
-        return kind === 'kg' ? base + ' kg' : base;
+        return base + ({ kg: ' kg', hrs: ' h' }[kind] || '');
     };
 
     // Chart.js shared defaults.

@@ -5,6 +5,43 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-08-07 — Machines Statistics (`2026_08_07_120000_add_duration_minutes_to_maintenance`)
+
+BIL → Machines → **Statistics**, the counterpart to Raw Materials → Statistics:
+five tabs (Overview, Machines, Service Jobs, Downtime, Workforce) over the
+machine hierarchy and `factory_machine_maintenance`. Same base class, same
+export/print, and it offers **All time** — Raw Materials caps at 12 months
+because its tables are 310k rows; maintenance is 43k.
+
+The migration adds `factory_machine_maintenance.duration_minutes` and swaps the
+five single-column id indexes for covering ones `(id, date, duration_minutes)`.
+Takes ~13s locally on 43k rows; safe to run with the app up, but the ALTERs lock
+the table briefly, so prefer the same window as anything else.
+
+**Why the column:** `duration` is the legacy `{"d":_,"h":_,"m":_}` JSON, so every
+stop-time total meant three `JSON_EXTRACT`s per row — ~500ms a query and ~10s for
+the all-time Downtime tab. With the column and the covering indexes that tab is
+~250ms. `duration` stays authoritative; this is a cache of it.
+
+**It is maintained by the existing BEFORE INSERT/UPDATE triggers, not a
+generated column** — deliberately. A `STORED GENERATED` column makes MySQL
+reject any INSERT whose duration isn't valid JSON, and the legacy app still
+writes this table; a trigger degrades to NULL instead of failing the write.
+Those two triggers are **rewritten whole** by this migration (MySQL can't append
+to a trigger), so the id-resolution statements are repeated from
+`2026_08_05_200000` — change one and you must change the other.
+
+After deploying: `php artisan gds:sync-pages`, then grant
+**`bil.machines.statistics`** to the roles that need it — like every new page it
+starts with no access for everyone except Admin.
+
+Verify with `scripts/verify_machine_stats.php` (every section × range renders,
+figures reconcile against SQL derived from the JSON rather than the new column)
+and `scripts/verify_duration_trigger.php` (both apps' write paths keep it in step). Both
+passed locally, as did the existing Services report and pagination suites.
+
+---
+
 ## 2026-08-07 — Encoding repair (`2026_08_07_100000_repair_legacy_mojibake`)
 
 Notes pasted from Word showed up as `â€¢` where a bullet belonged. The legacy PHP
