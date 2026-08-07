@@ -105,6 +105,9 @@ class FactoryReturns extends RawMaterialReport
                     ['Label', 'label', $label],
                 ],
                 'searchable' => ['r.barcode', 'r.product', 'r.user', 'r.authorizer', 'r.type', 'r.status'],
+                // Explicit because "Label" is a reprint link, not a selected
+                // column — sorting on it would be an unknown-column error.
+                'sortable' => ['barcode', 'product', 'type', 'weight', 'user', 'authorizer', 'dateofcreation', 'status'],
                 'query' => fn () => $this->base()
                     ->select('r.id', 'r.barcode', 'r.product', 'r.type', 'r.weight',
                         'r.user', 'r.authorizer', 'r.dateofcreation', 'r.status')

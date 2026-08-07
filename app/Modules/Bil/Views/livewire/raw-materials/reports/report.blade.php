@@ -127,7 +127,13 @@
                         @endif
                         <th style="width:60px">#</th>
                         @foreach ($columns as $col)
-                            <th>{{ $col[0] }}</th>
+                            @php $sortable = in_array($col[1] ?? null, $this->sortableFor($gridView), true); @endphp
+                            <th @class(['sortable' => $sortable]) @if ($sortable) wire:click="sortBy('{{ $col[1] }}')" @endif>
+                                {{ $col[0] }}
+                                @if ($sortable)
+                                    @include('core::partials.sort-caret', ['field' => $col[1]])
+                                @endif
+                            </th>
                         @endforeach
                         @if ($showActions)
                             <th class="col-actions">Actions</th>

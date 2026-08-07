@@ -33,6 +33,10 @@ abstract class RawMaterialReport extends Component
     public string $dateTo = '';
     public string $view = '';
     public string $search = '';
+
+    /** Column sort, applied on top of each view's own default ordering. */
+    public string $sortField = '';
+    public string $sortDir = 'asc';
     // Starts at 10, matching the DataGrid pages, so a report opens with a short
     // page rather than a wall of rows.
     public int $perPage = 10;
@@ -494,6 +498,10 @@ abstract class RawMaterialReport extends Component
     {
         $this->resetPage();
         $this->closeRowDetails();
+        // Views have different columns, so a sort from the previous one would
+        // either not apply or, worse, silently match a same-named column.
+        $this->sortField = '';
+        $this->sortDir = 'asc';
     }
 
     protected function currentView(): array
@@ -635,7 +643,55 @@ abstract class RawMaterialReport extends Component
             });
         }
 
+        if ($this->sortField !== '' && in_array($this->sortField, $this->sortableFor($view), true)) {
+            // reorder() first: each view sets its own default ordering (often
+            // `id DESC`, which is the fast path on the big tables), and appending
+            // to it would leave that as the primary key of the sort.
+            $q->reorder()->orderBy($this->sortField, $this->sortDir === 'desc' ? 'desc' : 'asc');
+        }
+
         return $q;
+    }
+
+    /**
+     * Columns a view may be sorted on. A view can name them explicitly with a
+     * `sortable` key; otherwise every column backed by a real field is sortable
+     * and action columns (null field) are not.
+     *
+     * The names are select-list aliases, which MySQL resolves in ORDER BY ahead
+     * of table columns — so a report doesn't have to repeat its join prefixes.
+     *
+     * A column whose field is NOT in the select list (a rendered link or badge
+     * given a field name for export) must therefore be excluded with an explicit
+     * `sortable`, or sorting it is an unknown-column error.
+     */
+    public function sortableFor(array $view): array
+    {
+        if (isset($view['sortable'])) {
+            return $view['sortable'];
+        }
+
+        return array_values(array_filter(array_map(
+            fn ($c) => $c[1] ?? null,
+            $view['columns']
+        )));
+    }
+
+    public function sortBy(string $field): void
+    {
+        $view = $this->currentView();
+        if (! in_array($field, $this->sortableFor($view), true)) {
+            return;
+        }
+
+        if ($this->sortField === $field) {
+            $this->sortDir = $this->sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortField = $field;
+            $this->sortDir = 'asc';
+        }
+
+        $this->resetPage();
     }
 
     /* ---------------- Export / print ---------------- */
