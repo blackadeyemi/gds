@@ -119,13 +119,53 @@ class Services extends RawMaterialReport
     }
 
     /**
-     * The legacy report_factory_machine screen led with the per-project grouping
-     * and nested each project's jobs underneath, so Summary (by project) is the
-     * default here and the job rows sit behind the details toggle.
+     * The legacy report_factory_machine screen was a per-project grouping with
+     * each project's jobs listed underneath it. Summary (by project) is the
+     * default view, and each of its rows opens its own jobs inline.
+     *
+     * Project names are globally unique (enforced on machine_projects.name), so
+     * the project name is a safe key for a summary row that has no id.
      */
-    public function detailsViewKey(): ?string
+    public function expandableBy(): ?string
     {
-        return 'details';
+        return 'project';
+    }
+
+    /** Job columns for the nested table. No row actions — this is a read-out. */
+    public function detailColumns(): array
+    {
+        return [
+            ['Job ID', 'jobid'],
+            ['Job Title', 'jobtitle'],
+            ['Type', 'service_type', fn ($r) => $r->service_type
+                ? '<span class="badge badge-muted">' . e($r->service_type) . '</span>'
+                : '<span class="text-muted">Unclassified</span>'],
+            ['Sub-project', 'subproject', fn ($r) => e($r->subproject ?: '—')],
+            ['Division', 'division', fn ($r) => e(ucwords(strtolower((string) $r->division)))],
+            ['Staff', 'staff', fn ($r) => e(ucwords(strtolower((string) $r->staff)))],
+            ['Start', 'starttime'],
+            ['End', 'endtime'],
+            ['Duration', 'duration', fn ($r) => e(self::humanDuration($r->duration))],
+            ['Note', 'note', fn ($r) => nl2br(e((string) $r->note))],
+        ];
+    }
+
+    /**
+     * The jobs behind one project row, under the same filters and date range as
+     * the summary it sits in — so the nested list always reconciles with the
+     * job count beside it.
+     */
+    public function detailRows(string $key): iterable
+    {
+        return $this->base()
+            ->where('m.project', $key)
+            ->select([
+                'm.id', 'm.jobid', 'm.jobtitle', 'm.subproject', 'm.division',
+                'm.staff', 'm.starttime', 'm.endtime', 'm.duration', 'm.note',
+                't.name as service_type',
+            ])
+            ->orderByDesc('m.id')
+            ->get();
     }
 
     public function views(): array

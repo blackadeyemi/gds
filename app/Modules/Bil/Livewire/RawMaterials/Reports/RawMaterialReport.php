@@ -220,31 +220,51 @@ abstract class RawMaterialReport extends Component
      */
     abstract public function views(): array;
 
+    /* ---------------- Expandable summary rows ---------------- */
+
+    /** Summary rows the user has opened, by key. */
+    public array $expandedRows = [];
+
     /**
-     * Key of the row-level view, for reports whose default view is a summary.
-     * Non-null turns on a "Show detailed / Show summary" toggle beside the view
-     * picker, so drilling from the grouped figures into the underlying rows is
-     * one click rather than a hunt through the dropdown. Null = no toggle.
+     * Field on a summary row that identifies it for drill-down (e.g. 'project'),
+     * or null when the view isn't expandable.
+     *
+     * Non-null puts a view-detail button on each row of that view, which opens
+     * the underlying records inline beneath it — the shape of the legacy grouped
+     * reports, where each group listed its own records under a heading. Keyed by
+     * value rather than id because summary rows are aggregates and have no id.
      */
-    public function detailsViewKey(): ?string
+    public function expandableBy(): ?string
     {
         return null;
     }
 
-    public function showingDetails(): bool
+    /** Columns for the nested table: [[label, field, ?fn($row) => html], …]. */
+    public function detailColumns(): array
     {
-        return $this->detailsViewKey() !== null && $this->view === $this->detailsViewKey();
+        return [];
     }
 
-    /** Flip between the detail rows and the report's default (summary) view. */
-    public function toggleDetails(): void
+    /** The records nested under one summary row. */
+    public function detailRows(string $key): iterable
     {
-        if (! $key = $this->detailsViewKey()) {
+        return [];
+    }
+
+    public function isRowExpanded(string $key): bool
+    {
+        return in_array($key, $this->expandedRows, true);
+    }
+
+    public function toggleRowDetails(string $key): void
+    {
+        if (! $this->expandableBy()) {
             return;
         }
 
-        $this->view = $this->showingDetails() ? array_key_first($this->views()) : $key;
-        $this->resetPage();
+        $this->expandedRows = $this->isRowExpanded($key)
+            ? array_values(array_diff($this->expandedRows, [$key]))
+            : [...$this->expandedRows, $key];
     }
 
     /** Fields for the generic edit modal: name => ['label','step'?]. Empty = no edit. */
@@ -328,12 +348,20 @@ abstract class RawMaterialReport extends Component
         $this->initFilters();
     }
 
-    public function updatedDateFrom(): void { $this->resetPage(); }
-    public function updatedDateTo(): void { $this->resetPage(); }
-    public function updatedPerPage(): void { $this->resetPage(); }
-    public function updatedView(): void { $this->resetPage(); }
-    public function updatedFilters(): void { $this->resetPage(); }
-    public function updatedSearch(): void { $this->resetPage(); }
+    // Any change to what's being listed also closes open detail rows — they
+    // belong to the previous result set.
+    public function updatedDateFrom(): void { $this->resetListing(); }
+    public function updatedDateTo(): void { $this->resetListing(); }
+    public function updatedPerPage(): void { $this->resetListing(); }
+    public function updatedView(): void { $this->resetListing(); }
+    public function updatedFilters(): void { $this->resetListing(); }
+    public function updatedSearch(): void { $this->resetListing(); }
+
+    protected function resetListing(): void
+    {
+        $this->resetPage();
+        $this->expandedRows = [];
+    }
 
     protected function currentView(): array
     {

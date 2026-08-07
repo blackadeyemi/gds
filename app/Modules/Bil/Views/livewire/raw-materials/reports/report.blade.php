@@ -45,20 +45,6 @@
                     </select>
                 @endif
 
-                {{-- Drill between the grouped figures and the rows behind them.
-                     Only rendered by reports that lead with a summary. --}}
-                @if ($this->detailsViewKey())
-                    <button type="button" class="btn btn-ghost" wire:click="toggleDetails"
-                            title="{{ $this->showingDetails() ? 'Back to the grouped summary' : 'Show the individual rows' }}">
-                        @if ($this->showingDetails())
-                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-                            Show summary
-                        @else
-                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-                            Show detailed
-                        @endif
-                    </button>
-                @endif
                 @if ($paginated)
                     <div class="flex items-center gap-2 text-sm text-muted">
                         <span>Show</span>
@@ -125,12 +111,21 @@
             </div>
         @endif
 
-        @php $showActions = $this->hasActions() && ($gridView['type'] ?? 'table') === 'table'; @endphp
+        @php
+            $showActions = $this->hasActions() && ($gridView['type'] ?? 'table') === 'table';
+            // Summary views can drill into the records behind each group.
+            $expandBy = ($gridView['type'] ?? 'table') === 'summary' ? $this->expandableBy() : null;
+            $detailCols = $expandBy ? $this->detailColumns() : [];
+            $spanCount = count($columns) + 1 + ($showActions ? 1 : 0) + ($expandBy ? 1 : 0);
+        @endphp
 
         <div class="table-wrap">
             <table class="data">
                 <thead>
                     <tr>
+                        @if ($expandBy)
+                            <th style="width:44px"></th>
+                        @endif
                         <th style="width:60px">#</th>
                         @foreach ($columns as $col)
                             <th>{{ $col[0] }}</th>
@@ -142,7 +137,23 @@
                 </thead>
                 <tbody>
                     @forelse ($rows as $i => $row)
+                        @php $rowKey = $expandBy ? (string) data_get($row, $expandBy) : null; @endphp
                         <tr wire:key="row-{{ $gridView['key'] }}-{{ $row->id ?? $i }}">
+                            @if ($expandBy)
+                                @php $isOpen = $this->isRowExpanded($rowKey); @endphp
+                                <td>
+                                    <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                                            wire:click="toggleRowDetails(@js($rowKey))"
+                                            title="{{ $isOpen ? 'Hide details' : 'View details' }}"
+                                            aria-expanded="{{ $isOpen ? 'true' : 'false' }}">
+                                        @if ($isOpen)
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M1 1l22 22"/></svg>
+                                        @else
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                        @endif
+                                    </button>
+                                </td>
+                            @endif
                             <td>{{ $paginated ? $rows->firstItem() + $i : $i + 1 }}</td>
                             @foreach ($columns as $col)
                                 <td>{!! isset($col[2]) && is_callable($col[2]) ? $col[2]($row) : e(data_get($row, $col[1]) ?? '—') !!}</td>
@@ -176,8 +187,42 @@
                                 </td>
                             @endif
                         </tr>
+
+                        {{-- The records behind this group, nested under it — the
+                             shape of the legacy grouped reports. Read-only. --}}
+                        @if ($expandBy && $this->isRowExpanded($rowKey))
+                            <tr wire:key="detail-{{ $gridView['key'] }}-{{ $rowKey }}" class="detail-row">
+                                <td colspan="{{ $spanCount }}">
+                                    @php $details = $this->detailRows($rowKey); @endphp
+                                    @if (count($details))
+                                        <div class="table-wrap detail-panel">
+                                            <table class="data">
+                                                <thead>
+                                                    <tr>
+                                                        @foreach ($detailCols as $dc)
+                                                            <th>{{ $dc[0] }}</th>
+                                                        @endforeach
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach ($details as $d)
+                                                        <tr>
+                                                            @foreach ($detailCols as $dc)
+                                                                <td>{!! isset($dc[2]) && is_callable($dc[2]) ? $dc[2]($d) : e(data_get($d, $dc[1]) ?? '—') !!}</td>
+                                                            @endforeach
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    @else
+                                        <div class="text-muted text-sm detail-panel">Nothing to show for this row.</div>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endif
                     @empty
-                        <tr><td colspan="{{ count($columns) + 1 + ($showActions ? 1 : 0) }}" class="empty-row">No records found.</td></tr>
+                        <tr><td colspan="{{ $spanCount }}" class="empty-row">No records found.</td></tr>
                     @endforelse
                 </tbody>
             </table>
