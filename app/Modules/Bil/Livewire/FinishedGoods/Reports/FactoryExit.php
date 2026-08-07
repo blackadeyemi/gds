@@ -5,51 +5,51 @@ namespace Modules\Bil\Livewire\FinishedGoods\Reports;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Title;
 use Modules\Bil\Livewire\RawMaterials\Reports\RawMaterialReport;
-use Modules\Bil\Models\FactoryConversion;
+use Modules\Bil\Models\FactoryExit as FactoryExitModel;
+use Modules\Bil\Models\FactoryExitLocation;
 use Modules\Bil\Models\FinishedGoodsProduct;
-use Modules\Core\Models\Factory;
-use Modules\Core\Models\MachineLine;
 
 /**
- * BIL → Finished Goods → Reports → Conversion Output. Rebuild of the legacy
- * report_factory_production.php, over factory_conversion (1.2M pallets).
+ * BIL → Finished Goods → Reports → Factory Exit. Rebuild of the legacy
+ * report_factory_exit.php ("Item Sent (to Warehouse)"), over factory_exit.
  *
- * The legacy screen offered seven views; the three carried over here are the
- * ones it led with — Default, Summary (by sub-line, product) and Summary (by
- * product) — matching Report\Factory\Production::option1/2/5 column for column.
- * The Calendar X/Y and the two real-time views are deliberately left behind.
+ * The legacy screen offered five views; the three kept here are the ones it led
+ * with — Default, Summary (by location, product) and Summary (by product) —
+ * matching Report\Factory\Out::option1/2/5 column for column. Calendar Y and
+ * Calendar X are deliberately left behind, as on the Conversion Output report.
  *
- * "Palette" in the legacy column headings is spelled **Pallet** here.
+ * "Palette" in the legacy headings is spelled **Pallet** here.
  *
- * Delete mirrors the legacy guard: a pallet can only be removed while it has
- * NOT been received into the store, because store_entrance and everything after
- * it match on the barcode. There is no edit — a pallet's weights come from the
- * product spec, so correcting one means deleting and re-creating it.
+ * There is no edit: an exit row records a scan, and its product and bundle count
+ * are the pallet's, not the operator's. Delete mirrors the legacy
+ * Factory\Out::_delete — remove the row and put the pallet back on the factory
+ * floor (`factory_conversion.status` = NULL) — but refuses once the store has
+ * received the pallet, because the receipt is what would then be orphaned.
  */
-#[Title('Conversion Output Report')]
-class ConversionOutput extends RawMaterialReport
+#[Title('Factory Exit Report')]
+class FactoryExit extends RawMaterialReport
 {
     protected ?array $optCache = null;
     protected ?array $receivedCache = null;
 
     public function title(): string
     {
-        return 'Conversion Output Report';
+        return 'Factory Exit Report';
     }
 
     public function printKey(): string
     {
-        return 'conversion-output';
+        return 'factory-exit';
     }
 
     public function subtitle(): string
     {
-        return 'Pallets produced off the converting lines — by pallet, by line and by product.';
+        return 'Pallets sent from the factory to the warehouse — by pallet, by gate and by product.';
     }
 
     protected function reportPageKey(): string
     {
-        return 'bil.finished_goods.reports.conversion_output';
+        return 'bil.finished_goods.reports.factory_exit';
     }
 
     protected function printRouteName(): string
@@ -62,17 +62,24 @@ class ConversionOutput extends RawMaterialReport
         return 'bil.finished-goods.reports.download';
     }
 
+    /**
+     * Factories and gates come from factoryexit_details — the same three rows
+     * the entry screen offers, so a filter can never name a gate nothing was
+     * ever scanned through.
+     */
     protected function options(): array
     {
-        return $this->optCache ??= [
-            'factories' => Factory::orderBy('name')->pluck('name', 'name')->all(),
-            'lines' => MachineLine::treeOrder()->get()
-                ->mapWithKeys(fn ($l) => [
-                    ($l->legacy_alias ?: $l->name) => ($l->parent_id ? '— ' : '') . $l->name,
-                ])->all(),
+        if ($this->optCache !== null) {
+            return $this->optCache;
+        }
+
+        $gates = FactoryExitLocation::orderBy('factoryname')->orderBy('exitlocation')->get();
+
+        return $this->optCache = [
+            'factories' => $gates->pluck('factoryname', 'factoryname')->all(),
+            'locations' => $gates->pluck('exitlocation', 'exitlocation')->all(),
             'products' => FinishedGoodsProduct::query()->active()
                 ->orderBy('productname')->pluck('productname', 'productname')->all(),
-            'shifts' => ['day' => 'Day', 'night' => 'Night'],
         ];
     }
 
@@ -82,36 +89,36 @@ class ConversionOutput extends RawMaterialReport
 
         return [
             'factory' => ['label' => 'Factory', 'options' => $o['factories']],
-            'line' => ['label' => 'Line', 'options' => $o['lines']],
-            'sublinename' => ['label' => 'Sub-Line', 'options' => $o['lines']],
+            'location' => ['label' => 'Exit Location', 'options' => $o['locations']],
             'product' => ['label' => 'Product', 'options' => $o['products']],
-            'shift' => ['label' => 'Shift', 'options' => $o['shifts']],
         ];
     }
 
     /**
-     * `dateofproduction` is a varchar in Y/m/d form, which sorts correctly as a
-     * string — so the range compares directly, as the legacy report did.
+     * `dateofexit` is a varchar in Y/m/d form, which sorts correctly as a
+     * string, so the range compares directly — as the legacy report did.
+     *
+     * factoryexit_details is joined only to resolve the gate's factory: the exit
+     * row stores the location name, not a factory.
      */
     protected function base()
     {
         $f = $this->filters;
 
-        return DB::connection('bil')->table('factory_conversion as c')
-            ->leftJoin('products as p', 'c.productid', '=', 'p.productid')
-            ->when($this->dateFrom !== '', fn ($q) => $q->where('c.dateofproduction', '>=', str_replace('-', '/', $this->dateFrom)))
-            ->when($this->dateTo !== '', fn ($q) => $q->where('c.dateofproduction', '<=', str_replace('-', '/', $this->dateTo)))
-            ->when($f['factory'] ?? '', fn ($q, $v) => $q->where('c.factory', $v))
-            ->when($f['line'] ?? '', fn ($q, $v) => $q->where('c.linename', $v))
-            ->when($f['sublinename'] ?? '', fn ($q, $v) => $q->where('c.sublinename', $v))
+        return DB::connection('bil')->table('factory_exit as e')
+            ->leftJoin('products as p', 'e.productid', '=', 'p.productid')
+            ->leftJoin('factoryexit_details as d', 'e.exitlocation', '=', 'd.exitlocation')
+            ->when($this->dateFrom !== '', fn ($q) => $q->where('e.dateofexit', '>=', str_replace('-', '/', $this->dateFrom)))
+            ->when($this->dateTo !== '', fn ($q) => $q->where('e.dateofexit', '<=', str_replace('-', '/', $this->dateTo)))
+            ->when($f['factory'] ?? '', fn ($q, $v) => $q->where('d.factoryname', $v))
+            ->when($f['location'] ?? '', fn ($q, $v) => $q->where('e.exitlocation', $v))
             ->when($f['product'] ?? '', fn ($q, $v) => $q->where('p.productname', $v))
-            ->when($f['shift'] ?? '', fn ($q, $v) => $q->where('c.shift', $v))
             ->when($this->search !== '', fn ($q) => $q->where(function ($w) {
                 $term = '%' . $this->search . '%';
-                $w->where('c.barcode', 'like', $term)
+                $w->where('e.barcode', 'like', $term)
                   ->orWhere('p.productname', 'like', $term)
                   ->orWhere('p.productcode', 'like', $term)
-                  ->orWhere('c.sublinename', 'like', $term);
+                  ->orWhere('e.exitlocation', 'like', $term);
             }));
     }
 
@@ -123,38 +130,36 @@ class ConversionOutput extends RawMaterialReport
                 'type' => 'table',
                 'columns' => [
                     ['Barcode', 'barcode'],
-                    ['Factory', 'factory'],
-                    ['Line', 'linename'],
-                    ['Sub-Line', 'sublinename'],
+                    ['Factory', 'factoryname'],
+                    ['Location', 'exitlocation'],
                     ['Product Code', 'productcode'],
                     ['Product', 'productname'],
                     ['Bundles', 'bundles'],
                 ],
-                'searchable' => ['c.barcode', 'p.productname', 'p.productcode', 'c.sublinename'],
+                'searchable' => ['e.barcode', 'p.productname', 'p.productcode', 'e.exitlocation'],
                 'query' => fn () => $this->base()
-                    ->select('c.id', 'c.barcode', 'c.factory', 'c.linename', 'c.sublinename',
-                        'p.productcode', 'p.productname', 'c.bundles')
+                    ->select('e.id', 'e.barcode', 'd.factoryname', 'e.exitlocation',
+                        'p.productcode', 'p.productname', 'e.bundles')
                     // id is chronological, so newest-first via the PK — fast on
                     // any range, unlike ordering by the varchar date.
-                    ->orderByDesc('c.id'),
+                    ->orderByDesc('e.id'),
             ],
-            'by_subline_product' => [
-                'label' => 'Summary (by sub-line, product)',
+            'by_location_product' => [
+                'label' => 'Summary (by location, product)',
                 'type' => 'summary',
                 'columns' => [
-                    ['Line', 'linename'],
-                    ['Sub-Line', 'sublinename'],
+                    ['Location', 'exitlocation'],
                     ['Product Code', 'productcode'],
                     ['Product', 'productname'],
                     ['Pallets', 'pallets'],
                     ['Bundles', 'bundles'],
                 ],
-                'searchable' => ['p.productname', 'p.productcode', 'c.sublinename'],
+                'searchable' => ['p.productname', 'p.productcode', 'e.exitlocation'],
                 'query' => fn () => $this->base()
-                    ->selectRaw('c.linename, c.sublinename, p.productcode, p.productname,
-                                 COUNT(c.barcode) as pallets, SUM(c.bundles) as bundles')
-                    ->groupBy('c.linename', 'c.sublinename', 'p.productcode', 'p.productname')
-                    ->orderBy('c.linename')->orderBy('p.productname'),
+                    ->selectRaw('e.exitlocation, p.productcode, p.productname,
+                                 COUNT(e.barcode) as pallets, SUM(e.bundles) as bundles')
+                    ->groupBy('e.exitlocation', 'p.productcode', 'p.productname')
+                    ->orderBy('e.exitlocation')->orderBy('p.productname'),
             ],
             'by_product' => [
                 'label' => 'Summary (by product)',
@@ -164,28 +169,30 @@ class ConversionOutput extends RawMaterialReport
                     ['Product', 'productname'],
                     ['Pallets', 'pallets'],
                     ['Bundles', 'bundles'],
-                    ['Weight (kg)', 'grossweight'],
                 ],
                 'searchable' => ['p.productname', 'p.productcode'],
-                // Weights are stored in grams, hence the /1000 — same as legacy.
                 'query' => fn () => $this->base()
-                    ->selectRaw('p.productcode, p.productname, COUNT(c.barcode) as pallets,
-                                 SUM(c.bundles) as bundles,
-                                 ROUND(SUM(c.grossweight) / 1000, 2) as grossweight')
+                    ->selectRaw('p.productcode, p.productname,
+                                 COUNT(e.barcode) as pallets, SUM(e.bundles) as bundles')
                     ->groupBy('p.productcode', 'p.productname')
                     ->orderBy('p.productname'),
             ],
         ];
     }
 
+    /* ---------------- Delete ---------------- */
+
     /**
-     * Has this pallet been received into the store?
+     * Has the store received this pallet?
      *
      * The page's barcodes are prefetched in one query on first use, so a normal
      * render costs a single lookup. Anything NOT on that page — notably the
      * server-side re-check when a delete is confirmed — falls through to its own
      * query rather than being assumed absent: a cache miss must not read as
      * "not received" and quietly permit the delete.
+     *
+     * `factory_exit.status` mirrors this, but it is a denormalised copy written
+     * by two different screens, so the receipt itself is the authority.
      */
     protected function isReceived(string $barcode): bool
     {
@@ -231,43 +238,36 @@ class ConversionOutput extends RawMaterialReport
         return $this->runQuery($view)->limit($this->perPage)->pluck('barcode')->all();
     }
 
-    /** A pallet that reached the store can't be deleted — everything downstream
-     *  matches on its barcode. Mirrors the legacy Production::_delete check. */
     public function deleteGuard($row): ?string
     {
         return $this->isReceived((string) ($row->barcode ?? ''))
-            ? 'Already received into the store — cannot delete.'
+            ? 'Already received into the warehouse — delete the store entry first.'
             : null;
     }
 
-    /* ---------------- Delete ---------------- */
-
     protected function findRow(int $id)
     {
-        return FactoryConversion::find($id);
+        return FactoryExitModel::find($id);
     }
 
     /**
-     * Remove the pallet. The guard has already refused anything the store has
-     * received, so the only downstream row that can still exist is a factory
-     * exit — dropped with it, so a re-created pallet can be scanned out again
-     * (`factory_exit.barcode` is UNIQUE).
+     * Undo the exit: drop the row and put the pallet back on the factory floor,
+     * exactly as the legacy Factory\Out::_delete did.
      */
     protected function performDelete(int $id): void
     {
-        $pallet = FactoryConversion::find($id);
-        if (! $pallet) {
+        $exit = FactoryExitModel::find($id);
+        if (! $exit) {
             return;
         }
 
-        DB::connection('bil')->transaction(function () use ($pallet) {
-            DB::connection('bil')->table('factory_exit')
-                ->where('barcode', $pallet->barcode)->delete();
-            $pallet->delete();
+        DB::connection('bil')->transaction(function () use ($exit) {
+            DB::connection('bil')->table('factory_conversion')
+                ->where('barcode', $exit->barcode)->update(['status' => null]);
+            $exit->delete();
         });
 
-        // The page's cached "received" answers describe rows that may no longer
-        // exist.
+        // The cached "received" answers describe rows that may no longer exist.
         $this->receivedCache = null;
     }
 }

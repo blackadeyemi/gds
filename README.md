@@ -70,7 +70,7 @@ docs/DEPLOYMENT.md              release runbooks, newest first
 scripts/verify_*.php            standalone checks a release is verified with
 ```
 
-Currently 45 registered pages and 14 data grids.
+Currently 47 registered pages and 14 data grids.
 
 ### Two base classes do most of the work
 

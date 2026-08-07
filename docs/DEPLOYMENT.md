@@ -5,6 +5,97 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-08-07 — Finished Goods: Factory Exit + its report; delete fixed on the Conversion Output report
+
+Code only — **no migration, no schema change**. `factory_exit` and
+`factoryexit_details` are used exactly as the legacy app leaves them.
+
+### What shipped
+
+**BIL → Finished Goods → Factory Exit** — a rebuild of legacy
+`factory_exit_beta.php`, which the legacy nav calls *"Item Send (to Warehouse)"*.
+Pallets are scanned as they pass the gate. This is the middle step of a pallet's
+life: Conversion Output mints it, Factory Exit sends it, the store receives it.
+
+**BIL → Finished Goods → Reports → Factory Exit** — a rebuild of
+`report_factory_exit.php`, keeping the **first three** of its five views
+(Default, Summary by location/product, Summary by product = legacy
+`Report\Factory\Out::option1/2/5`). Calendar Y and Calendar X were left behind,
+as on the Conversion Output report.
+
+**Bug fix — delete on the Conversion Output report never worked.** The report
+declared the `delete` ability and rendered the button, but never implemented the
+`findRow`/`performDelete` hooks, so `deleteConfirmed()` always fell into its
+"Row not found." branch and flashed that error. Nothing was ever deleted and
+nothing was ever corrupted — it simply did nothing. Both hooks are now
+implemented. An audit of the other 11 reports found no second instance: every
+other non-`readOnly()` report implements both.
+
+### Contracts reproduced from the legacy app
+
+- A barcode is accepted only if it exists in `factory_conversion` **and** is not
+  already in `factory_exit` (the column is UNIQUE — a pallet leaves once).
+  Product and bundle count are read off the pallet, never typed.
+- Barcodes are stored **upper-cased**, as `Factory\Out::insertScanning` did.
+- Saving flips `factory_conversion.status` to `'yes'` so the production screens
+  stop showing the pallet as still on the floor.
+- **`factory_exit.status` is not the exit's own state** — it mirrors whether the
+  *store* has received the pallet. Exit sets it only on an out-of-order scan
+  (barcode already in `store_entrance`); the legacy store-entrance screen is what
+  normally sets and clears it.
+- Date follows the legacy production date: a scan before 07:00 books against the
+  previous day. `backdate` holders may pick any date.
+- Deleting an exit puts the pallet back on the factory floor
+  (`factory_conversion.status` = NULL), mirroring `Factory\Out::_delete`.
+
+### Two guards the legacy app did not have
+
+Both refuse a delete that would orphan a downstream row, and both name the step
+to undo first, so nothing is a dead end:
+
+- **Factory Exit report** refuses to delete an exit once the store has received
+  the pallet — "delete the store entry first".
+- **Conversion Output report** already refused a received pallet; its delete now
+  also removes any `factory_exit` row for the barcode, so a re-created pallet can
+  be scanned out again rather than colliding with the UNIQUE index.
+
+The receipt itself is the authority for both, not the denormalised
+`factory_exit.status` copy, because two different screens write that column.
+
+### After deploying
+
+```
+php artisan gds:sync-pages
+```
+
+Then grant the two new pages — like every new page they start with no access for
+anyone but Admin:
+
+| Page key | Where |
+| --- | --- |
+| `bil.finished_goods.factory_exit` | Finished Goods → Factory Exit |
+| `bil.finished_goods.reports.factory_exit` | Finished Goods → Reports → Factory Exit |
+
+`backdate` on the entry page is the ability that unlocks the date field; without
+it the operator always books against the shift date.
+
+### What to check afterwards
+
+- Legacy **Item Send (to Warehouse)** still saves — nothing about the schema
+  changed, so it should be untouched.
+- A pallet scanned out in gds disappears from the legacy factory-production
+  "still on the floor" listings.
+- Report totals match the legacy report for the same day. Verified before
+  shipping against 2026/08/06: 409 pallets, 22,364 bundles, identical row count.
+- Delete on **Reports → Conversion Output** now actually deletes.
+
+### If it goes wrong
+
+Revert the code; there is nothing to roll back. The two pages only write rows the
+legacy app already writes, in the same shape.
+
+---
+
 ## 2026-08-07 — Finished Goods module; BIL "production" renamed to "conversion"
 
 Three migrations, in this order:

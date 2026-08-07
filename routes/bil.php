@@ -3,7 +3,9 @@
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Modules\Bil\Livewire\FinishedGoods\ConversionOutput;
+use Modules\Bil\Livewire\FinishedGoods\FactoryExit;
 use Modules\Bil\Livewire\FinishedGoods\Reports\ConversionOutput as ConversionOutputReport;
+use Modules\Bil\Livewire\FinishedGoods\Reports\FactoryExit as FactoryExitReport;
 use Modules\Bil\Livewire\FinishedGoods\Products as FinishedGoodsProducts;
 use Modules\Bil\Livewire\Machines\Lines as MachineLines;
 use Modules\Bil\Livewire\Machines\Projects as MachineProjects;
@@ -50,6 +52,8 @@ Route::middleware('auth')
             ->middleware('page:bil.finished_goods.products')->name('products');
         Route::get('/conversion-output', ConversionOutput::class)
             ->middleware('page:bil.finished_goods.conversion_output')->name('conversion-output');
+        Route::get('/factory-exit', FactoryExit::class)
+            ->middleware('page:bil.finished_goods.factory_exit')->name('factory-exit');
 
         // Labels for the pallets just created (ids held in session).
         Route::get('/conversion-output/print', function () {
@@ -71,8 +75,13 @@ Route::middleware('auth')
         Route::prefix('reports')->name('reports.')->group(function () {
             Route::get('/conversion-output', ConversionOutputReport::class)
                 ->middleware('page:bil.finished_goods.reports.conversion_output')->name('conversion-output');
+            Route::get('/factory-exit', FactoryExitReport::class)
+                ->middleware('page:bil.finished_goods.reports.factory_exit')->name('factory-exit');
 
-            $reports = ['conversion-output' => ConversionOutputReport::class];
+            $reports = [
+                'conversion-output' => ConversionOutputReport::class,
+                'factory-exit' => FactoryExitReport::class,
+            ];
 
             $hydrate = function (string $class) {
                 $c = new $class();

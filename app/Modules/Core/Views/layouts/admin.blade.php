@@ -241,6 +241,12 @@
                                 <span class="label">Conversion Output</span>
                             </a>
                             @endcanPage
+                            @canPage('bil.finished_goods.factory_exit')
+                            <a href="{{ route('bil.finished-goods.factory-exit') }}" class="nav-link {{ $is('bil/finished-goods/factory-exit*') }}" title="Factory Exit">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+                                <span class="label">Factory Exit</span>
+                            </a>
+                            @endcanPage
                             @canPrefix('bil.finished_goods.reports.')
                             <div class="nav-group" :class="{ open: fgReportsOpen }">
                                 <button type="button" class="nav-link" :class="{ active: {{ $onFgReports ? 'true' : 'false' }} && collapsed }" @click="openGroup('fgReportsOpen')" title="Reports">
@@ -252,6 +258,11 @@
                                     @canPage('bil.finished_goods.reports.conversion_output')
                                     <a href="{{ route('bil.finished-goods.reports.conversion-output') }}" class="nav-link {{ $is('bil/finished-goods/reports/conversion-output*') }}" title="Conversion Output">
                                         <span class="label">Conversion Output</span>
+                                    </a>
+                                    @endcanPage
+                                    @canPage('bil.finished_goods.reports.factory_exit')
+                                    <a href="{{ route('bil.finished-goods.reports.factory-exit') }}" class="nav-link {{ $is('bil/finished-goods/reports/factory-exit*') }}" title="Factory Exit">
+                                        <span class="label">Factory Exit</span>
                                     </a>
                                     @endcanPage
                                 </div>
