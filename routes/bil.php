@@ -2,10 +2,14 @@
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Modules\Bil\Livewire\FinishedGoods\ConversionOutput;
+use Modules\Bil\Livewire\FinishedGoods\Reports\ConversionOutput as ConversionOutputReport;
 use Modules\Bil\Livewire\FinishedGoods\Products as FinishedGoodsProducts;
 use Modules\Bil\Livewire\Machines\Lines as MachineLines;
 use Modules\Bil\Livewire\Machines\Projects as MachineProjects;
+use Modules\Bil\Livewire\Machines\Reports\ConversionHistory;
 use Modules\Bil\Livewire\Machines\Reports\Services as ServicesReport;
+use Modules\Bil\Livewire\Machines\ConversionSetup;
 use Modules\Bil\Livewire\Machines\Services as MachineServices;
 use Modules\Bil\Livewire\Machines\Statistics as MachineStatistics;
 use Modules\Bil\Livewire\RawMaterials\DamagedGoods;
@@ -44,6 +48,60 @@ Route::middleware('auth')
     ->group(function () {
         Route::get('/products', FinishedGoodsProducts::class)
             ->middleware('page:bil.finished_goods.products')->name('products');
+        Route::get('/conversion-output', ConversionOutput::class)
+            ->middleware('page:bil.finished_goods.conversion_output')->name('conversion-output');
+
+        // Labels for the pallets just created (ids held in session).
+        Route::get('/conversion-output/print', function () {
+            $ids = array_map('intval', session('fg_conversion_print_ids', []));
+            abort_if($ids === [], 404);
+
+            $rows = DB::connection('bil')->table('factory_conversion as c')
+                ->leftJoin('products as p', 'c.productid', '=', 'p.productid')
+                ->whereIn('c.id', $ids)
+                ->orderByRaw('FIELD(c.id, ' . implode(',', $ids) . ')')
+                ->get(['c.barcode', 'c.bundles', 'c.factory', 'c.linename', 'c.sublinename',
+                       'p.productname', 'p.productcode']);
+
+            return view('bil::print.conversion-barcodes', ['rows' => $rows]);
+        })->middleware('page:bil.finished_goods.conversion_output')->name('conversion-output.print');
+
+        // Reports — same print/download contract as the other report groups,
+        // gated on bil.finished_goods.reports.* keys.
+        Route::prefix('reports')->name('reports.')->group(function () {
+            Route::get('/conversion-output', ConversionOutputReport::class)
+                ->middleware('page:bil.finished_goods.reports.conversion_output')->name('conversion-output');
+
+            $reports = ['conversion-output' => ConversionOutputReport::class];
+
+            $hydrate = function (string $class) {
+                $c = new $class();
+                $c->view = (string) request('view', '');
+                $c->search = (string) request('search', '');
+                $c->dateFrom = (string) request('dateFrom', now()->format('Y-m-d'));
+                $c->dateTo = (string) request('dateTo', now()->format('Y-m-d'));
+                $c->filters = array_map('strval', (array) request('filters', []));
+
+                return $c;
+            };
+
+            Route::get('/{report}/print', function (string $report) use ($reports, $hydrate) {
+                abort_unless(isset($reports[$report]), 404);
+                abort_unless((bool) request()->user()?->canDo('bil.finished_goods.reports.' . str_replace('-', '_', $report), 'export'), 403);
+
+                return view('core::print.grid', $hydrate($reports[$report])->reportPayload());
+            })->name('print');
+
+            Route::get('/{report}/download', function (string $report) use ($reports, $hydrate) {
+                abort_unless(isset($reports[$report]), 404);
+                abort_unless((bool) request()->user()?->canDo('bil.finished_goods.reports.' . str_replace('-', '_', $report), 'export'), 403);
+
+                $format = strtolower((string) request('format', 'xlsx'));
+                abort_unless(in_array($format, ['xlsx', 'csv', 'pdf'], true), 404);
+
+                return $hydrate($reports[$report])->export($format);
+            })->name('download');
+        });
     });
 
 /*
@@ -249,6 +307,8 @@ Route::middleware('auth')
             ->middleware('page:bil.machines.lines')->name('lines');
         Route::get('/projects', MachineProjects::class)
             ->middleware('page:bil.machines.projects')->name('projects');
+        Route::get('/conversion-setup', ConversionSetup::class)
+            ->middleware('page:bil.machines.conversion_setup')->name('conversion-setup');
         Route::get('/services', MachineServices::class)
             ->middleware('page:bil.machines.services')->name('services');
 
@@ -257,8 +317,13 @@ Route::middleware('auth')
         Route::prefix('reports')->name('reports.')->group(function () {
             Route::get('/services', ServicesReport::class)
                 ->middleware('page:bil.machines.reports.services')->name('services');
+            Route::get('/conversion-history', ConversionHistory::class)
+                ->middleware('page:bil.machines.reports.conversion_history')->name('conversion-history');
 
-            $reports = ['services' => ServicesReport::class];
+            $reports = [
+                'services' => ServicesReport::class,
+                'conversion-history' => ConversionHistory::class,
+            ];
 
             $hydrate = function (string $class) {
                 $c = new $class();

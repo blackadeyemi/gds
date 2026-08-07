@@ -20,6 +20,7 @@ return [
         // BIL — Machines
         \Modules\Bil\Livewire\Machines\Lines::class,
         \Modules\Bil\Livewire\Machines\Projects::class,
+        \Modules\Bil\Livewire\Machines\ConversionSetup::class,
 
         // BIL — Raw Materials
         \Modules\Bil\Livewire\RawMaterials\Products::class,

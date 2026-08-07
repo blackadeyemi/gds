@@ -11,6 +11,7 @@
     $onRmReports = request()->is('bil/raw-materials/reports/*');
     $onFinishedGoods = request()->is('bil/finished-goods/*');
     $onMachines = request()->is('bil/machines/*');
+    $onFgReports = request()->is('bil/finished-goods/reports/*');
     $onMachineReports = request()->is('bil/machines/reports/*');
     $onBpl = request()->is('bpl/*');
     $onJumboRolls = request()->is('bpl/jumbo-rolls/*');
@@ -58,6 +59,7 @@
         rawMaterialsOpen: {{ $onRawMaterials ? 'true' : 'false' }},
         rmReportsOpen: {{ $onRmReports ? 'true' : 'false' }},
         finishedGoodsOpen: {{ $onFinishedGoods ? 'true' : 'false' }},
+        fgReportsOpen: {{ $onFgReports ? 'true' : 'false' }},
         machinesOpen: {{ $onMachines ? 'true' : 'false' }},
         machineReportsOpen: {{ $onMachineReports ? 'true' : 'false' }},
         bplOpen: {{ $onBpl ? 'true' : 'false' }},
@@ -67,7 +69,7 @@
             if (window.innerWidth <= 900) { this.mobileOpen = !this.mobileOpen; return; }
             this.collapsed = !this.collapsed;
             localStorage.setItem('gds_sidebar_collapsed', JSON.stringify(this.collapsed));
-            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; this.finishedGoodsOpen = false; this.machinesOpen = false; this.machineReportsOpen = false; this.bplOpen = false; this.jumboRollsOpen = false; this.bplSalesOpen = false; }
+            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; this.finishedGoodsOpen = false; this.fgReportsOpen = false; this.machinesOpen = false; this.machineReportsOpen = false; this.bplOpen = false; this.jumboRollsOpen = false; this.bplSalesOpen = false; }
         },
         openGroup(group) {
             if (this.collapsed) {
@@ -217,6 +219,28 @@
                                 <span class="label">Products</span>
                             </a>
                             @endcanPage
+                            @canPage('bil.finished_goods.conversion_output')
+                            <a href="{{ route('bil.finished-goods.conversion-output') }}" class="nav-link {{ $is('bil/finished-goods/conversion-output*') }}" title="Conversion Output">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1"/><rect x="6" y="14" width="5" height="6" rx="1"/><rect x="13" y="14" width="5" height="6" rx="1"/><path d="M12 10v4"/></svg>
+                                <span class="label">Conversion Output</span>
+                            </a>
+                            @endcanPage
+                            @canPrefix('bil.finished_goods.reports.')
+                            <div class="nav-group" :class="{ open: fgReportsOpen }">
+                                <button type="button" class="nav-link" :class="{ active: {{ $onFgReports ? 'true' : 'false' }} && collapsed }" @click="openGroup('fgReportsOpen')" title="Reports">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
+                                    <span class="label">Reports</span>
+                                    <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                                </button>
+                                <div class="nav-sub" x-show="fgReportsOpen">
+                                    @canPage('bil.finished_goods.reports.conversion_output')
+                                    <a href="{{ route('bil.finished-goods.reports.conversion-output') }}" class="nav-link {{ $is('bil/finished-goods/reports/conversion-output*') }}" title="Conversion Output">
+                                        <span class="label">Conversion Output</span>
+                                    </a>
+                                    @endcanPage
+                                </div>
+                            </div>
+                            @endcanPrefix
                         </div>
                     </div>
                     @endcanPrefix
@@ -247,6 +271,12 @@
                                 <span class="label">Projects</span>
                             </a>
                             @endcanPage
+                            @canPage('bil.machines.conversion_setup')
+                            <a href="{{ route('bil.machines.conversion-setup') }}" class="nav-link {{ $is('bil/machines/conversion-setup*') }}" title="Conversion Setup">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11l-3-3M21 17H10l3 3"/><rect x="16" y="4" width="5" height="6" rx="1"/><rect x="3" y="14" width="5" height="6" rx="1"/></svg>
+                                <span class="label">Conversion Setup</span>
+                            </a>
+                            @endcanPage
                             @canPage('bil.machines.services')
                             <a href="{{ route('bil.machines.services') }}" class="nav-link {{ $is('bil/machines/services*') }}" title="Services">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 0 5.4-5.4l-2.3 2.3-2-2 2.3-2.3z"/></svg>
@@ -265,6 +295,12 @@
                                     <a href="{{ route('bil.machines.reports.services') }}" class="nav-link {{ $is('bil/machines/reports/services*') }}" title="Services">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 0 5.4-5.4l-2.3 2.3-2-2 2.3-2.3z"/></svg>
                                         <span class="label">Services</span>
+                                    </a>
+                                    @endcanPage
+                                    @canPage('bil.machines.reports.conversion_history')
+                                    <a href="{{ route('bil.machines.reports.conversion-history') }}" class="nav-link {{ $is('bil/machines/reports/conversion-history*') }}" title="Conversion History">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+                                        <span class="label">Conversion History</span>
                                     </a>
                                     @endcanPage
                                 </div>

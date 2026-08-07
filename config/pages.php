@@ -46,13 +46,21 @@ return [
         ['key' => 'bil.machines.statistics', 'label' => 'Statistics', 'module' => 'BIL / Machines', 'route' => 'bil.machines.statistics', 'abilities' => $snapshot],
         ['key' => 'bil.machines.lines',    'label' => 'Lines',    'module' => 'BIL / Machines', 'route' => 'bil.machines.lines',    'abilities' => $crud],
         ['key' => 'bil.machines.projects', 'label' => 'Projects', 'module' => 'BIL / Machines', 'route' => 'bil.machines.projects', 'abilities' => $crud],
+        ['key' => 'bil.machines.conversion_setup', 'label' => 'Conversion Setup', 'module' => 'BIL / Machines', 'route' => 'bil.machines.conversion-setup', 'abilities' => $crud],
         ['key' => 'bil.machines.services', 'label' => 'Services', 'module' => 'BIL / Machines', 'route' => 'bil.machines.services', 'abilities' => $entryPlain],
 
         // BIL — Machines Reports
         ['key' => 'bil.machines.reports.services', 'label' => 'Services', 'module' => 'BIL / Machines Reports', 'route' => 'bil.machines.reports.services', 'abilities' => $report],
+        // The setup page owns the lifecycle; the log is a read-out.
+        ['key' => 'bil.machines.reports.conversion_history', 'label' => 'Conversion History', 'module' => 'BIL / Machines Reports', 'route' => 'bil.machines.reports.conversion-history', 'abilities' => $snapshot],
 
         // BIL — Finished Goods
         ['key' => 'bil.finished_goods.products', 'label' => 'Products', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.products', 'abilities' => $crud],
+        ['key' => 'bil.finished_goods.conversion_output', 'label' => 'Conversion Output', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.conversion-output', 'abilities' => $entry],
+
+        // BIL — Finished Goods Reports. No `edit`: a pallet's weights come from
+        // the product spec, so a wrong one is deleted and re-created.
+        ['key' => 'bil.finished_goods.reports.conversion_output', 'label' => 'Conversion Output', 'module' => 'BIL / Finished Goods Reports', 'route' => 'bil.finished-goods.reports.conversion-output', 'abilities' => ['view', 'delete', 'export']],
 
         // BIL — Raw Materials
         ['key' => 'bil.raw_materials.statistics',          'label' => 'Statistics',          'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.statistics',          'abilities' => $snapshot],

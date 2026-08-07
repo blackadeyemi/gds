@@ -79,14 +79,14 @@ class Consumption extends Component
             ->where('location', $this->factory)->orderBy('sublinename')->pluck('sublinename');
     }
 
-    /** The product currently pre-produced on the chosen machine (if any). */
+    /** The product the chosen machine is currently set up to convert (if any). */
     public function productOnLine(): string
     {
         if ($this->machine === '') {
             return '';
         }
 
-        return (string) DB::connection('bil')->table('factory_preproduction')
+        return (string) DB::connection('bil')->table('conversion_setup')
             ->where('linename', $this->machine)->orderByDesc('id')->value('productname');
     }
 
