@@ -5,6 +5,57 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-08-07 — Encoding repair (`2026_08_07_100000_repair_legacy_mojibake`)
+
+Notes pasted from Word showed up as `â€¢` where a bullet belonged. The legacy PHP
+connected without setting a charset, so UTF-8 bytes landed in columns declared
+`latin1`: right bytes, wrong label. Any client that connects as `utf8mb4` — GDS,
+**and the legacy app as it runs today** — then expands each byte into its own
+character. This predates GDS; the legacy screens render it identically.
+
+The migration does two things:
+
+- **`bil.factory_machine_maintenance.note`** (2,514 of 43,401 rows) is
+  re-declared `utf8mb4` by round-tripping the column through `BLOB`. Not one row
+  is rewritten — the bytes were always right. The `BLOB → TEXT` step doubles as
+  the guard: MySQL refuses it if any row isn't valid UTF-8, which is exactly when
+  a blanket relabel would corrupt data. **Run it on a table nobody is writing
+  to**; it takes ~2s on 17.5 MB.
+- **Seven rows** in `sales_customers`, `sales_loading` and `bpl_customers` are
+  rewritten byte-for-byte from pairs recorded in the migration. Those columns
+  keep their charset — they're short varchars that legacy queries group and join
+  on, and widening the collation risks *illegal mix of collations*. Each write is
+  conditional on the row still holding the damaged bytes, so it is idempotent and
+  `down()` is exact.
+
+Before running, take a byte-faithful backup — `mysqldump --default-character-set=binary
+--hex-blob` — of `factory_machine_maintenance`, `sales_customers`, `sales_loading`
+and `bpl.bpl_customers`. A normal dump re-encodes and is useless as a reference here.
+
+Verify with `scripts/verify_mojibake.php`. Run it once **before** the migration
+with `--snapshot` (records the damaged rows' bytes and per-column checksums into
+`storage/app/`), then again after to confirm the bytes were preserved, the
+mojibake is gone and the untouched rows still hash identically. It passed
+locally, including a full rollback-and-reapply.
+
+**Two things left for someone to decide:**
+
+- `bpl_customers` id 131 is still `SociÃ©tÃ© HygiÃ¨ne Plus Gabon`. Repairing it
+  collides with the UNIQUE index: id 128 is `SOCIETE HYGIENE PLUS GABON` at the
+  same address, and `utf8mb3_general_ci` treats `e` and `é` as equal. They are two
+  records for one company, **both in active use** (230 and 42 `bpl_production`
+  rows). Merging them is a business decision; the migration reports the skip and
+  moves on.
+- The 4 `sales_loading.truckdriver` rows lost a decorative siren emoji (U+1F6A8
+  has no cp1252 form). They now read `POLICE`, matching the 47 rows that already
+  did. `down()` cannot bring the emoji back.
+
+New writes were never at risk: GDS declares `utf8mb4`, so MySQL converts properly
+on the way in. Only the historic rows were damaged, and the damage stopped growing
+once the legacy app started connecting as `utf8mb4`.
+
+---
+
 ## 2026-08-05 — Machines hierarchy, Department → Division → Staff, Services
 
 Large release. It changes the **shape of the shared data**, converts five legacy

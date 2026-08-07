@@ -121,14 +121,16 @@ class Services extends RawMaterialReport
     /**
      * The legacy report_factory_machine screen was a per-project grouping with
      * each project's jobs listed underneath it. Summary (by project) is the
-     * default view, and each of its rows opens its own jobs inline.
+     * default view, and each of its rows opens its own jobs in a modal.
      *
-     * Project names are globally unique (enforced on machine_projects.name), so
-     * the project name is a safe key for a summary row that has no id.
+     * Keyed by line *and* project, matching the view's GROUP BY: the same
+     * project name turns up under more than one line in the legacy data
+     * (GAMBINI REWINDER 01 has 2,410 jobs under one line and 2 under another),
+     * so keying on project alone would show more jobs than the row's own count.
      */
-    public function expandableBy(): ?string
+    public function expandableBy(): ?array
     {
-        return 'project';
+        return ['linename', 'project'];
     }
 
     /** Job columns for the nested table. No row actions — this is a read-out. */
@@ -152,7 +154,9 @@ class Services extends RawMaterialReport
 
     public function detailTitle(string $key): string
     {
-        return $key;
+        [, $project] = $this->detailKeyParts($key) + ['', ''];
+
+        return $project;
     }
 
     /**
@@ -161,22 +165,35 @@ class Services extends RawMaterialReport
      */
     public function detailSubtitle(string $key): string
     {
-        $row = $this->base()
-            ->where('m.project', $key)
-            ->selectRaw('m.linename, COUNT(*) as jobs, ' . self::MINUTES_SQL . ' as minutes')
-            ->groupBy('m.linename')
+        [$line, $project] = $this->detailKeyParts($key) + ['', ''];
+
+        $row = $this->groupQuery($key)
+            ->selectRaw('COUNT(*) as jobs, ' . self::MINUTES_SQL . ' as minutes')
             ->first();
 
         if (! $row) {
             return '';
         }
 
-        $code = MachineProject::where('name', $key)->value('code');
+        $code = MachineProject::where('name', $project)->value('code');
 
-        return trim(($row->linename ?: '—')
+        return trim(($line ?: '—')
             . ($code ? ' · ' . $code : '')
             . ' · ' . $row->jobs . ' ' . str($row->jobs === 1 ? 'job' : 'jobs')
             . ' · total stop time ' . self::formatMinutes((int) $row->minutes));
+    }
+
+    /** The filtered rows behind exactly one summary row — line and project both. */
+    private function groupQuery(string $key)
+    {
+        [$line, $project] = $this->detailKeyParts($key) + ['', ''];
+
+        $query = $this->base()->where('m.project', $project);
+
+        // A blank line in the summary is NULL or '' in the data; match both.
+        return $line === ''
+            ? $query->where(fn ($w) => $w->whereNull('m.linename')->orWhere('m.linename', ''))
+            : $query->where('m.linename', $line);
     }
 
     /**
@@ -186,8 +203,7 @@ class Services extends RawMaterialReport
      */
     public function detailRows(string $key): iterable
     {
-        return $this->base()
-            ->where('m.project', $key)
+        return $this->groupQuery($key)
             ->select([
                 'm.id', 'm.jobid', 'm.jobtitle', 'm.subproject', 'm.division',
                 'm.staff', 'm.starttime', 'm.endtime', 'm.duration', 'm.note',

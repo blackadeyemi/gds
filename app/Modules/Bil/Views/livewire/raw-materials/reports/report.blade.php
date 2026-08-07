@@ -136,7 +136,7 @@
                 </thead>
                 <tbody>
                     @forelse ($rows as $i => $row)
-                        @php $rowKey = $expandBy ? (string) data_get($row, $expandBy) : null; @endphp
+                        @php $rowKey = $expandBy ? $this->detailKeyFor($row) : null; @endphp
                         <tr wire:key="row-{{ $gridView['key'] }}-{{ $row->id ?? $i }}">
                             @if ($expandBy)
                                 <td>

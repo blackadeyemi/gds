@@ -226,18 +226,38 @@ abstract class RawMaterialReport extends Component
     public ?string $detailKey = null;
 
     /**
-     * Field on a summary row that identifies it for drill-down (e.g. 'project'),
-     * or null when the view has no drill-down.
+     * The fields that identify a summary row for drill-down — every column the
+     * view groups by, e.g. ['linename', 'project'] — or null for no drill-down.
      *
      * Non-null puts a view-detail button on each row of that view, which opens
-     * the records behind that group in a modal — the legacy grouped reports
-     * listed each group's records under a heading; a modal gives them the width
-     * to read properly without pushing the table around. Keyed by value rather
-     * than id because summary rows are aggregates and have no id.
+     * the records behind that group in a modal: the legacy grouped reports
+     * listed each group's records under a heading, and a modal gives them the
+     * width to read properly without pushing the table around. Keyed by value
+     * rather than id because summary rows are aggregates and have no id — and
+     * by *all* the grouping columns, or the modal would show more records than
+     * the count the user clicked (one project can appear under two lines).
      */
-    public function expandableBy(): ?string
+    public function expandableBy(): ?array
     {
         return null;
+    }
+
+    /** Identity of one summary row, as a single string the view can post back. */
+    public function detailKeyFor(object $row): ?string
+    {
+        $fields = $this->expandableBy();
+
+        if (! $fields) {
+            return null;
+        }
+
+        return implode("\x1f", array_map(fn ($f) => (string) data_get($row, $f), $fields));
+    }
+
+    /** Splits a key made by detailKeyFor() back into its parts. */
+    public function detailKeyParts(string $key): array
+    {
+        return explode("\x1f", $key);
     }
 
     /** Columns for the detail table: [[label, field, ?fn($row) => html], …]. */
