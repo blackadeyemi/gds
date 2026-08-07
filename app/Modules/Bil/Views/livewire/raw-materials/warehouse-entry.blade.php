@@ -1,12 +1,7 @@
 <div>
-    <div class="page-head flex items-center justify-between">
-        <div>
-            <h1>Warehouse Entry</h1>
-            <p>Scan delivered raw-material barcodes to enter them into warehouse stock.</p>
-        </div>
-        @canPage('bil.raw_materials.reports.warehouse_entry')
-            <a href="{{ route('bil.raw-materials.reports.warehouse-entry') }}" class="btn btn-ghost btn-sm">View Entries</a>
-        @endcanPage
+    <div class="page-head">
+        <h1>Warehouse Entry</h1>
+        <p>Scan delivered raw-material barcodes to enter them into warehouse stock.</p>
     </div>
 
     @if (session('ok'))

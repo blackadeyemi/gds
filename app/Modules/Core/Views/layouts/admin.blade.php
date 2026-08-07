@@ -16,6 +16,22 @@
     $onBpl = request()->is('bpl/*');
     $onJumboRolls = request()->is('bpl/jumbo-rolls/*');
     $onBplSales = request()->is('bpl/jumbo-rolls/sales/*');
+
+    // Global "View Entries" link: on any BIL entry page whose route
+    // (bil.<module>.<slug>) has a matching report route
+    // (bil.<module>.reports.<slug>), link to it. Module-agnostic, so every
+    // entry page — Raw Materials, Finished Goods, … — gets it with no per-page
+    // markup. The report's page key is the report route with hyphens→underscores.
+    $viewEntriesUrl = null;
+    $viewEntriesPage = null;
+    $routeName = request()->route()?->getName();
+    if ($routeName && \Illuminate\Support\Str::startsWith($routeName, 'bil.') && ! \Illuminate\Support\Str::contains($routeName, '.reports.')) {
+        $reportRoute = \Illuminate\Support\Str::beforeLast($routeName, '.') . '.reports.' . \Illuminate\Support\Str::afterLast($routeName, '.');
+        if (\Illuminate\Support\Facades\Route::has($reportRoute)) {
+            $viewEntriesUrl = route($reportRoute);
+            $viewEntriesPage = str_replace('-', '_', $reportRoute);
+        }
+    }
 @endphp
 <!DOCTYPE html>
 <html lang="en" data-theme="light" data-font="small">
@@ -469,6 +485,15 @@
             </div>
 
             <div class="ml-auto flex items-center gap-3">
+                @if ($viewEntriesUrl)
+                    @canPage($viewEntriesPage)
+                        <a href="{{ $viewEntriesUrl }}" class="btn btn-ghost btn-sm" title="View the entries recorded on this page">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
+                            View Entries
+                        </a>
+                    @endcanPage
+                @endif
+
                 <span class="clock" x-data="{ now: '' }" x-init="now = new Date().toLocaleString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' }); setInterval(() => now = new Date().toLocaleString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' }), 30000)" x-text="now"></span>
 
                 <button class="icon-btn" title="Notifications">

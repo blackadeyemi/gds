@@ -1,12 +1,7 @@
 <div>
-    <div class="page-head flex items-center justify-between">
-        <div>
-            <h1>Damaged Goods</h1>
-            <p>Report in-store raw material as damaged, then approve to write it off.</p>
-        </div>
-        @canPage('bil.raw_materials.reports.damaged_goods')
-            <a href="{{ route('bil.raw-materials.reports.damaged-goods') }}" class="btn btn-ghost btn-sm">View Entries</a>
-        @endcanPage
+    <div class="page-head">
+        <h1>Damaged Goods</h1>
+        <p>Report in-store raw material as damaged, then approve to write it off.</p>
     </div>
 
     @if (session('ok'))

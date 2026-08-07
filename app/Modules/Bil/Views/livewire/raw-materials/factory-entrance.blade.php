@@ -1,10 +1,7 @@
 <div>
-    <div class="page-head flex items-center justify-between">
-        <div>
-            <h1>Factory Entrance</h1>
-            <p>Scan store-exited raw-material barcodes into a factory location.</p>
-        </div>
-        <a href="{{ route('bil.raw-materials.reports.factory-entrance') }}" class="btn btn-ghost btn-sm">View Entries</a>
+    <div class="page-head">
+        <h1>Factory Entrance</h1>
+        <p>Scan store-exited raw-material barcodes into a factory location.</p>
     </div>
 
     @if (session('ok'))

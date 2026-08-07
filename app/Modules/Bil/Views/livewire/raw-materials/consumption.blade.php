@@ -1,12 +1,7 @@
 <div>
-    <div class="page-head flex items-center justify-between">
-        <div>
-            <h1>Consumption</h1>
-            <p>Record raw material consumed on a factory line during a shift.</p>
-        </div>
-        @canPage('bil.raw_materials.reports.consumption')
-            <a href="{{ route('bil.raw-materials.reports.consumption') }}" class="btn btn-ghost btn-sm">View Entries</a>
-        @endcanPage
+    <div class="page-head">
+        <h1>Consumption</h1>
+        <p>Record raw material consumed on a factory line during a shift.</p>
     </div>
 
     @if (session('ok'))
