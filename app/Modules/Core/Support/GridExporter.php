@@ -47,8 +47,11 @@ class GridExporter
      * @param  string    $basename  filename without extension
      * @param  string[]  $headings  column labels
      * @param  iterable  $rows      each item an array of scalar cell values
+     * @param  array     $context   [[label, value], ...] describing what was
+     *                              filtered — written above the table so the
+     *                              file says what it is out of context
      */
-    public static function download(string $format, string $basename, array $headings, iterable $rows): BinaryFileResponse
+    public static function download(string $format, string $basename, array $headings, iterable $rows, array $context = []): BinaryFileResponse
     {
         $format = strtolower($format) === 'csv' ? 'csv' : 'xlsx';
         $tmp = self::tempFile('gdsgrid');
@@ -59,6 +62,22 @@ class GridExporter
             ? new CsvWriter()
             : new XlsxWriter(new XlsxOptions(tempFolder: self::tempDir()));
         $writer->openToFile($tmp);
+
+        // A spreadsheet outlives the screen it came from, so lead with the
+        // filters that produced it — otherwise "1,204 rows" is unreadable a week
+        // later. Blank row between the context block and the table so the sheet
+        // still sorts/filters cleanly from the heading row.
+        foreach ($context as [$label, $value]) {
+            $writer->addRow(Row::fromValues([$label, $value]));
+        }
+
+        if ($context !== []) {
+            // One empty cell, not an empty array: a row with no cells writes
+            // nothing at all in CSV, and the context would run straight into
+            // the headings.
+            $writer->addRow(Row::fromValues(['']));
+        }
+
         $writer->addRow(Row::fromValues($headings));
         foreach ($rows as $row) {
             $writer->addRow(Row::fromValues(array_values($row)));
@@ -90,8 +109,9 @@ class GridExporter
      * @param  string    $label     report title shown on the page
      * @param  string[]  $headings  column labels
      * @param  iterable  $rows      each item an array of scalar cell values
+     * @param  array     $context   [[label, value], ...] shown under the title
      */
-    public static function pdf(string $basename, string $label, array $headings, iterable $rows): BinaryFileResponse
+    public static function pdf(string $basename, string $label, array $headings, iterable $rows, array $context = []): BinaryFileResponse
     {
         // dompdf holds the whole document in memory and is memory-hungry (a
         // ~450-row × 10-col table already nears 512M). Under php-cgi an OOM kills
@@ -103,7 +123,9 @@ class GridExporter
 
         $rows = is_array($rows) ? $rows : iterator_to_array($rows);
         // Lean, border-light template — dompdf is slow with per-cell borders.
-        $html = view('core::print.grid-pdf', ['label' => $label, 'headings' => $headings, 'rows' => $rows])->render();
+        $html = view('core::print.grid-pdf', [
+            'label' => $label, 'headings' => $headings, 'rows' => $rows, 'context' => $context,
+        ])->render();
 
         // dompdf's own tempDir/fontCache also default to sys_get_temp_dir();
         // pin them to the writable app dir so large PDFs (which spool to temp)

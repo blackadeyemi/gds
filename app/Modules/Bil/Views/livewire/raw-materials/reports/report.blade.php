@@ -203,14 +203,16 @@
         @endif
     </div>
 
-    {{-- Drill-down: the records behind one summary row. Read-only — the legacy
-         grouped reports listed each group's records under a heading, and a modal
-         gives them the width to read without pushing the table around. --}}
+    {{-- Drill-down: the records behind one summary row. Read-only, but with the
+         same search / page-size / export controls as the report itself — a group
+         can hold thousands of records, and an export of just that group is what
+         the legacy per-project screen effectively printed. --}}
     @if ($this->expandableBy() && $detailOpen && $detailKey !== null)
         @php
             $details = $this->detailRows($detailKey);
             $detailCols = $this->detailColumns();
             $detailSub = $this->detailSubtitle($detailKey);
+            $detailPaged = $details instanceof \Illuminate\Contracts\Pagination\Paginator;
         @endphp
         <div class="modal-backdrop" x-data x-show="$wire.detailOpen" x-cloak
              @keydown.escape.window="$wire.closeRowDetails()" style="display:none;">
@@ -225,20 +227,59 @@
                     <button class="modal-close" wire:click="closeRowDetails">&times;</button>
                 </div>
 
+                {{-- Search / page size / export, mirroring the report's own bar. --}}
+                <div class="modal-toolbar">
+                    <div class="search-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                        <input type="text" class="form-control" placeholder="Search these records…"
+                               wire:model.live.debounce.300ms="detailSearch">
+                    </div>
+
+                    @if ($detailPaged)
+                        <div class="flex items-center gap-2 text-sm text-muted">
+                            <span>Show</span>
+                            <select class="form-control" style="width:auto;padding-top:0.35em;padding-bottom:0.35em;" wire:model.live="detailPerPage">
+                                @foreach ($detailPerPageOptions as $opt)
+                                    <option value="{{ $opt }}">{{ $opt }}</option>
+                                @endforeach
+                            </select>
+                            <span>entries</span>
+                        </div>
+                    @endif
+
+                    @if ($this->mayDo('export'))
+                        <div class="dropdown ml-auto" x-data="{ open: false }" @click.outside="open = false">
+                            <button class="btn btn-ghost btn-sm" @click="open = !open" title="Export / Print these records">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                                Export
+                            </button>
+                            <div class="dropdown-menu" x-show="open" x-cloak x-transition @click="open = false" style="right:0;left:auto;">
+                                <a class="dropdown-item" href="{{ $this->detailDownloadUrl('xlsx') }}">Export Excel (.xlsx)</a>
+                                <a class="dropdown-item" href="{{ $this->detailDownloadUrl('csv') }}">Export CSV</a>
+                                <a class="dropdown-item" href="{{ $this->detailDownloadUrl('pdf') }}">Export PDF</a>
+                                <div class="dropdown-sep"></div>
+                                <a class="dropdown-item" target="_blank" href="{{ $this->detailPrintUrl() }}">Print</a>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
                 <div class="modal-body">
                     @if (count($details))
                         <div class="table-wrap">
                             <table class="data">
                                 <thead>
                                     <tr>
+                                        <th style="width:52px">#</th>
                                         @foreach ($detailCols as $dc)
                                             <th>{{ $dc[0] }}</th>
                                         @endforeach
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach ($details as $d)
+                                    @foreach ($details as $i => $d)
                                         <tr>
+                                            <td>{{ $detailPaged ? $details->firstItem() + $i : $i + 1 }}</td>
                                             @foreach ($detailCols as $dc)
                                                 <td>{!! isset($dc[2]) && is_callable($dc[2]) ? $dc[2]($d) : e(data_get($d, $dc[1]) ?? '—') !!}</td>
                                             @endforeach
@@ -247,13 +288,25 @@
                                 </tbody>
                             </table>
                         </div>
+                    @elseif ($detailSearch !== '')
+                        <p class="text-muted">No records match “{{ $detailSearch }}”.</p>
                     @else
                         <p class="text-muted">Nothing to show for this row.</p>
                     @endif
                 </div>
 
-                <div class="modal-foot">
-                    <button type="button" class="btn btn-ghost" wire:click="closeRowDetails">Close</button>
+                <div class="modal-foot" style="justify-content:space-between;">
+                    <span class="text-muted text-sm">
+                        @if ($detailPaged && $details->total())
+                            Showing {{ $details->firstItem() }}–{{ $details->lastItem() }} of {{ $details->total() }}
+                        @endif
+                    </span>
+                    <div class="flex items-center gap-2">
+                        @if ($detailPaged)
+                            @include('bil::partials.detail-pagination', ['paginator' => $details])
+                        @endif
+                        <button type="button" class="btn btn-ghost" wire:click="closeRowDetails">Close</button>
+                    </div>
                 </div>
             </div>
         </div>

@@ -2,6 +2,7 @@
 
 namespace Modules\Bil\Livewire\RawMaterials\Reports;
 
+use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Support\Facades\DB;
@@ -9,6 +10,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Modules\Core\Support\GridExporter;
+use Modules\Core\Support\Prefs;
 
 /**
  * Shared base for the Raw Materials reports (Supplier Deliveries, Warehouse
@@ -260,16 +262,110 @@ abstract class RawMaterialReport extends Component
         return explode("\x1f", $key);
     }
 
+    /** Search within the open drill-down, independent of the report's own search. */
+    public string $detailSearch = '';
+
+    public int $detailPage = 1;
+
+    public int $detailPerPage = 10;
+
+    public array $detailPerPageOptions = [10, 25, 50, 100];
+
+    /**
+     * Set by the print/download routes to mean "export the open group's records
+     * rather than the report's". Not touched by the UI.
+     */
+    public bool $detailMode = false;
+
     /** Columns for the detail table: [[label, field, ?fn($row) => html], …]. */
     public function detailColumns(): array
     {
         return [];
     }
 
-    /** The records behind one summary row. */
-    public function detailRows(string $key): iterable
+    /**
+     * The query behind one summary row. Return a builder — the base applies the
+     * modal's own search and paging, and exports it whole. Null = no drill-down
+     * records (the default for reports that don't implement it).
+     */
+    public function detailQuery(string $key)
+    {
+        return null;
+    }
+
+    /** Columns the modal's search box matches on. */
+    public function detailSearchable(): array
     {
         return [];
+    }
+
+    /** The drill-down query with the modal's search applied. */
+    protected function detailFiltered(string $key)
+    {
+        $q = $this->detailQuery($key);
+
+        if (! $q) {
+            return null;
+        }
+
+        $cols = $this->detailSearchable();
+
+        if ($this->detailSearch !== '' && $cols !== []) {
+            $term = '%' . $this->detailSearch . '%';
+            $q->where(function ($w) use ($cols, $term) {
+                foreach ($cols as $col) {
+                    $w->orWhere($col, 'like', $term);
+                }
+            });
+        }
+
+        return $q;
+    }
+
+    /**
+     * One page of the records behind a summary row. A group can hold thousands
+     * of jobs, so the modal pages like the report does rather than rendering the
+     * lot; `detailPage` is its own cursor so it can't fight the report's.
+     */
+    public function detailRows(string $key): iterable
+    {
+        $q = $this->detailFiltered($key);
+
+        if (! $q) {
+            return [];
+        }
+
+        return $q->paginate($this->detailPerPage, ['*'], 'detailPage', max(1, $this->detailPage));
+    }
+
+    public function detailGotoPage(int $page): void
+    {
+        $this->detailPage = max(1, $page);
+    }
+
+    public function updatedDetailSearch(): void
+    {
+        $this->detailPage = 1;
+    }
+
+    public function updatedDetailPerPage(): void
+    {
+        $this->detailPage = 1;
+    }
+
+    /** Identity of the open group, as [label, value] pairs for exports. */
+    public function detailContext(string $key): array
+    {
+        $fields = $this->expandableBy() ?? [];
+        $parts = $this->detailKeyParts($key);
+
+        $out = [];
+
+        foreach ($fields as $i => $field) {
+            $out[] = [ucfirst(str_replace('_', ' ', $field)), $parts[$i] ?? ''];
+        }
+
+        return $out;
     }
 
     /** Heading for the detail modal. */
@@ -292,12 +388,16 @@ abstract class RawMaterialReport extends Component
 
         $this->detailKey = $key;
         $this->detailOpen = true;
+        $this->detailPage = 1;
+        $this->detailSearch = '';
     }
 
     public function closeRowDetails(): void
     {
         $this->detailOpen = false;
         $this->detailKey = null;
+        $this->detailPage = 1;
+        $this->detailSearch = '';
     }
 
     /** Fields for the generic edit modal: name => ['label','step'?]. Empty = no edit. */
@@ -586,13 +686,109 @@ abstract class RawMaterialReport extends Component
         }
     }
 
+    /**
+     * What produced this data, as [label, value] pairs: the view, the date
+     * range, every active filter (by its display label, not its id) and the
+     * search term. Written into every export and printout — a spreadsheet or a
+     * PDF is read away from the screen that made it, and "1,204 rows" means
+     * nothing without the filters behind it.
+     */
+    public function reportContext(): array
+    {
+        $out = [];
+
+        if (count($this->views()) > 1) {
+            // The resolved view, not the raw property: the export routes leave
+            // it blank when the report opened on its default.
+            $out[] = ['View', $this->currentView()['label'] ?? ''];
+        }
+
+        if ($this->hasDateRange()) {
+            $out[] = ['Date range', $this->dateRangeLabel()];
+        }
+
+        foreach ($this->filterDefs() as $name => $def) {
+            $value = $this->filters[$name] ?? '';
+
+            if ($value === '' || $value === null) {
+                continue;
+            }
+
+            // Show what the user picked, not the id behind it.
+            $out[] = [$def['label'], (string) ($def['options'][$value] ?? $value)];
+        }
+
+        if ($this->search !== '') {
+            $out[] = ['Search', $this->search];
+        }
+
+        return $out;
+    }
+
+    /** The date range in the user's chosen display format. */
+    public function dateRangeLabel(): string
+    {
+        $fmt = Prefs::dateFormat();
+
+        $show = function (string $iso) use ($fmt) {
+            try {
+                return Carbon::parse($iso)->format($fmt);
+            } catch (\Throwable) {
+                return $iso;
+            }
+        };
+
+        if ($this->dateFrom === '' && $this->dateTo === '') {
+            return 'All time';
+        }
+
+        if ($this->dateFrom === '') {
+            return 'Up to ' . $show($this->dateTo);
+        }
+
+        if ($this->dateTo === '') {
+            return 'From ' . $show($this->dateFrom);
+        }
+
+        return $this->dateFrom === $this->dateTo
+            ? $show($this->dateFrom)
+            : $show($this->dateFrom) . ' — ' . $show($this->dateTo);
+    }
+
+    /** Context for a drill-down export: the group, then the report's own. */
+    protected function detailExportContext(): array
+    {
+        $out = array_merge($this->detailContext((string) $this->detailKey), $this->reportContext());
+
+        if ($this->detailSearch !== '') {
+            $out[] = ['Details search', $this->detailSearch];
+        }
+
+        return $out;
+    }
+
     /** Payload for the print route (title + headings + rows for the current view). */
     public function reportPayload(): array
     {
+        if ($this->detailMode && $this->detailKey !== null) {
+            $columns = $this->detailColumns();
+            $q = $this->detailFiltered($this->detailKey);
+
+            return [
+                'label' => $this->title() . ' — ' . $this->detailTitle($this->detailKey),
+                'context' => $this->detailExportContext(),
+                'headings' => array_map(fn ($c) => $c[0], $columns),
+                'rows' => $q
+                    ? $q->limit(self::PRINT_ROW_CAP)->get()->map(fn ($r) => $this->mapRow($r, ['columns' => $columns]))->all()
+                    : [],
+            ];
+        }
+
         $view = $this->currentView();
 
         return [
             'label' => $this->title(),
+            'context' => $this->reportContext(),
             'headings' => array_map(fn ($c) => $c[0], $view['columns']),
             'rows' => $this->reportRows($view, self::PRINT_ROW_CAP),
         ];
@@ -605,9 +801,14 @@ abstract class RawMaterialReport extends Component
         // lift it for this user-initiated action.
         @set_time_limit(0);
 
+        if ($this->detailMode && $this->detailKey !== null) {
+            return $this->exportDetail($format);
+        }
+
         $view = $this->currentView();
         $headings = array_map(fn ($c) => $c[0], $view['columns']);
         $base = 'rm-' . $this->printKey();
+        $context = $this->reportContext();
 
         if (strtolower($format) === 'pdf') {
             // Enforce the PDF row limit server-side too (the UI disables it, but
@@ -618,11 +819,41 @@ abstract class RawMaterialReport extends Component
             }
 
             // dompdf renders one document — cap rows to stay responsive.
-            return GridExporter::pdf($base, $this->title(), $headings, $this->reportRows($view, self::PRINT_ROW_CAP));
+            return GridExporter::pdf($base, $this->title(), $headings, $this->reportRows($view, self::PRINT_ROW_CAP), $context);
         }
 
         // xlsx/csv stream row-by-row from a DB cursor — full set, low memory.
-        return GridExporter::download($format, $base, $headings, $this->reportRowsLazy($view));
+        return GridExporter::download($format, $base, $headings, $this->reportRowsLazy($view), $context);
+    }
+
+    /** Export the open drill-down group: every record behind it, not one page. */
+    protected function exportDetail(string $format)
+    {
+        $columns = $this->detailColumns();
+        $headings = array_map(fn ($c) => $c[0], $columns);
+        $base = 'rm-' . $this->printKey() . '-detail';
+        $context = $this->detailExportContext();
+        $label = $this->title() . ' — ' . $this->detailTitle((string) $this->detailKey);
+        $q = $this->detailFiltered((string) $this->detailKey);
+
+        if (! $q) {
+            abort(404);
+        }
+
+        if (strtolower($format) === 'pdf') {
+            $rows = $q->limit(self::PRINT_ROW_CAP)->get()
+                ->map(fn ($r) => $this->mapRow($r, ['columns' => $columns]))->all();
+
+            return GridExporter::pdf($base, $label, $headings, $rows, $context);
+        }
+
+        $rows = (function () use ($q, $columns) {
+            foreach ($q->cursor() as $r) {
+                yield $this->mapRow($r, ['columns' => $columns]);
+            }
+        })();
+
+        return GridExporter::download($format, $base, $headings, $rows, $context);
     }
 
     /** Query params describing the current view + filters + search + date range. */
@@ -659,11 +890,41 @@ abstract class RawMaterialReport extends Component
         return 'bil.raw-materials.reports.download';
     }
 
+    /**
+     * Params identifying the open drill-down group, so the print/download routes
+     * can rebuild it outside Livewire. The key holds a unit-separator between
+     * its parts; http_build_query encodes it safely.
+     */
+    protected function detailQueryParams(): array
+    {
+        $q = ['detail' => 1, 'detailKey' => (string) $this->detailKey];
+
+        if ($this->detailSearch !== '') {
+            $q['detailSearch'] = $this->detailSearch;
+        }
+
+        return $q;
+    }
+
     /** URL to the print route carrying the current view + filters + search. */
     public function printUrl(): string
     {
         return route($this->printRouteName(), ['report' => $this->printKey()])
             . '?' . http_build_query($this->reportQueryParams());
+    }
+
+    /** Print URL for the open drill-down group rather than the report. */
+    public function detailPrintUrl(): string
+    {
+        return route($this->printRouteName(), ['report' => $this->printKey()])
+            . '?' . http_build_query($this->detailQueryParams() + $this->reportQueryParams());
+    }
+
+    /** Download URL for the open drill-down group — every record, not one page. */
+    public function detailDownloadUrl(string $format): string
+    {
+        return route($this->downloadRouteName(), ['report' => $this->printKey()])
+            . '?' . http_build_query(['format' => $format] + $this->detailQueryParams() + $this->reportQueryParams());
     }
 
     /**

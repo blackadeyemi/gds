@@ -200,9 +200,9 @@ class Services extends RawMaterialReport
     /**
      * The jobs behind one project row, under the same filters and date range as
      * the summary it sits in — so the list always reconciles with the job count
-     * beside it.
+     * beside it. The base pages and searches this; exports take it whole.
      */
-    public function detailRows(string $key): iterable
+    public function detailQuery(string $key)
     {
         return $this->groupQuery($key)
             ->select([
@@ -210,8 +210,21 @@ class Services extends RawMaterialReport
                 'm.staff', 'm.starttime', 'm.endtime', 'm.duration', 'm.note',
                 't.name as service_type',
             ])
-            ->orderByDesc('m.id')
-            ->get();
+            ->orderByDesc('m.id');
+    }
+
+    /** What the modal's own search box matches on. */
+    public function detailSearchable(): array
+    {
+        return ['m.jobid', 'm.jobtitle', 'm.staff', 'm.subproject', 'm.note'];
+    }
+
+    /** Named for the export header, since the key is just line + project. */
+    public function detailContext(string $key): array
+    {
+        [$line, $project] = $this->detailKeyParts($key) + ['', ''];
+
+        return [['Line', $line ?: '—'], ['Project', $project]];
     }
 
     public function views(): array

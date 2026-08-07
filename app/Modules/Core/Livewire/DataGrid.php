@@ -317,6 +317,28 @@ abstract class DataGrid extends Component
         return $connection->query()->fromSub($sub, 't')->count();
     }
 
+    /**
+     * What produced this data — the view and any search — written into every
+     * export and printout. A spreadsheet is read away from the screen that made
+     * it, so it has to say what it is on its own.
+     */
+    public function exportContext(): array
+    {
+        $out = [];
+
+        if (count($this->views()) > 1) {
+            // The resolved view, not the raw property: the print route leaves it
+            // blank when the grid opened on its default.
+            $out[] = ['View', $this->currentView()['label'] ?? ''];
+        }
+
+        if ($this->search !== '') {
+            $out[] = ['Search', $this->search];
+        }
+
+        return $out;
+    }
+
     public function export(string $format = 'xlsx')
     {
         abort_unless($this->mayDo('export'), 403);
@@ -324,6 +346,7 @@ abstract class DataGrid extends Component
         $view = $this->currentView();
         $headings = array_map(fn ($c) => $c[0], $this->exportColumns($view));
         $base = str_replace('.', '-', $this->pageKey());
+        $context = $this->exportContext();
 
         if (strtolower($format) === 'pdf') {
             // Refused server-side as well as disabled in the menu: export() is
@@ -334,10 +357,10 @@ abstract class DataGrid extends Component
                     . ' rows — use Print, or export to Excel/CSV for the full data.');
             }
 
-            return GridExporter::pdf($base, $this->pageLabel(), $headings, $this->rowsForExport($view, self::PRINT_ROW_CAP));
+            return GridExporter::pdf($base, $this->pageLabel(), $headings, $this->rowsForExport($view, self::PRINT_ROW_CAP), $context);
         }
 
-        return GridExporter::download($format, $base, $headings, $this->rowsForExport($view));
+        return GridExporter::download($format, $base, $headings, $this->rowsForExport($view), $context);
     }
 
     /** Used by the generic print controller (plain call, no Livewire lifecycle). */
@@ -349,6 +372,7 @@ abstract class DataGrid extends Component
 
         return [
             'label' => $this->pageLabel(),
+            'context' => $this->exportContext(),
             'headings' => array_map(fn ($c) => $c[0], $this->exportColumns($view)),
             'rows' => $this->rowsForExport($view),
         ];

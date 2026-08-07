@@ -5,6 +5,46 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-08-07 — Exports carry their filters; drill-down modal gets search, paging and export
+
+Code only — no migration, no schema change.
+
+**Exports and printouts now state what produced them.** Every xlsx, csv, pdf and
+print page leads with a context block: the view, the date range (in the user's
+display format, not ISO), each active filter *by its display label rather than
+the id behind it*, and the search term. A spreadsheet outlives the screen that
+made it, and "1,204 rows" is unreadable a week later without that. In xlsx/csv
+the block sits above a blank line, so the sheet still sorts and filters cleanly
+from the heading row.
+
+This covers all three export paths — `RawMaterialReport` (the nine Raw Materials
+reports plus Machines → Services), `DataGrid` (every admin/module grid) and
+`StatisticsPage` (section, period and the Rounded/Exact toggle, which the export
+URL now carries so the file agrees with the screen).
+
+**The drill-down modal is now a working table**, not a read-out: its own search
+box, page-size selector and pager, plus an Export menu (Excel / CSV / PDF /
+Print) for that group alone. Two things worth knowing:
+
+- The modal pages on `detailPage`, **not** Livewire's `page` — stepping through a
+  group's records must not move the report underneath it.
+- **Exports take the whole group, not the visible page.** A drill-down export of
+  a 2,410-job project writes 2,410 rows, led by the group's identity and then the
+  report's own filters.
+
+A report opts in by implementing `detailQuery()` (returning a builder) and
+`detailSearchable()`; the base does search, paging and export. The old
+`detailRows()` contract — return every row — is gone, and `detailRows()` now
+returns a paginator. **Only Machines → Services implements the drill-down**, so
+nothing else changes, but any report adding one gets the whole thing free.
+
+Verify with `scripts/verify_export_context.php`: filters reach every format,
+the blank-line separator is where it should be, the modal pages/searches, and a
+drill-down export holds every record. It passed locally, as did the Services,
+drill-down and pagination suites.
+
+---
+
 ## 2026-08-07 — Machines Statistics (`2026_08_07_120000_add_duration_minutes_to_maintenance`)
 
 BIL → Machines → **Statistics**, the counterpart to Raw Materials → Statistics:

@@ -67,6 +67,7 @@ Route::middleware('auth')
             $c = new Statistics();
             $c->section = (string) request('section', '');
             $c->range = (string) request('range', '30d');
+            $c->figures = (string) request('figures', 'rounded');
 
             return $c->exportResponse($format);
         })->middleware('page:bil.raw_materials.statistics')->name('statistics.export');
@@ -154,6 +155,10 @@ Route::middleware('auth')
                 $c->dateFrom = (string) request('dateFrom', now()->format('Y-m-d'));
                 $c->dateTo = (string) request('dateTo', now()->format('Y-m-d'));
                 $c->filters = array_map('strval', (array) request('filters', []));
+                // A drill-down export: same filters, but the open group's records.
+                $c->detailMode = (bool) request('detail', false);
+                $c->detailKey = request('detailKey') !== null ? (string) request('detailKey') : null;
+                $c->detailSearch = (string) request('detailSearch', '');
 
                 return view('core::print.grid', $c->reportPayload());
             })->name('print');
@@ -187,6 +192,10 @@ Route::middleware('auth')
                 $c->dateFrom = (string) request('dateFrom', now()->format('Y-m-d'));
                 $c->dateTo = (string) request('dateTo', now()->format('Y-m-d'));
                 $c->filters = array_map('strval', (array) request('filters', []));
+                // A drill-down export: same filters, but the open group's records.
+                $c->detailMode = (bool) request('detail', false);
+                $c->detailKey = request('detailKey') !== null ? (string) request('detailKey') : null;
+                $c->detailSearch = (string) request('detailSearch', '');
 
                 return $c->export($format);
             })->name('download');
@@ -232,6 +241,7 @@ Route::middleware('auth')
             $c = new MachineStatistics();
             $c->section = (string) request('section', '');
             $c->range = (string) request('range', '30d');
+            $c->figures = (string) request('figures', 'rounded');
 
             return $c->exportResponse($format);
         })->middleware('page:bil.machines.statistics')->name('statistics.export');
@@ -257,6 +267,10 @@ Route::middleware('auth')
                 $c->dateFrom = (string) request('dateFrom', now()->format('Y-m-d'));
                 $c->dateTo = (string) request('dateTo', now()->format('Y-m-d'));
                 $c->filters = array_map('strval', (array) request('filters', []));
+                // A drill-down export: same filters, but the open group's records.
+                $c->detailMode = (bool) request('detail', false);
+                $c->detailKey = request('detailKey') !== null ? (string) request('detailKey') : null;
+                $c->detailSearch = (string) request('detailSearch', '');
 
                 return $c;
             };

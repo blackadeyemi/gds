@@ -213,6 +213,9 @@ abstract class StatisticsPage extends Component
             'format' => $format,
             'section' => $this->section,
             'range' => $this->range,
+            // Carry the Rounded/Exact toggle, or the file would silently
+            // disagree with the figures on screen.
+            'figures' => $this->figures,
         ]);
     }
 
@@ -272,6 +275,16 @@ abstract class StatisticsPage extends Component
         return $this->pageTitle() . ' — ' . ($this->sections()[$this->section] ?? '') . ' (' . $this->rangeLabel() . ')';
     }
 
+    /** Which tab and window these figures came from, for the exported file. */
+    public function exportContext(): array
+    {
+        return [
+            ['Section', $this->sections()[$this->section] ?? $this->section],
+            ['Period', $this->rangeLabel()],
+            ['Figures', $this->isRounded() ? 'Rounded' : 'Exact'],
+        ];
+    }
+
     /** Build the export file for the current section/range (called from the download route). */
     public function exportResponse(string $format)
     {
@@ -280,12 +293,13 @@ abstract class StatisticsPage extends Component
 
         [$headings, $rows] = $this->flattenForExport($this->section($this->section));
         $base = 'stats-' . Str::slug($this->pageTitle()) . '-' . $this->section . '-' . $this->range;
+        $context = $this->exportContext();
 
         if (strtolower($format) === 'pdf') {
-            return GridExporter::pdf($base, $this->exportLabel(), $headings, $rows);
+            return GridExporter::pdf($base, $this->exportLabel(), $headings, $rows, $context);
         }
 
-        return GridExporter::download($format, $base, $headings, $rows);
+        return GridExporter::download($format, $base, $headings, $rows, $context);
     }
 
     /* ---------------- Render ---------------- */

@@ -238,6 +238,11 @@ table.data .col-actions { text-align: right; white-space: nowrap; }
 .modal-title { font-size: 1.05rem; font-weight: 700; margin: 0; }
 .modal-body { padding: 1.4rem; }
 .modal-foot { display: flex; justify-content: flex-end; gap: 0.6rem; padding: 1rem 1.4rem; border-top: 1px solid var(--line); }
+/* Search / page-size / export strip in the drill-down modal. */
+.modal-toolbar { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--line); }
+.modal-toolbar .search-box { flex: 1 1 220px; max-width: 340px; }
+.modal-toolbar .ml-auto { margin-left: auto; }
+.modal-foot .pagination { margin: 0; }
 .modal-close { background: transparent; border: 0; color: var(--muted); cursor: pointer; font-size: 1.2rem; line-height: 1; }
 
 /* ---- Search box ---- */
