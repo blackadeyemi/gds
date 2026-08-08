@@ -5,6 +5,117 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-08-08 — Finished Goods: Warehouse Entrance + its report (moves stock)
+
+Code only — **no migration, no schema change**. `store_entrance`,
+`storeentrance_details`, `storebundle`, `storebundle_floor` and `store_floors`
+are used exactly as the legacy app leaves them.
+
+### What shipped
+
+**BIL → Finished Goods → Warehouse Entrance** — a rebuild of legacy
+`store_entrance_beta.php` (*"Item Receive"* in the legacy nav), and
+**→ Reports → Warehouse Entrance**, a rebuild of `report_store_entrance.php`
+(*"Item Received"*), keeping the **first three** of its five views
+(= `Report\Store\Entrance::option1/2/5`). Calendar Y/X left behind as before.
+
+This completes the pallet pipeline: **Conversion Output → Factory Exit →
+Warehouse Entrance**. After this point stock is counted in bundles, not
+barcodes, so nothing downstream references a receipt row (`sales_loading`
+carries its own load barcode, not the pallet's — verified against live data).
+
+### ⚠️ This page moves stock — the important difference
+
+Unlike the other two scanning screens, receiving a pallet updates two running
+totals that are **shared live with the legacy app**:
+
+| Table | Holds |
+| --- | --- |
+| `storebundle` | bundles per product across warehouse `01`, plus a `modifications` JSON audit trail |
+| `storebundle_floor` | bundles per product per floor |
+
+**Nothing recomputes these from the receipts.** They are only ever incremented
+and decremented, so a receive that skips them, or a delete that fails to reverse
+them, is permanent drift that no reconciliation job will find. Both directions
+therefore go through one class — `Modules\Bil\Support\FinishedGoodsStock` — so
+they cannot fall out of step, and both run inside the same transaction as the
+receipt itself.
+
+Two consequences worth knowing before granting anything:
+
+- **`delete` on the report is a stock permission, not a tidy-up one.** Deleting
+  a receipt takes its bundles back out of both totals.
+- The reversal uses the **receipt's own** product, bundles and gate, not the
+  pallet's current values — so it is an exact mirror of what that receipt added
+  even if the pallet has since changed.
+
+**The gate → floor mapping is a shared contract.** `FG Store FB Elevator 1`
+feeds `floor b`; every other gate feeds `floor c`. That hard-coded string is
+copied verbatim from the legacy trait: if the two apps ever disagree, a
+product's floor totals silently split between them. Verified identical for all
+three gates. **If a gate is ever added, change both apps together.**
+
+If a gate somehow has no floor, the save now **fails loudly** rather than
+writing a receipt with no stock movement — a blocked scan is recoverable, silent
+drift is not.
+
+### Other contracts reproduced from the legacy app
+
+- A barcode is accepted if it is in `factory_conversion` and not already in
+  `store_entrance` (UNIQUE — received once). Note it is checked against
+  **conversion, not factory exit**: the warehouse can receive a pallet whose
+  gate scan was missed or comes later, which is exactly what
+  `factory_exit.status` exists to record.
+- **`dateofentrance` is the pallet's EXIT date when it has one**, falling back to
+  the date on the form. A pallet scanned in the next morning still lands on the
+  day it actually left the factory. The date field on the form only applies to
+  pallets with no exit record, and the page says so.
+- Both `factory_exit.status` and `factory_conversion.status` are flipped to
+  `'yes'`; deleting a receipt clears `factory_exit.status` back to NULL (and,
+  as in the legacy `_delete`, leaves the conversion status alone).
+
+One deliberate difference: the legacy trait seeded `modifications` with a bare
+JSON object, which `JSON_ARRAY_APPEND` auto-wraps on the next write (2 of 371
+live rows are still bare objects). gds seeds a one-element array instead — same
+result from the first write, consistent shape. Nothing reads the column; it is a
+write-only audit trail.
+
+### After deploying
+
+```
+php artisan gds:sync-pages
+```
+
+Then grant the two new pages — invisible to everyone but Admin until then:
+
+| Page key | Where |
+| --- | --- |
+| `bil.finished_goods.warehouse_entrance` | Finished Goods → Warehouse Entrance |
+| `bil.finished_goods.reports.warehouse_entrance` | Finished Goods → Reports → Warehouse Entrance |
+
+The legacy screen restricted each store user to their own floor's gates by user
+level (16 → Store FB, 18 → FC 1, 19 → FC 2). gds gates access **per page, not
+per floor**, so every gate is offered to anyone who can open the page. If
+per-floor separation is wanted, it needs a new mechanism — do not assume the old
+restriction carried over.
+
+### What to check afterwards
+
+- Legacy **Item Receive** still saves, and its stock totals still move.
+- Receive a pallet in gds, then check `storebundle` and `storebundle_floor` for
+  that product moved by exactly its bundle count — and that deleting the receipt
+  puts both back. Verified before shipping, including the round trip.
+- Report totals match the legacy report for the same day. Verified against
+  2026/08/06: 376 pallets, 20,160 bundles, identical row count.
+
+### If it goes wrong
+
+Revert the code; there is nothing to roll back. But **check the stock totals
+first** if any receipts were saved or deleted through gds — those are the only
+writes that are not self-correcting.
+
+---
+
 ## 2026-08-07 — Finished Goods: Factory Exit + its report; delete fixed on the Conversion Output report
 
 Code only — **no migration, no schema change**. `factory_exit` and

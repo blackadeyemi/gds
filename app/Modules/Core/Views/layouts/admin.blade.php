@@ -247,6 +247,12 @@
                                 <span class="label">Factory Exit</span>
                             </a>
                             @endcanPage
+                            @canPage('bil.finished_goods.warehouse_entrance')
+                            <a href="{{ route('bil.finished-goods.warehouse-entrance') }}" class="nav-link {{ $is('bil/finished-goods/warehouse-entrance*') }}" title="Warehouse Entrance">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M8 17l-5-5 5-5M3 12h12"/></svg>
+                                <span class="label">Warehouse Entrance</span>
+                            </a>
+                            @endcanPage
                             @canPrefix('bil.finished_goods.reports.')
                             <div class="nav-group" :class="{ open: fgReportsOpen }">
                                 <button type="button" class="nav-link" :class="{ active: {{ $onFgReports ? 'true' : 'false' }} && collapsed }" @click="openGroup('fgReportsOpen')" title="Reports">
@@ -263,6 +269,11 @@
                                     @canPage('bil.finished_goods.reports.factory_exit')
                                     <a href="{{ route('bil.finished-goods.reports.factory-exit') }}" class="nav-link {{ $is('bil/finished-goods/reports/factory-exit*') }}" title="Factory Exit">
                                         <span class="label">Factory Exit</span>
+                                    </a>
+                                    @endcanPage
+                                    @canPage('bil.finished_goods.reports.warehouse_entrance')
+                                    <a href="{{ route('bil.finished-goods.reports.warehouse-entrance') }}" class="nav-link {{ $is('bil/finished-goods/reports/warehouse-entrance*') }}" title="Warehouse Entrance">
+                                        <span class="label">Warehouse Entrance</span>
                                     </a>
                                     @endcanPage
                                 </div>

@@ -58,12 +58,16 @@ return [
         ['key' => 'bil.finished_goods.products', 'label' => 'Products', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.products', 'abilities' => $crud],
         ['key' => 'bil.finished_goods.conversion_output', 'label' => 'Conversion Output', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.conversion-output', 'abilities' => $entry],
         ['key' => 'bil.finished_goods.factory_exit', 'label' => 'Factory Exit', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.factory-exit', 'abilities' => $entry],
+        ['key' => 'bil.finished_goods.warehouse_entrance', 'label' => 'Warehouse Entrance', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.warehouse-entrance', 'abilities' => $entry],
 
         // BIL — Finished Goods Reports. No `edit`: a pallet's weights come from
         // the product spec, and an exit row is a scan event — a wrong one is
         // deleted and re-made rather than corrected in place.
         ['key' => 'bil.finished_goods.reports.conversion_output', 'label' => 'Conversion Output', 'module' => 'BIL / Finished Goods Reports', 'route' => 'bil.finished-goods.reports.conversion-output', 'abilities' => ['view', 'delete', 'export']],
         ['key' => 'bil.finished_goods.reports.factory_exit', 'label' => 'Factory Exit', 'module' => 'BIL / Finished Goods Reports', 'route' => 'bil.finished-goods.reports.factory-exit', 'abilities' => ['view', 'delete', 'export']],
+        // Deleting a receipt also reverses the warehouse and floor stock totals,
+        // so `delete` here is a stock permission, not just a tidy-up one.
+        ['key' => 'bil.finished_goods.reports.warehouse_entrance', 'label' => 'Warehouse Entrance', 'module' => 'BIL / Finished Goods Reports', 'route' => 'bil.finished-goods.reports.warehouse-entrance', 'abilities' => ['view', 'delete', 'export']],
 
         // BIL — Raw Materials
         ['key' => 'bil.raw_materials.statistics',          'label' => 'Statistics',          'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.statistics',          'abilities' => $snapshot],
