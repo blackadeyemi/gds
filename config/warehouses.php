@@ -43,6 +43,18 @@ return [
     ],
 
     /*
+    | The day gds took over finished-goods movements.
+    |
+    | Receipts imported from the legacy `store_entrance` are flagged historic and
+    | never count toward stock; loadings have no such flag, so they are excluded
+    | by this date instead. Both boundaries must agree, or stock would be charged
+    | for dispatches of goods it never counted receiving.
+    |
+    | Set this to the day the finished-goods warehouses actually went live.
+    */
+    'finished_goods_cutover' => env('FG_STOCK_CUTOVER', '2026-08-12'),
+
+    /*
     | Which way goods move through a gate. `both` exists because a single
     | elevator or roller door is often used in either direction.
     */

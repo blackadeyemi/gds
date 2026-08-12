@@ -247,6 +247,12 @@
                                 <span class="label">Factory Exit</span>
                             </a>
                             @endcanPage
+                            @canPage('bil.finished_goods.stock')
+                            <a href="{{ route('bil.finished-goods.stock') }}" class="nav-link {{ $is('bil/finished-goods/stock*') }}" title="Stock">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4M3 17l9 4 9-4"/></svg>
+                                <span class="label">Stock</span>
+                            </a>
+                            @endcanPage
                             @canPage('bil.finished_goods.warehouse_entrance')
                             <a href="{{ route('bil.finished-goods.warehouse-entrance') }}" class="nav-link {{ $is('bil/finished-goods/warehouse-entrance*') }}" title="Warehouse Entrance">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M8 17l-5-5 5-5M3 12h12"/></svg>

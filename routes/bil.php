@@ -9,6 +9,7 @@ use Modules\Bil\Livewire\FinishedGoods\Reports\FactoryExit as FactoryExitReport;
 use Modules\Bil\Livewire\FinishedGoods\Reports\WarehouseEntrance as WarehouseEntranceReport;
 use Modules\Bil\Livewire\FinishedGoods\WarehouseEntrance;
 use Modules\Bil\Livewire\FinishedGoods\Products as FinishedGoodsProducts;
+use Modules\Bil\Livewire\FinishedGoods\Stock as FinishedGoodsStockPage;
 use Modules\Bil\Livewire\Machines\Lines as MachineLines;
 use Modules\Bil\Livewire\Machines\Projects as MachineProjects;
 use Modules\Bil\Livewire\Machines\Reports\ConversionHistory;
@@ -58,6 +59,8 @@ Route::middleware('auth')
             ->middleware('page:bil.finished_goods.factory_exit')->name('factory-exit');
         Route::get('/warehouse-entrance', WarehouseEntrance::class)
             ->middleware('page:bil.finished_goods.warehouse_entrance')->name('warehouse-entrance');
+        Route::get('/stock', FinishedGoodsStockPage::class)
+            ->middleware('page:bil.finished_goods.stock')->name('stock');
 
         // Labels for the pallets just created (ids held in session).
         Route::get('/conversion-output/print', function () {

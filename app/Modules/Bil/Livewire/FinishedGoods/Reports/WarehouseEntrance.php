@@ -19,11 +19,10 @@ use Modules\Core\Models\WarehouseGate;
  * Default, Summary (by entrance, product) and Summary (by product) — with
  * warehouse in place of the old hard-coded store floor.
  *
- * ⚠️ **This shows gds receipts only.** The 1.17M legacy `store_entrance` rows
- * are not merged in: the schemas differ, the legacy app still owns and reports
- * on them, and blending two sources into one total is how a number nobody can
- * reproduce gets created. The legacy report remains the place to look at
- * anything received before the cut-over.
+ * Legacy receipts imported by `bil:backfill-fg-receipts` appear here too,
+ * flagged **Historic**. They make the report complete without counting toward
+ * stock — nine years of arrivals are not goods on the floor. The Source filter
+ * separates them from what gds has actually taken in.
  *
  * There is no edit: a receipt records a scan, and its product and bundle count
  * are the pallet's. Delete un-receives — it takes the bundles back OUT of the
@@ -90,6 +89,10 @@ class WarehouseEntrance extends RawMaterialReport
             'warehouse' => ['label' => 'Warehouse', 'options' => $o['warehouses']],
             'entrance' => ['label' => 'Entrance', 'options' => $o['entrances']],
             'product' => ['label' => 'Product', 'options' => $o['products']],
+            'source' => ['label' => 'Source', 'options' => [
+                'live' => 'Received in gds',
+                'historic' => 'Imported history',
+            ]],
         ];
     }
 
@@ -109,6 +112,7 @@ class WarehouseEntrance extends RawMaterialReport
             ->when($f['warehouse'] ?? '', fn ($q, $v) => $q->where('r.warehouse_id', $v))
             ->when($f['entrance'] ?? '', fn ($q, $v) => $q->where('r.entrance_id', $v))
             ->when($f['product'] ?? '', fn ($q, $v) => $q->where('r.productid', $v))
+            ->when($f['source'] ?? '', fn ($q, $v) => $q->where('r.is_historic', $v === 'historic'))
             ->when($this->search !== '', fn ($q) => $q->where(function ($w) {
                 $term = '%' . $this->search . '%';
                 $w->where('r.barcode', 'like', $term)
@@ -163,13 +167,16 @@ class WarehouseEntrance extends RawMaterialReport
                     ['Product', 'productname', fn ($r) => e($this->productName($r->productid))],
                     ['Bundles', 'bundles'],
                     $this->dateCol('Date', 'date_of_entrance'),
+                    ['Source', 'is_historic', fn ($r) => $r->is_historic
+                        ? '<span class="badge badge-muted">Historic</span>'
+                        : '<span class="badge badge-success">gds</span>'],
                 ],
                 // Product name/code are resolved per row from the other
                 // connection, so they cannot be sorted on in SQL.
-                'sortable' => ['barcode', 'warehouse_name', 'entrance_name', 'bundles', 'date_of_entrance'],
+                'sortable' => ['barcode', 'warehouse_name', 'entrance_name', 'bundles', 'date_of_entrance', 'is_historic'],
                 'query' => fn () => $this->base()
                     ->select('r.id', 'r.barcode', 'w.name as warehouse_name', 'e.name as entrance_name',
-                        'r.productid', 'r.bundles', 'r.date_of_entrance')
+                        'r.productid', 'r.bundles', 'r.date_of_entrance', 'r.is_historic')
                     ->orderByDesc('r.id'),
             ],
             'by_entrance_product' => [
@@ -232,11 +239,15 @@ class WarehouseEntrance extends RawMaterialReport
         }
 
         DB::connection('core')->transaction(function () use ($receipt) {
-            FinishedGoodsStock::apply(
-                (int) $receipt->warehouse_id,
-                (int) $receipt->productid,
-                -(int) $receipt->bundles
-            );
+            // Imported history never counted toward stock, so removing it must
+            // not take bundles out either.
+            if (! $receipt->is_historic) {
+                FinishedGoodsStock::apply(
+                    (int) $receipt->warehouse_id,
+                    (int) $receipt->productid,
+                    -(int) $receipt->bundles
+                );
+            }
 
             DB::connection('bil')->table('factory_exit')
                 ->where('barcode', $receipt->barcode)->update(['status' => null]);

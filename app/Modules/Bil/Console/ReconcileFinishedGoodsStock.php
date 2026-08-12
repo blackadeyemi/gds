@@ -58,11 +58,19 @@ class ReconcileFinishedGoodsStock extends Command
             return self::FAILURE;
         }
 
-        DB::connection('core')->transaction(function () use ($drift) {
+        DB::connection('core')->transaction(function () use ($drift, $products) {
             foreach ($drift as $d) {
                 DB::connection('core')->table('finished_goods_warehouse_stock')->updateOrInsert(
                     ['warehouse_id' => $d['warehouse_id'], 'productid' => $d['productid']],
-                    ['bundles' => $d['expected'], 'updated_at' => now(), 'created_at' => now()]
+                    [
+                        'bundles' => $d['expected'],
+                        // Refresh the denormalised copy the Stock grid sorts on.
+                        'productname' => $products[$d['productid']] ?? null,
+                        'productcode' => DB::connection('bil')->table('products')
+                            ->where('productid', $d['productid'])->value('productcode'),
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ]
                 );
             }
         });

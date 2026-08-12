@@ -68,6 +68,9 @@ return [
         ['key' => 'bil.finished_goods.products', 'label' => 'Products', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.products', 'abilities' => $crud],
         ['key' => 'bil.finished_goods.conversion_output', 'label' => 'Conversion Output', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.conversion-output', 'abilities' => $entry],
         ['key' => 'bil.finished_goods.factory_exit', 'label' => 'Factory Exit', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.factory-exit', 'abilities' => $entry, 'gates' => 'factory'],
+        // Stock lines are created by movement and never deleted, so no create
+        // or delete ability; `edit` records an adjustment.
+        ['key' => 'bil.finished_goods.stock', 'label' => 'Stock', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.stock', 'abilities' => ['view', 'edit', 'export']],
         ['key' => 'bil.finished_goods.warehouse_entrance', 'label' => 'Warehouse Entrance', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.warehouse-entrance', 'abilities' => $entry, 'gates' => 'warehouse'],
 
         // BIL — Finished Goods Reports. No `edit`: a pallet's weights come from
