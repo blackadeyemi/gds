@@ -79,7 +79,7 @@
                             ['Sales returns', 'Returned by the customer, back into stock.', $in['sales_returns'], [
                                 ['Return #', fn ($r) => $r->returnnumber],
                                 ['Order', fn ($r) => e($r->orderid)],
-                                ['Customer', fn ($r) => e($r->customerid ?? '—')],
+                                ['Customer', fn ($r) => e($r->customername ?? '—')],
                                 ['Returned', fn ($r) => number_format($r->quantityreturned)],
                                 ['Rejected', fn ($r) => number_format($r->quantityrejected)],
                                 ['Date', fn ($r) => $r->dateofreturn],
@@ -96,7 +96,7 @@
                         : [
                             ['Orders', 'Ordered — not a stock movement on its own.', $out['orders'], [
                                 ['Order', fn ($r) => e($r->orderid)],
-                                ['Customer', fn ($r) => e($r->customerid ?? '—')],
+                                ['Customer', fn ($r) => e($r->customername ?? '—')],
                                 ['Quantity', fn ($r) => number_format($r->quantityordered)],
                                 ['FOC', fn ($r) => $r->foc ? '<span class="badge badge-muted">FOC</span>' : '—'],
                                 ['Date', fn ($r) => $r->dateoforder],
@@ -117,7 +117,7 @@
                                 ['Delivery #', fn ($r) => $r->deliverynumber],
                                 ['Barcode', fn ($r) => e($r->barcode)],
                                 ['Load #', fn ($r) => $r->loadnumber],
-                                ['Customer', fn ($r) => e($r->deliverycustomerid ?? '—')],
+                                ['Customer', fn ($r) => e($r->customername ?? '—')],
                                 ['Date', fn ($r) => $r->dateofdelivery],
                                 ['By', fn ($r) => e($r->username ?: '—')],
                             ]],

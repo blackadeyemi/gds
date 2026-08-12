@@ -135,6 +135,7 @@ class FinishedGoodsStockMovements
 
         return $rows->map(function ($r) use ($headers) {
             $r->customerid = $headers[$r->orderid]->customerid ?? null;
+            $r->customername = self::customerName($r->customerid);
 
             return $r;
         })->all();
@@ -218,11 +219,36 @@ class FinishedGoodsStockMovements
             $o = $headers[$d->orderid] ?? null;
             $d->dateoforder = $o->dateoforder ?? null;
             $d->customerid = $o->customerid ?? null;
+            $d->customername = self::customerName($o->customerid ?? null);
             $d->username = $o->username ?? null;
             $d->warehousecode = $o->warehousecode ?? null;
 
             return $d;
         })->all();
+    }
+
+    /** id => customer name, loaded once per request. */
+    protected static ?array $customers = null;
+
+    /**
+     * Customer name for an id.
+     *
+     * `sales_order.customerid` and `sales_delivery.deliverycustomerid` both hold
+     * `sales_customers.id`. There are only a few thousand customers, so the
+     * whole list is cached rather than joined into six separate queries —
+     * `deliverycustomerid` is a varchar against an int key, which is the kind
+     * of mismatch that costs an index (see the orderid note above).
+     */
+    public static function customerName($id): string
+    {
+        if ($id === null || $id === '') {
+            return '—';
+        }
+
+        self::$customers ??= DB::connection('bil')->table('sales_customers')
+            ->pluck('customername', 'id')->all();
+
+        return self::$customers[(int) $id] ?? ('#' . $id);
     }
 
     /** Order headers by id. A constant list compares fine across collations. */
@@ -267,6 +293,11 @@ class FinishedGoodsStockMovements
             ->limit(self::LIMIT)
             ->get(['deliverynumber', 'barcode', 'loadnumber', 'dateofdelivery',
                 'username', 'deliverycustomerid'])
+            ->map(function ($r) {
+                $r->customername = self::customerName($r->deliverycustomerid);
+
+                return $r;
+            })
             ->all();
     }
 
