@@ -106,7 +106,11 @@ class FinishedGoodsStock
      */
     public static function adjust(int $warehouseId, int $productid, int $bundles, ?string $reason = null): void
     {
-        if ($bundles === 0) {
+        // Guard the SAME cases apply() refuses. Writing a ledger row that
+        // apply() then silently skips makes the two disagree forever — which
+        // is exactly what happened seeding the 44 legacy receipts that carry
+        // productid 0.
+        if ($bundles === 0 || $warehouseId <= 0 || $productid <= 0) {
             return;
         }
 

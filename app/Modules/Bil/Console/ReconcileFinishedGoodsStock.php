@@ -36,7 +36,7 @@ class ReconcileFinishedGoodsStock extends Command
             return self::SUCCESS;
         }
 
-        $warehouses = DB::connection('core')->table('finished_goods_warehouse')->pluck('name', 'id');
+        $warehouses = DB::connection('core')->table('warehouses')->pluck('name', 'id');
         $products = DB::connection('bil')->table('products')
             ->whereIn('productid', array_column($drift, 'productid'))
             ->pluck('productname', 'productid');

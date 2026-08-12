@@ -144,7 +144,7 @@ class SeedFinishedGoodsStock extends Command
     {
         return DB::connection('bil')->table('storebundle')
             ->where('warehousecode', '01')
-            ->whereNotNull('productid')
+            ->whereNotNull('productid')->where('productid', '>', 0)
             ->pluck('bundles', 'productid')
             ->map(fn ($b) => (int) $b)
             ->all();
@@ -171,6 +171,12 @@ class SeedFinishedGoodsStock extends Command
 
         $out = [];
         foreach ($received as $productid => $bundles) {
+            // 44 legacy receipts carry productid 0 — real corruption in
+            // store_entrance. They are imported so the history is honest, but
+            // there is no product to hold their stock against.
+            if ((int) $productid <= 0) {
+                continue;
+            }
             $out[(int) $productid] = (int) $bundles
                 - (int) ($loaded[$productid] ?? 0)
                 + (int) ($unloaded[$productid] ?? 0)
