@@ -34,8 +34,8 @@
         </div>
 
         <div class="modal-body" style="max-height:70vh;overflow:auto;">
-                {{-- Tabs --}}
-                <div style="display:flex;gap:.4rem;border-bottom:1px solid var(--line);margin-bottom:1rem;">
+                {{-- Tabs, and how far back to look --}}
+                <div style="display:flex;gap:.4rem;align-items:center;border-bottom:1px solid var(--line);margin-bottom:1rem;">
                     @foreach (['incoming' => 'Incoming', 'outgoing' => 'Outgoing'] as $key => $label)
                         <button type="button"
                                 wire:click="$set('movementTab', '{{ $key }}')"
@@ -45,6 +45,16 @@
                             <span class="badge badge-muted">{{ number_format($key === 'incoming' ? $inCount : $outCount) }}</span>
                         </button>
                     @endforeach
+
+                    <div style="margin-left:auto;display:flex;align-items:center;gap:.4rem;padding-bottom:.35rem;">
+                        <span class="text-muted text-sm">Last</span>
+                        @foreach (\Modules\Bil\Support\FinishedGoodsStockMovements::WINDOWS as $w)
+                            <button type="button" wire:click="$set('movementWindow', {{ $w }})"
+                                    class="btn btn-sm {{ $movementWindow === $w ? 'btn-primary' : 'btn-ghost' }}">
+                                {{ $w }}d
+                            </button>
+                        @endforeach
+                    </div>
                 </div>
 
                 @php
@@ -131,7 +141,7 @@
 
                         @if (count($rows) === 0)
                             <div class="text-muted text-sm" style="padding:.5rem .75rem;border:1px dashed var(--line);border-radius:8px;">
-                                None.
+                                None in the last {{ $movementWindow }} days.
                             </div>
                         @else
                             <div class="table-wrap">
@@ -148,7 +158,8 @@
                             </div>
                             @if (count($rows) >= $cap)
                                 <p class="text-muted text-sm" style="margin:.35rem 0 0;">
-                                    Showing the most recent {{ $cap }}. Use the reports for the full history.
+                                    Capped at {{ $cap }} rows even within {{ $movementWindow }} days —
+                                    narrow the window, or use the reports for the full history.
                                 </p>
                             @endif
                         @endif

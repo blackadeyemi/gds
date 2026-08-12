@@ -33,13 +33,42 @@ use Illuminate\Support\Facades\DB;
  * The last two are two joins from the product, which is why they are queried
  * through the load numbers rather than joined in one statement.
  *
- * Everything here is capped: a modal is for reading, not for exporting a
- * decade of history.
+ * Everything is bounded twice: by a DATE WINDOW the reader chooses (30/60/90
+ * days) and by a row cap as a backstop. Nine years of movements is not something
+ * to read in a modal — the reports are for that.
+ *
+ * Each source dates differently, which is why the window is applied per method
+ * rather than once: `date_of_entrance` is a real DATE, `created_at` a timestamp,
+ * the sales dates are legacy `Y/m/d` varchars (which compare correctly as
+ * strings), and `sales_loading_return` has only a unix `timestamp`.
  */
 class FinishedGoodsStockMovements
 {
-    /** Rows per section. A modal that returns 40k rows helps nobody. */
-    public const LIMIT = 200;
+    /**
+     * Rows per section, once the window has been applied.
+     *
+     * Sized for reading, not for analysis: even at 30 days a busy product can
+     * have several hundred loadings, and four sections of 200 is a wall. The
+     * modal says when it has capped so the reports are the obvious next step.
+     */
+    public const LIMIT = 50;
+
+    /** Windows offered in the modal, in days. */
+    public const WINDOWS = [30, 60, 90];
+
+    public const DEFAULT_WINDOW = 30;
+
+    /** Legacy `Y/m/d` cut-off for a window. */
+    protected static function since(int $days): string
+    {
+        return now()->subDays($days)->format('Y/m/d');
+    }
+
+    /** ISO cut-off, for the columns that are real dates. */
+    protected static function sinceIso(int $days): string
+    {
+        return now()->subDays($days)->format('Y-m-d');
+    }
 
     /* ---------------- Incoming ---------------- */
 
@@ -47,23 +76,24 @@ class FinishedGoodsStockMovements
      * Goods arriving: warehouse receipts, manual corrections, and anything the
      * sales side gave back (customer returns, and loads unloaded again).
      */
-    public static function incoming(int $warehouseId, int $productid): array
+    public static function incoming(int $warehouseId, int $productid, int $days = self::DEFAULT_WINDOW): array
     {
         return [
-            'receipts' => self::receipts($warehouseId, $productid),
-            'adjustments' => self::adjustments($warehouseId, $productid),
-            'sales_returns' => self::salesReturns($productid),
-            'loading_returns' => self::loadingReturns($productid),
+            'receipts' => self::receipts($warehouseId, $productid, $days),
+            'adjustments' => self::adjustments($warehouseId, $productid, $days),
+            'sales_returns' => self::salesReturns($productid, $days),
+            'loading_returns' => self::loadingReturns($productid, $days),
         ];
     }
 
     /** Pallets received through a gate — the barcode, its bundles and the date. */
-    public static function receipts(int $warehouseId, int $productid): array
+    public static function receipts(int $warehouseId, int $productid, int $days = self::DEFAULT_WINDOW): array
     {
         return DB::connection('core')->table('finished_goods_warehouse_receipts as r')
             ->leftJoin('warehouse_gates as g', 'r.entrance_id', '=', 'g.id')
             ->where('r.warehouse_id', $warehouseId)
             ->where('r.productid', $productid)
+            ->where('r.date_of_entrance', '>=', self::sinceIso($days))
             ->orderByDesc('r.date_of_entrance')->orderByDesc('r.id')
             ->limit(self::LIMIT)
             ->get(['r.barcode', 'r.bundles', 'r.date_of_entrance', 'r.username',
@@ -72,11 +102,12 @@ class FinishedGoodsStockMovements
     }
 
     /** Manual corrections, with who made them and why. */
-    public static function adjustments(int $warehouseId, int $productid): array
+    public static function adjustments(int $warehouseId, int $productid, int $days = self::DEFAULT_WINDOW): array
     {
         return DB::connection('core')->table('finished_goods_stock_adjustments')
             ->where('warehouse_id', $warehouseId)
             ->where('productid', $productid)
+            ->where('created_at', '>=', now()->subDays($days))
             ->orderByDesc('id')
             ->limit(self::LIMIT)
             ->get(['bundles', 'reason', 'username', 'created_at'])
@@ -89,11 +120,12 @@ class FinishedGoodsStockMovements
      * `sod_id` is an int on both sides so that join is fine; only the order
      * header is looked up separately, for the collation reason above.
      */
-    public static function salesReturns(int $productid): array
+    public static function salesReturns(int $productid, int $days = self::DEFAULT_WINDOW): array
     {
         $rows = DB::connection('bil')->table('sales_return as sr')
             ->join('sales_order_details as d', 'sr.sod_id', '=', 'd.id')
             ->where('d.productid', $productid)
+            ->where('sr.dateofreturn', '>=', self::since($days))
             ->orderByDesc('sr.id')
             ->limit(self::LIMIT)
             ->get(['sr.returnnumber', 'sr.quantityreturned', 'sr.quantityrejected',
@@ -108,12 +140,18 @@ class FinishedGoodsStockMovements
         })->all();
     }
 
-    /** Loads unloaded again before they left — also back into stock. */
-    public static function loadingReturns(int $productid): array
+    /**
+     * Loads unloaded again before they left — also back into stock.
+     *
+     * This table has no date column, only a unix `timestamp`, so the window is
+     * applied against that.
+     */
+    public static function loadingReturns(int $productid, int $days = self::DEFAULT_WINDOW): array
     {
         return DB::connection('bil')->table('sales_loading_return as lr')
             ->join('sales_order_details as d', 'lr.sod_id', '=', 'd.id')
             ->where('d.productid', $productid)
+            ->where('lr.timestamp', '>=', now()->subDays($days)->getTimestamp())
             ->orderByDesc('lr.id')
             ->limit(self::LIMIT)
             ->get(['lr.barcode', 'lr.quantityunloaded', 'lr.username', 'lr.timestamp', 'd.orderid'])
@@ -126,19 +164,19 @@ class FinishedGoodsStockMovements
      * The sales chain for this product, stage by stage:
      * ordered → loaded (leaves the warehouse) → delivered → waybilled.
      */
-    public static function outgoing(int $productid): array
+    public static function outgoing(int $productid, int $days = self::DEFAULT_WINDOW): array
     {
-        $loadings = self::loadings($productid);
+        $loadings = self::loadings($productid, $days);
         $loadNumbers = array_values(array_unique(array_filter(array_column($loadings, 'loadnumber'))));
 
-        $deliveries = self::deliveries($loadNumbers);
+        $deliveries = self::deliveries($loadNumbers, $days);
         $deliveryNumbers = array_values(array_unique(array_filter(array_column($deliveries, 'deliverynumber'))));
 
         return [
-            'orders' => self::orders($productid),
+            'orders' => self::orders($productid, $days),
             'loadings' => $loadings,
             'deliveries' => $deliveries,
-            'waybills' => self::waybills($deliveryNumbers),
+            'waybills' => self::waybills($deliveryNumbers, $days),
         ];
     }
 
@@ -152,10 +190,22 @@ class FinishedGoodsStockMovements
      * key and then reading only those order headers turns a 1.6s query into two
      * indexed ones. (The same trap is noted on the Warehouse Exit report.)
      */
-    public static function orders(int $productid): array
+    public static function orders(int $productid, int $days = self::DEFAULT_WINDOW): array
     {
+        // The date lives on the header, so the window is applied there first and
+        // the details are then restricted to those orders — which also keeps
+        // the collation mismatch out of the query.
+        $orderIds = DB::connection('bil')->table('sales_order')
+            ->where('dateoforder', '>=', self::since($days))
+            ->pluck('orderid');
+
+        if ($orderIds->isEmpty()) {
+            return [];
+        }
+
         $details = DB::connection('bil')->table('sales_order_details')
             ->where('productid', $productid)
+            ->whereIn('orderid', $orderIds)
             // id is chronological, so this is newest-first without touching the
             // order header — and it is the primary key.
             ->orderByDesc('id')
@@ -190,11 +240,12 @@ class FinishedGoodsStockMovements
     }
 
     /** Goods actually leaving the warehouse — this is what reduces stock. */
-    public static function loadings(int $productid): array
+    public static function loadings(int $productid, int $days = self::DEFAULT_WINDOW): array
     {
         return DB::connection('bil')->table('sales_loading as l')
             ->join('sales_order_details as d', 'l.sod_id', '=', 'd.id')
             ->where('d.productid', $productid)
+            ->where('l.dateofloading', '>=', self::since($days))
             ->orderByDesc('l.id')
             ->limit(self::LIMIT)
             ->get(['l.loadnumber', 'l.barcode', 'l.quantityloaded', 'l.cageroomcode',
@@ -203,7 +254,7 @@ class FinishedGoodsStockMovements
     }
 
     /** Deliveries, reached through the load numbers this product went out on. */
-    public static function deliveries(array $loadNumbers): array
+    public static function deliveries(array $loadNumbers, int $days = self::DEFAULT_WINDOW): array
     {
         if ($loadNumbers === []) {
             return [];
@@ -211,6 +262,7 @@ class FinishedGoodsStockMovements
 
         return DB::connection('bil')->table('sales_delivery')
             ->whereIn('loadnumber', $loadNumbers)
+            ->where('dateofdelivery', '>=', self::since($days))
             ->orderByDesc('id')
             ->limit(self::LIMIT)
             ->get(['deliverynumber', 'barcode', 'loadnumber', 'dateofdelivery',
@@ -219,7 +271,7 @@ class FinishedGoodsStockMovements
     }
 
     /** Waybills, reached through those deliveries — the end of the chain. */
-    public static function waybills(array $deliveryNumbers): array
+    public static function waybills(array $deliveryNumbers, int $days = self::DEFAULT_WINDOW): array
     {
         if ($deliveryNumbers === []) {
             return [];
@@ -227,6 +279,7 @@ class FinishedGoodsStockMovements
 
         return DB::connection('bil')->table('sales_waybill')
             ->whereIn('deliverynumber', $deliveryNumbers)
+            ->where('dateofwaybill', '>=', self::since($days))
             ->orderByDesc('id')
             ->limit(self::LIMIT)
             ->get(['barcode', 'deliverynumber', 'receiptnumber', 'dateofwaybill', 'username'])

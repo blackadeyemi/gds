@@ -46,6 +46,15 @@ class Stock extends DataGrid
     public ?int $detailProductId = null;
     public string $movementTab = 'incoming';
 
+    /**
+     * How far back the modal looks, in days.
+     *
+     * Defaults to the tightest window: a product with nine years of history has
+     * tens of thousands of movements, and almost every question asked of this
+     * screen is about the recent past.
+     */
+    public int $movementWindow = FinishedGoodsStockMovements::DEFAULT_WINDOW;
+
     public function pageKey(): string { return 'bil.finished_goods.stock'; }
     public function pageLabel(): string { return 'Finished Goods Stock'; }
     public function pageSubtitle(): string
@@ -147,7 +156,14 @@ class Stock extends DataGrid
         $this->warehouseLabel = (string) (Warehouse::find($row->warehouse_id)?->name ?? '—');
         $this->currentBundles = (int) $row->bundles;
         $this->movementTab = 'incoming';
+        $this->movementWindow = FinishedGoodsStockMovements::DEFAULT_WINDOW;
         $this->showMovements = true;
+    }
+
+    /** Changing the window invalidates the cached movement read. */
+    public function updatedMovementWindow(): void
+    {
+        unset($this->movements);
     }
 
     public function closeMovements(): void
@@ -172,9 +188,13 @@ class Stock extends DataGrid
             return ['incoming' => [], 'outgoing' => []];
         }
 
+        $days = in_array($this->movementWindow, FinishedGoodsStockMovements::WINDOWS, true)
+            ? $this->movementWindow
+            : FinishedGoodsStockMovements::DEFAULT_WINDOW;
+
         return [
-            'incoming' => FinishedGoodsStockMovements::incoming($this->detailWarehouseId, $this->detailProductId),
-            'outgoing' => FinishedGoodsStockMovements::outgoing($this->detailProductId),
+            'incoming' => FinishedGoodsStockMovements::incoming($this->detailWarehouseId, $this->detailProductId, $days),
+            'outgoing' => FinishedGoodsStockMovements::outgoing($this->detailProductId, $days),
         ];
     }
 
