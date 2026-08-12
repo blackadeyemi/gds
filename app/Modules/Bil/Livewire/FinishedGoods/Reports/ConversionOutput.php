@@ -89,18 +89,50 @@ class ConversionOutput extends RawMaterialReport
         ];
     }
 
+    /** Only the product filter and the search reach across into `products`. */
+    protected function joinedFilterKeys(): array
+    {
+        return ['product'];
+    }
+
+    /**
+     * The same rows, counted without the `products` join.
+     *
+     * It is a LEFT join, so it cannot add or drop rows and the total is
+     * identical — measured over 2020–2026: 855,338 either way, 5,414ms joined
+     * against 1,247ms without. paginate() falls back to the accurate joined count
+     * on its own whenever a product filter or a search is active (see
+     * countNeedsJoins), so this is only used when it is provably equivalent.
+     */
+    protected function countQuery()
+    {
+        $f = $this->filters;
+
+        $q = DB::connection('bil')->table('factory_conversion as c');
+
+        return $this->applyDate($q, 'c.dateofproduction', slash: true)
+            ->when($f['factory'] ?? '', fn ($q, $v) => $q->where('c.factory', $v))
+            ->when($f['line'] ?? '', fn ($q, $v) => $q->where('c.linename', $v))
+            ->when($f['sublinename'] ?? '', fn ($q, $v) => $q->where('c.sublinename', $v))
+            ->when($f['shift'] ?? '', fn ($q, $v) => $q->where('c.shift', $v));
+    }
+
     /**
      * `dateofproduction` is a varchar in Y/m/d form, which sorts correctly as a
      * string — so the range compares directly, as the legacy report did.
+     *
+     * Via applyDate() rather than a hand-rolled >= / <= pair: only the BETWEEN it
+     * produces lets MySQL use the `(dateofproduction, id)` index for the ORDER BY
+     * too. See the note on applyDate().
      */
     protected function base()
     {
         $f = $this->filters;
 
-        return DB::connection('bil')->table('factory_conversion as c')
-            ->leftJoin('products as p', 'c.productid', '=', 'p.productid')
-            ->when($this->dateFrom !== '', fn ($q) => $q->where('c.dateofproduction', '>=', str_replace('-', '/', $this->dateFrom)))
-            ->when($this->dateTo !== '', fn ($q) => $q->where('c.dateofproduction', '<=', str_replace('-', '/', $this->dateTo)))
+        $q = DB::connection('bil')->table('factory_conversion as c')
+            ->leftJoin('products as p', 'c.productid', '=', 'p.productid');
+
+        return $this->applyDate($q, 'c.dateofproduction', slash: true)
             ->when($f['factory'] ?? '', fn ($q, $v) => $q->where('c.factory', $v))
             ->when($f['line'] ?? '', fn ($q, $v) => $q->where('c.linename', $v))
             ->when($f['sublinename'] ?? '', fn ($q, $v) => $q->where('c.sublinename', $v))
@@ -134,9 +166,18 @@ class ConversionOutput extends RawMaterialReport
                 'query' => fn () => $this->base()
                     ->select('c.id', 'c.barcode', 'c.factory', 'c.linename', 'c.sublinename',
                         'p.productcode', 'p.productname', 'c.bundles')
-                    // id is chronological, so newest-first via the PK — fast on
-                    // any range, unlike ordering by the varchar date.
-                    ->orderByDesc('c.id'),
+                    // Newest first, ordered ALONG the (dateofproduction, id)
+                    // index rather than across it.
+                    //
+                    // Ordering by `c.id` alone looks equivalent — id is
+                    // chronological — but it forces MySQL to choose between the
+                    // date index and the primary key, and with a bound
+                    // `BETWEEN ? AND ?` it plans without knowing the values, so
+                    // it cannot tell the range is one day and picks a backwards
+                    // PK scan. That walks the whole table: 3,300ms against 3ms,
+                    // on the identical rows. Naming both columns leaves one
+                    // obviously-best plan whatever the dates turn out to be.
+                    ->orderByDesc('c.dateofproduction')->orderByDesc('c.id'),
             ],
             'by_subline_product' => [
                 'label' => 'Summary (by sub-line, product)',

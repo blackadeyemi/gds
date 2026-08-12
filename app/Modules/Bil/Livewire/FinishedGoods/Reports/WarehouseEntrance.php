@@ -97,18 +97,50 @@ class WarehouseEntrance extends RawMaterialReport
     }
 
     /**
+     * Every dropdown filters a column on the receipts table itself, so none of
+     * them need the joins. Only the search does (it matches gate and warehouse
+     * names), and countNeedsJoins() already accounts for that on its own.
+     */
+    protected function joinedFilterKeys(): array
+    {
+        return [];
+    }
+
+    /**
+     * The same rows without the gate/warehouse joins — both LEFT, so the count
+     * is identical. This table is 1.16M rows; the joins buy the count nothing.
+     */
+    protected function countQuery()
+    {
+        $f = $this->filters;
+
+        $q = DB::connection('core')->table('finished_goods_warehouse_receipts as r');
+
+        return $this->applyDate($q, 'r.date_of_entrance')
+            ->when($f['warehouse'] ?? '', fn ($q, $v) => $q->where('r.warehouse_id', $v))
+            ->when($f['entrance'] ?? '', fn ($q, $v) => $q->where('r.entrance_id', $v))
+            ->when($f['product'] ?? '', fn ($q, $v) => $q->where('r.productid', $v))
+            ->when($f['source'] ?? '', fn ($q, $v) => $q->where('r.is_historic', $v === 'historic'));
+    }
+
+    /**
      * `date_of_entrance` is a real DATE here, so the ISO range compares
      * directly — no string juggling, unlike the legacy `Y/m/d` varchar.
+     *
+     * Via applyDate() so a single-day range reaches MySQL as a BETWEEN, which it
+     * can collapse to an equality; a hand-rolled >= / <= pair cannot be. See the
+     * note on applyDate(). This table is 1.16M rows, the same size as the legacy
+     * ones it replaced.
      */
     protected function base()
     {
         $f = $this->filters;
 
-        return DB::connection('core')->table('finished_goods_warehouse_receipts as r')
+        $q = DB::connection('core')->table('finished_goods_warehouse_receipts as r')
             ->leftJoin('warehouse_gates as e', 'r.entrance_id', '=', 'e.id')
-            ->leftJoin('warehouses as w', 'r.warehouse_id', '=', 'w.id')
-            ->when($this->dateFrom !== '', fn ($q) => $q->where('r.date_of_entrance', '>=', $this->dateFrom))
-            ->when($this->dateTo !== '', fn ($q) => $q->where('r.date_of_entrance', '<=', $this->dateTo))
+            ->leftJoin('warehouses as w', 'r.warehouse_id', '=', 'w.id');
+
+        return $this->applyDate($q, 'r.date_of_entrance')
             ->when($f['warehouse'] ?? '', fn ($q, $v) => $q->where('r.warehouse_id', $v))
             ->when($f['entrance'] ?? '', fn ($q, $v) => $q->where('r.entrance_id', $v))
             ->when($f['product'] ?? '', fn ($q, $v) => $q->where('r.productid', $v))
@@ -177,7 +209,12 @@ class WarehouseEntrance extends RawMaterialReport
                 'query' => fn () => $this->base()
                     ->select('r.id', 'r.barcode', 'w.name as warehouse_name', 'e.name as entrance_name',
                         'r.productid', 'r.bundles', 'r.date_of_entrance', 'r.is_historic')
-                    ->orderByDesc('r.id'),
+                    // Along the date index, not across it — an InnoDB secondary
+                    // index carries the primary key, so (date_of_entrance) also
+                    // orders by id within a date. Ordering by `r.id` alone left
+                    // MySQL scanning the primary key backwards through 1.16M
+                    // rows; see the note on the Conversion Output report.
+                    ->orderByDesc('r.date_of_entrance')->orderByDesc('r.id'),
             ],
             'by_entrance_product' => [
                 'label' => 'Summary (by entrance, product)',

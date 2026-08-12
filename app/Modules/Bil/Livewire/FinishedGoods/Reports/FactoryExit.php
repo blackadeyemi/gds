@@ -119,9 +119,36 @@ class FactoryExit extends RawMaterialReport
         ];
     }
 
+    /** Only the product filter and the search reach across into `products`. */
+    protected function joinedFilterKeys(): array
+    {
+        return ['product'];
+    }
+
+    /**
+     * The same rows, counted without the `products` join — a LEFT join cannot
+     * change the count. Measured over 2020–2026: 853,948 either way, 4,757ms
+     * joined against 1,211ms without. paginate() falls back to the accurate
+     * joined count whenever a product filter or search is active.
+     */
+    protected function countQuery()
+    {
+        $f = $this->filters;
+
+        $q = DB::connection('bil')->table('factory_exit as e');
+
+        return $this->applyDate($q, 'e.dateofexit', slash: true)
+            ->when($f['factory'] ?? '', fn ($q, $v) => $q->whereIn('e.exit_location_id', $this->gateIdsForFactory($v)))
+            ->when($f['location'] ?? '', fn ($q, $v) => $q->where('e.exit_location_id', $v));
+    }
+
     /**
      * `dateofexit` is a varchar in Y/m/d form, which sorts correctly as a
      * string, so the range compares directly — as the legacy report did.
+     *
+     * Via applyDate() rather than a hand-rolled >= / <= pair: only the BETWEEN it
+     * produces lets MySQL use the `(dateofexit, id)` index for the ORDER BY too.
+     * See the note on applyDate().
      *
      * Gates are filtered by `exit_location_id`, the indexed column the rebuild
      * added and backfilled across all 1.2M rows — including four spellings from
@@ -131,10 +158,10 @@ class FactoryExit extends RawMaterialReport
     {
         $f = $this->filters;
 
-        return DB::connection('bil')->table('factory_exit as e')
-            ->leftJoin('products as p', 'e.productid', '=', 'p.productid')
-            ->when($this->dateFrom !== '', fn ($q) => $q->where('e.dateofexit', '>=', str_replace('-', '/', $this->dateFrom)))
-            ->when($this->dateTo !== '', fn ($q) => $q->where('e.dateofexit', '<=', str_replace('-', '/', $this->dateTo)))
+        $q = DB::connection('bil')->table('factory_exit as e')
+            ->leftJoin('products as p', 'e.productid', '=', 'p.productid');
+
+        return $this->applyDate($q, 'e.dateofexit', slash: true)
             ->when($f['factory'] ?? '', fn ($q, $v) => $q->whereIn('e.exit_location_id', $this->gateIdsForFactory($v)))
             ->when($f['location'] ?? '', fn ($q, $v) => $q->where('e.exit_location_id', $v))
             ->when($f['product'] ?? '', fn ($q, $v) => $q->where('p.productname', $v))
@@ -168,9 +195,12 @@ class FactoryExit extends RawMaterialReport
                 'query' => fn () => $this->base()
                     ->select('e.id', 'e.barcode', 'e.exit_location_id', 'e.exitlocation',
                         'p.productcode', 'p.productname', 'e.bundles')
-                    // id is chronological, so newest-first via the PK — fast on
-                    // any range, unlike ordering by the varchar date.
-                    ->orderByDesc('e.id'),
+                    // Newest first, ordered ALONG the (dateofexit, id) index
+                    // rather than across it — see the same note on the
+                    // Conversion Output report. Ordering by `e.id` alone made
+                    // MySQL fall back to a backwards primary-key scan of 1.2M
+                    // rows whenever the dates were bound rather than literal.
+                    ->orderByDesc('e.dateofexit')->orderByDesc('e.id'),
             ],
             'by_location_product' => [
                 'label' => 'Summary (by location, product)',

@@ -514,16 +514,42 @@ abstract class RawMaterialReport extends Component
 
     /* ---------------- Query helpers for children ---------------- */
 
-    /** Apply the date range to a column. `$slash` = the column stores Y/m/d strings. */
+    /**
+     * Apply the date range to a column. `$slash` = the column stores Y/m/d strings.
+     *
+     * Two-sided ranges MUST go through whereBetween rather than a pair of >= and
+     * <= comparisons, even though they select identical rows. MySQL collapses
+     * `BETWEEN x AND x` to an equality and will then use a `(date, id)` index for
+     * the ORDER BY as well; it does NOT collapse `>= x AND <= x`, so it falls
+     * back to a backwards primary-key scan and walks the whole table looking for
+     * a page. On factory_conversion that is the difference between 3ms and 2.4s —
+     * and every report opens on a single day, which is exactly that case.
+     *
+     * A one-sided range is applied as the single comparison it is. It previously
+     * fell through and applied NO filter at all, so asking for "from 1 January"
+     * quietly returned all time.
+     */
     protected function applyDate($q, string $column, bool $slash = false)
     {
-        if (! $this->hasDateRange() || $this->dateFrom === '' || $this->dateTo === '') {
+        if (! $this->hasDateRange()) {
             return $q;
         }
-        $from = $slash ? str_replace('-', '/', $this->dateFrom) : $this->dateFrom;
-        $to = $slash ? str_replace('-', '/', $this->dateTo) : $this->dateTo;
 
-        return $q->whereBetween($column, [$from, $to]);
+        $fmt = fn (string $d) => $slash ? str_replace('-', '/', $d) : $d;
+
+        if ($this->dateFrom !== '' && $this->dateTo !== '') {
+            return $q->whereBetween($column, [$fmt($this->dateFrom), $fmt($this->dateTo)]);
+        }
+
+        if ($this->dateFrom !== '') {
+            return $q->where($column, '>=', $fmt($this->dateFrom));
+        }
+
+        if ($this->dateTo !== '') {
+            return $q->where($column, '<=', $fmt($this->dateTo));
+        }
+
+        return $q;
     }
 
     /** Apply dropdown filters. `$map` = filterName => column. */

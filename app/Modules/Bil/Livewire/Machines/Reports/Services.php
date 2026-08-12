@@ -100,10 +100,10 @@ class Services extends RawMaterialReport
     {
         $f = $this->filters;
 
-        return DB::connection('bil')->table('factory_machine_maintenance as m')
-            ->leftJoin('core.service_types as t', 't.id', '=', 'm.service_type_id')
-            ->when($this->dateFrom !== '', fn ($q) => $q->where('m.date', '>=', str_replace('-', '/', $this->dateFrom)))
-            ->when($this->dateTo !== '', fn ($q) => $q->where('m.date', '<=', str_replace('-', '/', $this->dateTo)))
+        $q = DB::connection('bil')->table('factory_machine_maintenance as m')
+            ->leftJoin('core.service_types as t', 't.id', '=', 'm.service_type_id');
+
+        return $this->applyDate($q, 'm.date', slash: true)
             ->when($f['line'] ?? '', fn ($q, $v) => $q->where('m.linename', $v))
             ->when($f['project'] ?? '', fn ($q, $v) => $q->where('m.project', $v))
             ->when($f['subproject'] ?? '', fn ($q, $v) => $q->where('m.subproject', $v))
