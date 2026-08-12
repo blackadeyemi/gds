@@ -119,14 +119,22 @@ class Stock extends DataGrid
     public function leadingRowActions($row): string
     {
         return '<button type="button" class="btn btn-ghost btn-icon btn-sm"'
-            . ' wire:click="showMovements(' . (int) $row->id . ')" title="View movements">'
+            . ' wire:click="openMovements(' . (int) $row->id . ')" title="View movements">'
             . '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
             . ' stroke-linecap="round" stroke-linejoin="round">'
             . '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'
             . '</svg></button>';
     }
 
-    public function showMovements(int $id): void
+    /**
+     * Open the movement modal.
+     *
+     * NOT named `showMovements` — that is the property, and a Livewire action
+     * sharing a property's name is shadowed by it, so `wire:click` silently
+     * did nothing. (A direct ->call() in a test still worked, which is how it
+     * got through.)
+     */
+    public function openMovements(int $id): void
     {
         $row = DB::connection('core')->table('finished_goods_warehouse_stock')->find($id);
         if (! $row) {

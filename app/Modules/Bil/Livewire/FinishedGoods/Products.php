@@ -243,6 +243,32 @@ class Products extends DataGrid
             . '</svg></button>';
     }
 
+    /** Single-product history check, for the server-side re-check on delete. */
+    protected function historyOffPage(int $productid): array
+    {
+        $bil = DB::connection('bil');
+        $core = DB::connection('core');
+        $name = FinishedGoodsProduct::where('productid', $productid)->value('productname');
+
+        $checks = [
+            'conversion output' => fn () => $bil->table('factory_conversion')->where('productid', $productid)->exists(),
+            'factory exits' => fn () => $bil->table('factory_exit')->where('productid', $productid)->exists(),
+            'warehouse receipts' => fn () => $core->table('finished_goods_warehouse_receipts')->where('productid', $productid)->exists(),
+            'stock on hand' => fn () => $core->table('finished_goods_warehouse_stock')->where('productid', $productid)->where('bundles', '<>', 0)->exists(),
+            'sales orders' => fn () => $bil->table('sales_order_details')->where('productid', $productid)->exists(),
+            'set up on a line' => fn () => $name && $bil->table('conversion_setup')->where('productname', $name)->exists(),
+        ];
+
+        $found = [];
+        foreach ($checks as $label => $check) {
+            if ($check()) {
+                $found[] = $label;
+            }
+        }
+
+        return $found;
+    }
+
     protected function restoreButton($row): string
     {
         // mayDo() hides edit/delete in this view, so ask the base check.
@@ -964,8 +990,104 @@ class Products extends DataGrid
     }
 
     /** Delete is soft — the product moves to the Trash view. */
+    /* ---------------- Delete guard ---------------- */
+
+    /** productid => list of what references it. Built once per render. */
+    protected ?array $historyCache = null;
+
+    /**
+     * What history a product carries, for the rows on the current page.
+     *
+     * Checked per page rather than per row: `deleteGuard()` runs for every row,
+     * and `factory_conversion` alone is 1.2M rows — a query each would be 25
+     * scans per render. Every lookup below is on an indexed product column.
+     */
+    protected function history(int $productid): array
+    {
+        if ($this->historyCache === null) {
+            $ids = collect($this->currentPageRows())->pluck('productid')
+                ->filter()->map('intval')->unique()->values()->all();
+
+            $this->historyCache = [];
+            if ($ids !== []) {
+                $bil = DB::connection('bil');
+                $core = DB::connection('core');
+
+                $sources = [
+                    'conversion output' => $bil->table('factory_conversion')
+                        ->whereIn('productid', $ids)->distinct()->pluck('productid'),
+                    'factory exits' => $bil->table('factory_exit')
+                        ->whereIn('productid', $ids)->distinct()->pluck('productid'),
+                    'warehouse receipts' => $core->table('finished_goods_warehouse_receipts')
+                        ->whereIn('productid', $ids)->distinct()->pluck('productid'),
+                    'stock on hand' => $core->table('finished_goods_warehouse_stock')
+                        ->whereIn('productid', $ids)->where('bundles', '<>', 0)
+                        ->distinct()->pluck('productid'),
+                    'sales orders' => $bil->table('sales_order_details')
+                        ->whereIn('productid', $ids)->distinct()->pluck('productid'),
+                ];
+
+                foreach ($sources as $label => $hits) {
+                    foreach ($hits as $id) {
+                        $this->historyCache[(int) $id][] = $label;
+                    }
+                }
+
+                // A line currently set up to run it — matched by NAME, which is
+                // what conversion_setup stores.
+                $names = FinishedGoodsProduct::whereIn('productid', $ids)
+                    ->pluck('productname', 'productid');
+                $running = $bil->table('conversion_setup')
+                    ->whereIn('productname', $names->values()->all())
+                    ->pluck('productname')->flip();
+                foreach ($names as $id => $name) {
+                    if (isset($running[$name])) {
+                        $this->historyCache[(int) $id][] = 'set up on a line';
+                    }
+                }
+            }
+        }
+
+        return $this->historyCache[$productid] ?? [];
+    }
+
+    /** Product ids on the page being rendered. */
+    protected function currentPageRows(): array
+    {
+        $view = $this->currentView();
+
+        return $this->buildQuery($view)->limit($this->perPage)->get(['products.productid'])->all();
+    }
+
+    /**
+     * A product that has been made, moved or sold stays.
+     *
+     * Deleting is a soft delete, so nothing is lost — but the product would
+     * vanish from every picker while its pallets, receipts and orders still
+     * point at it, and the Trash view is not where anyone looks for that.
+     */
+    public function deleteGuard($row): ?string
+    {
+        $history = $this->history((int) ($row->productid ?? 0));
+
+        if ($history === []) {
+            return null;
+        }
+
+        return 'Has ' . implode(', ', array_unique($history)) . ' — cannot delete.';
+    }
+
     protected function performDelete(int $id): void
     {
+        // Re-check off-page: deleteGuard() only prefetched this page, and the
+        // confirm reloads the row fresh. A cache miss must not read as "no
+        // history" and let the delete through.
+        if ($this->history($id) === [] && $this->historyOffPage($id) !== []) {
+            session()->flash('err', 'That product has history — cannot delete.');
+
+            return;
+        }
+
         FinishedGoodsProduct::whereKey($id)->update(['is_deleted' => 1]);
     }
 
