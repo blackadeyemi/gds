@@ -12,7 +12,11 @@ use Modules\Core\Livewire\DataGrid;
 use Modules\Core\Models\Warehouse;
 
 /**
- * BIL → Finished Goods → Stock. Bundles of each product held in each warehouse.
+ * BIL → Finished Goods → Warehouse Stock. Bundles of each product held in
+ * each warehouse.
+ *
+ * Named to distinguish it from Factory Floor Stock, which is the other half of
+ * the picture: pallets made but not yet sent to a warehouse.
  *
  * Editing a row does NOT write `bundles` directly. It records an adjustment —
  * the signed difference between what is there and what the operator typed —
@@ -27,7 +31,7 @@ use Modules\Core\Models\Warehouse;
  * Sorted by quantity, highest first — the question this page answers is
  * usually "what do we have most of / has anything gone negative".
  */
-#[Title('Finished Goods Stock')]
+#[Title('Warehouse Stock')]
 class Stock extends DataGrid
 {
     public ?int $warehouse_id = null;
@@ -55,8 +59,8 @@ class Stock extends DataGrid
      */
     public int $movementWindow = FinishedGoodsStockMovements::DEFAULT_WINDOW;
 
-    public function pageKey(): string { return 'bil.finished_goods.stock'; }
-    public function pageLabel(): string { return 'Finished Goods Stock'; }
+    public function pageKey(): string { return 'bil.finished_goods.warehouse_stock'; }
+    public function pageLabel(): string { return 'Warehouse Stock'; }
     public function pageSubtitle(): string
     {
         $counted = $this->ordersCountedAt();

@@ -247,10 +247,10 @@
                                 <span class="label">Factory Exit</span>
                             </a>
                             @endcanPage
-                            @canPage('bil.finished_goods.stock')
-                            <a href="{{ route('bil.finished-goods.stock') }}" class="nav-link {{ $is('bil/finished-goods/stock*') }}" title="Stock">
+                            @canPage('bil.finished_goods.warehouse_stock')
+                            <a href="{{ route('bil.finished-goods.warehouse-stock') }}" class="nav-link {{ $is('bil/finished-goods/warehouse-stock*') }}" title="Warehouse Stock">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4M3 17l9 4 9-4"/></svg>
-                                <span class="label">Stock</span>
+                                <span class="label">Warehouse Stock</span>
                             </a>
                             @endcanPage
                             @canPage('bil.finished_goods.warehouse_entrance')
@@ -275,6 +275,11 @@
                                     @canPage('bil.finished_goods.reports.factory_exit')
                                     <a href="{{ route('bil.finished-goods.reports.factory-exit') }}" class="nav-link {{ $is('bil/finished-goods/reports/factory-exit*') }}" title="Factory Exit">
                                         <span class="label">Factory Exit</span>
+                                    </a>
+                                    @endcanPage
+                                    @canPage('bil.finished_goods.reports.factory_floor_stock')
+                                    <a href="{{ route('bil.finished-goods.reports.factory-floor-stock') }}" class="nav-link {{ $is('bil/finished-goods/reports/factory-floor-stock*') }}" title="Factory Floor Stock">
+                                        <span class="label">Factory Floor Stock</span>
                                     </a>
                                     @endcanPage
                                     @canPage('bil.finished_goods.reports.warehouse_entrance')

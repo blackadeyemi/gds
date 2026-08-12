@@ -6,6 +6,7 @@ use Modules\Bil\Livewire\FinishedGoods\ConversionOutput;
 use Modules\Bil\Livewire\FinishedGoods\FactoryExit;
 use Modules\Bil\Livewire\FinishedGoods\Reports\ConversionOutput as ConversionOutputReport;
 use Modules\Bil\Livewire\FinishedGoods\Reports\FactoryExit as FactoryExitReport;
+use Modules\Bil\Livewire\FinishedGoods\Reports\FactoryFloorStock as FgFactoryFloorStock;
 use Modules\Bil\Livewire\FinishedGoods\Reports\WarehouseEntrance as WarehouseEntranceReport;
 use Modules\Bil\Livewire\FinishedGoods\WarehouseEntrance;
 use Modules\Bil\Livewire\FinishedGoods\Products as FinishedGoodsProducts;
@@ -59,8 +60,8 @@ Route::middleware('auth')
             ->middleware('page:bil.finished_goods.factory_exit')->name('factory-exit');
         Route::get('/warehouse-entrance', WarehouseEntrance::class)
             ->middleware('page:bil.finished_goods.warehouse_entrance')->name('warehouse-entrance');
-        Route::get('/stock', FinishedGoodsStockPage::class)
-            ->middleware('page:bil.finished_goods.stock')->name('stock');
+        Route::get('/warehouse-stock', FinishedGoodsStockPage::class)
+            ->middleware('page:bil.finished_goods.warehouse_stock')->name('warehouse-stock');
 
         // Labels for the pallets just created (ids held in session).
         Route::get('/conversion-output/print', function () {
@@ -86,11 +87,14 @@ Route::middleware('auth')
                 ->middleware('page:bil.finished_goods.reports.factory_exit')->name('factory-exit');
             Route::get('/warehouse-entrance', WarehouseEntranceReport::class)
                 ->middleware('page:bil.finished_goods.reports.warehouse_entrance')->name('warehouse-entrance');
+            Route::get('/factory-floor-stock', FgFactoryFloorStock::class)
+                ->middleware('page:bil.finished_goods.reports.factory_floor_stock')->name('factory-floor-stock');
 
             $reports = [
                 'conversion-output' => ConversionOutputReport::class,
                 'factory-exit' => FactoryExitReport::class,
                 'warehouse-entrance' => WarehouseEntranceReport::class,
+                'factory-floor-stock' => FgFactoryFloorStock::class,
             ];
 
             $hydrate = function (string $class) {
