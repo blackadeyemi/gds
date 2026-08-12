@@ -64,24 +64,41 @@
 </div>
 
 {{--
-    Which finished-goods gates this user sees in the dropdowns. Not access
-    control — the page permission decides who may open those screens at all;
-    this narrows the list once they are there.
---}}
-@include('core::partials.gate-checklist', [
-    'label' => 'Warehouse gates',
-    'hint' => 'Gates this user can move goods through. None ticked = no gates, so the scanning screens have nothing to pick.',
-    'groups' => $this->entranceOptions,
-    'field' => 'entrance_ids',
-    'selected' => $entrance_ids,
-    'errorKey' => 'entrance_ids',
-])
+    Which gates this user sees in the scanning dropdowns.
 
-@include('core::partials.gate-checklist', [
-    'label' => 'Factory gates',
-    'hint' => 'Gates this user can send goods out through, or receive raw material at.',
-    'groups' => $this->exitLocationOptions,
-    'field' => 'exit_location_ids',
-    'selected' => $exit_location_ids,
-    'errorKey' => 'exit_location_ids',
-])
+    Each list appears only when the selected ROLE reaches a page that uses that
+    kind of gate — granting gates to a role that cannot open a scanning screen
+    is dead configuration, and showing the list implies otherwise. Pages declare
+    what they use via the `gates` field in config/pages.php.
+
+    Not access control: the page permission decides who may open those screens;
+    this only narrows the list once they are there.
+--}}
+@if ($this->usesWarehouseGates)
+    @include('core::partials.gate-checklist', [
+        'label' => 'Warehouse gates',
+        'hint' => 'Gates this user can move goods through, on ' . implode(', ', $this->gatePageLabels['warehouse']) . '. None ticked = nothing to pick.',
+        'groups' => $this->entranceOptions,
+        'field' => 'entrance_ids',
+        'selected' => $entrance_ids,
+        'errorKey' => 'entrance_ids',
+    ])
+@endif
+
+@if ($this->usesFactoryGates)
+    @include('core::partials.gate-checklist', [
+        'label' => 'Factory gates',
+        'hint' => 'Gates this user can move goods through, on ' . implode(', ', $this->gatePageLabels['factory']) . '. None ticked = nothing to pick.',
+        'groups' => $this->exitLocationOptions,
+        'field' => 'exit_location_ids',
+        'selected' => $exit_location_ids,
+        'errorKey' => 'exit_location_ids',
+    ])
+@endif
+
+@if ($role_id && ! $this->usesWarehouseGates && ! $this->usesFactoryGates)
+    <div class="text-muted text-sm" style="padding:.5rem .75rem;border:1px dashed var(--line);border-radius:8px;">
+        This role has no scanning screens, so there are no gates to assign.
+        Grant it a page like <em>Warehouse Entry</em> or <em>Factory Exit</em> in the role editor first.
+    </div>
+@endif

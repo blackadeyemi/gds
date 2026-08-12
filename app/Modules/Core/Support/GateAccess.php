@@ -5,6 +5,7 @@ namespace Modules\Core\Support;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Models\FactoryGate;
+use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
 use Modules\Core\Models\WarehouseGate;
 
@@ -56,6 +57,61 @@ class GateAccess
             $user,
             'factory_gate_user'
         );
+    }
+
+    /* ---------------- Which pages use which gates ---------------- */
+
+    public const WAREHOUSE = 'warehouse';
+    public const FACTORY = 'factory';
+
+    /**
+     * Page keys whose dropdown is filled from gates of this kind.
+     *
+     * Read from the `gates` field each page declares in config/pages.php, so a
+     * new scanning screen is covered by tagging it there rather than by
+     * remembering to extend a list here.
+     */
+    public static function pageKeysUsing(string $kind): array
+    {
+        return collect(config('pages.pages', []))
+            ->filter(fn ($page) => ($page['gates'] ?? null) === $kind)
+            ->pluck('key')
+            ->all();
+    }
+
+    /**
+     * Does a ROLE have access to any page that picks gates of this kind?
+     *
+     * Used by the user editor to decide whether to offer the gate checklist at
+     * all — a role that cannot open a scanning screen has no use for one.
+     * Admin (legacy level 1) can open everything, so it always does.
+     *
+     * `view` is the ability that grants access to a page, so that is what is
+     * checked; the special abilities (backdate, approve…) are irrelevant here.
+     */
+    public static function roleUsesGates(?int $roleId, string $kind): bool
+    {
+        if (! $roleId) {
+            return false;
+        }
+
+        $role = Role::find($roleId);
+        if (! $role) {
+            return false;
+        }
+
+        if ((int) $role->legacy_level === 1) {
+            return true;
+        }
+
+        $keys = self::pageKeysUsing($kind);
+        if ($keys === []) {
+            return false;
+        }
+
+        return $role->permissions()
+            ->whereIn('name', array_map(fn ($k) => $k . ':view', $keys))
+            ->exists();
     }
 
     /**

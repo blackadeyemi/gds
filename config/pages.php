@@ -11,6 +11,12 @@
 | support them, so they never appear where they don't apply.
 |
 | Keep page keys aligned with route names ('-' -> '_').
+|
+| 'gates' marks a page whose dropdown is filled from warehouse or factory gates.
+| The user editor reads it to decide whether to offer that gate checklist at all:
+| a role that cannot open any gate page has no use for one. It is a hint for the
+| editor, NOT access control — GateAccess decides what a user may pick, and the
+| page middleware decides who may open the screen.
 */
 
 $crud = ['view', 'create', 'edit', 'delete', 'export'];
@@ -61,8 +67,8 @@ return [
         // BIL — Finished Goods
         ['key' => 'bil.finished_goods.products', 'label' => 'Products', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.products', 'abilities' => $crud],
         ['key' => 'bil.finished_goods.conversion_output', 'label' => 'Conversion Output', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.conversion-output', 'abilities' => $entry],
-        ['key' => 'bil.finished_goods.factory_exit', 'label' => 'Factory Exit', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.factory-exit', 'abilities' => $entry],
-        ['key' => 'bil.finished_goods.warehouse_entrance', 'label' => 'Warehouse Entrance', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.warehouse-entrance', 'abilities' => $entry],
+        ['key' => 'bil.finished_goods.factory_exit', 'label' => 'Factory Exit', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.factory-exit', 'abilities' => $entry, 'gates' => 'factory'],
+        ['key' => 'bil.finished_goods.warehouse_entrance', 'label' => 'Warehouse Entrance', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.warehouse-entrance', 'abilities' => $entry, 'gates' => 'warehouse'],
 
         // BIL — Finished Goods Reports. No `edit`: a pallet's weights come from
         // the product spec, and an exit row is a scan event — a wrong one is
@@ -78,12 +84,12 @@ return [
         ['key' => 'bil.raw_materials.products',            'label' => 'Products',            'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.products',            'abilities' => $crud],
         ['key' => 'bil.raw_materials.suppliers',           'label' => 'Suppliers',           'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.suppliers',           'abilities' => $crud],
         ['key' => 'bil.raw_materials.supplier_deliveries', 'label' => 'Supplier Deliveries', 'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.supplier-deliveries', 'abilities' => $entry],
-        ['key' => 'bil.raw_materials.warehouse_entry',     'label' => 'Warehouse Entry',     'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.warehouse-entry',     'abilities' => $entry],
-        ['key' => 'bil.raw_materials.warehouse_exit',      'label' => 'Warehouse Exit',      'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.warehouse-exit',      'abilities' => $entry],
+        ['key' => 'bil.raw_materials.warehouse_entry',     'label' => 'Warehouse Entry',     'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.warehouse-entry',     'abilities' => $entry, 'gates' => 'warehouse'],
+        ['key' => 'bil.raw_materials.warehouse_exit',      'label' => 'Warehouse Exit',      'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.warehouse-exit',      'abilities' => $entry, 'gates' => 'warehouse'],
         ['key' => 'bil.raw_materials.stock_transfer',      'label' => 'Stock Transfer',      'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.stock-transfer',      'abilities' => $entry],
-        ['key' => 'bil.raw_materials.factory_entrance',    'label' => 'Factory Entrance',    'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.factory-entrance',    'abilities' => ['view', 'backdate', 'bypass-shift']],
+        ['key' => 'bil.raw_materials.factory_entrance',    'label' => 'Factory Entrance',    'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.factory-entrance',    'abilities' => ['view', 'backdate', 'bypass-shift'], 'gates' => 'factory'],
         ['key' => 'bil.raw_materials.consumption',         'label' => 'Consumption',         'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.consumption',         'abilities' => ['view', 'backdate', 'bypass-shift']],
-        ['key' => 'bil.raw_materials.factory_returns',     'label' => 'Factory Returns',     'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.factory-returns',     'abilities' => ['view', 'backdate', 'approve']],
+        ['key' => 'bil.raw_materials.factory_returns',     'label' => 'Factory Returns',     'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.factory-returns',     'abilities' => ['view', 'backdate', 'approve'], 'gates' => 'warehouse'],
         ['key' => 'bil.raw_materials.damaged_goods',       'label' => 'Damaged Goods',       'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.damaged-goods',       'abilities' => ['view', 'backdate', 'approve']],
 
         // BIL — Raw Materials Reports

@@ -238,6 +238,18 @@ Which gates appear in a dropdown is granted per user, ticked in Admin → Users.
 This is **not** access control — the `page:` middleware still decides who may
 open a screen — it narrows the list once they are there. Admin sees every gate.
 
+**The checklists only appear when the selected role reaches a page that uses
+that kind of gate.** Granting gates to a role with no scanning screens is dead
+configuration, and showing the list implies otherwise; the editor says so
+instead. Pages declare what they pick from via a `gates` field in
+`config/pages.php` (`warehouse` or `factory`), so tagging a new scanning screen
+there is all that is needed — no list to remember to extend. `PageSyncer`
+ignores the field, so it costs nothing at sync time.
+
+Changing a role does **not** clear existing grants. Gates are not access
+control, so a stale grant cannot let anyone in, and keeping them means moving a
+user out of a role and back does not silently lose their configuration.
+
 **Nothing is granted by this migration.** After deploying, every operator needs
 their gates ticked or their dropdown will be empty; the screens say so plainly
 rather than failing silently.

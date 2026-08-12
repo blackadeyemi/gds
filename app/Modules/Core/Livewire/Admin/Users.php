@@ -15,6 +15,7 @@ use Modules\Core\Models\Role;
 use Modules\Core\Models\FactoryGate;
 use Modules\Core\Models\User;
 use Modules\Core\Models\WarehouseGate;
+use Modules\Core\Support\GateAccess;
 
 #[Title('User Management')]
 class Users extends DataGrid
@@ -128,11 +129,59 @@ class Users extends DataGrid
         $this->division_id = null;
     }
 
+    /**
+     * Changing role changes which gate checklists apply.
+     *
+     * Existing grants are deliberately NOT cleared: gates are not access
+     * control, so a stale grant cannot let anyone in — the page middleware
+     * still refuses — and keeping them means moving a user out of a role and
+     * back does not silently lose their configuration.
+     */
+    public function updatedRoleId(): void
+    {
+        unset($this->usesWarehouseGates, $this->usesFactoryGates);
+    }
+
     /** Admin users span all companies, so company/department don't apply. */
     #[Computed]
     public function isAdminRole(): bool
     {
         return (int) optional(Role::find($this->role_id))->legacy_level === 1;
+    }
+
+    /**
+     * Does the selected role reach any page that picks warehouse gates?
+     *
+     * Drives whether the checklist is offered at all — granting gates to a role
+     * that cannot open a receiving or issuing screen is dead configuration, and
+     * showing the list implies otherwise. `role_id` is a live-bound field, so
+     * this re-evaluates as soon as the role changes.
+     */
+    #[Computed]
+    public function usesWarehouseGates(): bool
+    {
+        return GateAccess::roleUsesGates($this->role_id, GateAccess::WAREHOUSE);
+    }
+
+    /** The same question for factory gates. */
+    #[Computed]
+    public function usesFactoryGates(): bool
+    {
+        return GateAccess::roleUsesGates($this->role_id, GateAccess::FACTORY);
+    }
+
+    /** Pages behind each checklist, so the editor can say why it is shown. */
+    #[Computed]
+    public function gatePageLabels(): array
+    {
+        $labels = collect(config('pages.pages', []))->keyBy('key');
+
+        return [
+            GateAccess::WAREHOUSE => collect(GateAccess::pageKeysUsing(GateAccess::WAREHOUSE))
+                ->map(fn ($k) => $labels[$k]['label'] ?? $k)->unique()->values()->all(),
+            GateAccess::FACTORY => collect(GateAccess::pageKeysUsing(GateAccess::FACTORY))
+                ->map(fn ($k) => $labels[$k]['label'] ?? $k)->unique()->values()->all(),
+        ];
     }
 
     /**
