@@ -12,7 +12,9 @@ use Modules\Bil\Models\RawMaterialFactoryUsage;
 use Modules\Bil\Models\RawMaterialItem;
 use Modules\Bil\Models\RawMaterialProduct;
 use Modules\Bil\Models\RawMaterialReturnApproval;
-use Modules\Bil\Models\RawMaterialStock;
+use Modules\Bil\Support\RawMaterialsStock;
+use Modules\Core\Models\WarehouseGate;
+use Modules\Core\Support\GateAccess;
 use Modules\Bil\Models\RawMaterialWarehouseExit;
 
 /**
@@ -43,8 +45,22 @@ class FactoryReturns extends Component
     public const TYPE_NON_CONSUMED = 'Non-Consumed';
     public const TYPE_PARTIAL = 'Partially Consumed';
 
-    public const LOCATION_ID = 1; // Ogba — the raw-materials store
     public const MAX_SCAN = 10;   // barcodes per submit
+
+    /**
+     * The gate the material comes back in through.
+     *
+     * A return lands back in the store, so it is a warehouse INBOUND gate, not
+     * a factory one — which is also what the legacy `LOCATION_ID = 1` meant.
+     */
+    public ?int $gate_id = null;
+
+    /** Inbound gates on raw-materials warehouses this user may receive into. */
+    #[Computed]
+    public function gates()
+    {
+        return GateAccess::warehouseGates(auth()->user(), 'raw-materials', WarehouseGate::IN);
+    }
 
     public string $dateIso = '';
     public string $returnType = self::TYPE_NON_CONSUMED;
@@ -280,6 +296,18 @@ class FactoryReturns extends Component
             return;
         }
 
+        // Re-resolve from the granted set: the return puts stock back into a
+        // warehouse, so the gate decides whose stock moves.
+        $gate = $this->gates()->firstWhere('id', $this->gate_id) ?? $this->gates()->first();
+        $warehouse = $gate?->warehouse;
+        $legacyLocationId = $warehouse?->legacy_location_id;
+
+        if (! $gate || ! $legacyLocationId) {
+            session()->flash('err', 'Pick a store entrance to receive the return through.');
+
+            return;
+        }
+
         $conn = DB::connection('bil');
         $got = (int) ($conn->selectOne("SELECT GET_LOCK('rm_return', 10) AS l")->l ?? 0);
         if ($got !== 1) {
@@ -298,11 +326,13 @@ class FactoryReturns extends Component
                 // sourced from the factory rather than the original supplier.
                 RawMaterialFactoryEntrance::where('barcode', $barcode)->update(['status' => 'return']);
                 RawMaterialWarehouseExit::where('barcode', $barcode)->update(['status' => 'return']);
-                RawMaterialItem::where('barcode', $barcode)->update(['status' => null, 'source' => 'factory']);
+                RawMaterialItem::where('barcode', $barcode)
+                    ->update(['status' => null, 'source' => 'factory',
+                              'location_id' => $legacyLocationId, 'gate_id' => $gate->id]);
                 RawMaterialFactoryUsage::where('barcode', $barcode)->update(['status' => 'return']);
 
                 if ($parent) {
-                    $this->addToStock($parent->productid, (float) $parent->weight);
+                    $this->addToStock((int) $warehouse->id, (int) $parent->productid, (float) $parent->weight);
                 }
             } else {
                 // Leftover returns as a NEW child barcode; parent stays consumed.
@@ -314,12 +344,13 @@ class FactoryReturns extends Component
                         'productid' => $parent->productid,
                         'barcode' => $childBarcode,
                         'weight' => (float) $req->weight,
-                        'location_id' => self::LOCATION_ID,
+                        'location_id' => $legacyLocationId,
+                        'gate_id' => $gate->id,
                         'dateofcreation' => now()->format('Y-m-d'),
                         'status' => null,
                         'source' => 'factory',
                     ]);
-                    $this->addToStock($parent->productid, (float) $req->weight);
+                    $this->addToStock((int) $warehouse->id, (int) $parent->productid, (float) $req->weight);
                 }
             }
 
@@ -353,15 +384,15 @@ class FactoryReturns extends Component
         session()->flash('ok', 'Return rejected.');
     }
 
-    /** Add a returned item back to the stock aggregate for its product. */
-    protected function addToStock(int $productId, float $weight): void
+    /**
+     * Put a returned item back into the warehouse's stock.
+     *
+     * The legacy version updated `rawmaterials_stock` by product alone, with no
+     * warehouse in it at all — so a second store could never have been right.
+     */
+    protected function addToStock(int $warehouseId, int $productId, float $weight): void
     {
-        $stock = RawMaterialStock::where('productid', $productId)->first();
-        if ($stock) {
-            $stock->quantity = (int) $stock->quantity + 1;
-            $stock->weight = (float) $stock->weight + $weight;
-            $stock->save();
-        }
+        RawMaterialsStock::apply($warehouseId, $productId, 1, $weight);
     }
 
     /** First free `<barcode>-A`, `-B`, … child not already in the store. */

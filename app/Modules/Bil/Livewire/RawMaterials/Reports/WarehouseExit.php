@@ -3,6 +3,7 @@
 namespace Modules\Bil\Livewire\RawMaterials\Reports;
 
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Models\WarehouseGate;
 use Livewire\Attributes\Title;
 
 /**
@@ -39,9 +40,19 @@ class WarehouseExit extends RawMaterialReport
         return true;
     }
 
+
+    /**
+     * Gates, for the filter.
+     *
+     * Only gds movements carry a `gate_id` — the legacy app never recorded which
+     * gate was used, and the historic rows were deliberately not backfilled with
+     * a guess. So this filter narrows to movements booked through gds; the
+     * Location filter is still the one that covers all of history.
+     */
     protected function options(): array
     {
         return $this->optCache ??= [
+            'gates' => WarehouseGate::ordered()->pluck('name', 'id')->all(),
             'locations' => DB::connection('bil')->table('rawmaterial_store_location')
                 ->orderBy('id')->pluck('location', 'id')->all(),
             'products' => DB::connection('bil')->table('rawmaterials_products')
@@ -61,6 +72,7 @@ class WarehouseExit extends RawMaterialReport
             'location' => ['label' => 'Location', 'options' => $o['locations']],
             'group' => ['label' => 'Group', 'options' => $o['groups']],
             'subgroup' => ['label' => 'Sub Group', 'options' => $o['subgroups']],
+            'gate' => ['label' => 'Exit Gate', 'options' => $o['gates']],
             'product' => ['label' => 'Product', 'options' => $o['products']],
         ];
     }
@@ -96,6 +108,7 @@ class WarehouseExit extends RawMaterialReport
         $this->applyDate($q, 'we.dateofcreation');
         $this->applyFilters($q, [
             'location' => 'we.location_id',
+            'gate' => 'we.gate_id',
             'product' => 'r.productid',
         ]);
 
@@ -120,6 +133,7 @@ class WarehouseExit extends RawMaterialReport
         $this->applyDate($q, 'we.dateofcreation');
         $this->applyFilters($q, [
             'location' => 'we.location_id',
+            'gate' => 'we.gate_id',
             'product' => 'r.productid',
             'group' => 'p.groupid',
             'subgroup' => 'p.subgroupid',

@@ -9,7 +9,9 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 use Modules\Bil\Models\RawMaterialDelivery;
 use Modules\Bil\Models\RawMaterialItem;
-use Modules\Bil\Models\RawMaterialStock;
+use Modules\Bil\Support\RawMaterialsStock;
+use Modules\Core\Models\WarehouseGate;
+use Modules\Core\Support\GateAccess;
 
 /**
  * Raw Materials → Warehouse Entry. Rebuilt from the legacy Store Entrance
@@ -17,14 +19,23 @@ use Modules\Bil\Models\RawMaterialStock;
  *
  * Scan delivered barcodes (validated against the delivery-staging table) into
  * a batch of up to 10, then Save promotes each into the live `rawmaterials`
- * stock table and updates the aggregated `rawmaterials_stock`.
+ * table and adds it to the warehouse's stock.
+ *
+ * The gate is chosen rather than hard-coded: the legacy screen booked straight
+ * against store 1 (Ogba), so a second store could never be used. Gates come from
+ * `warehouse_gates` filtered to raw-materials warehouses and inbound direction,
+ * and narrowed to the ones this user has been granted — see GateAccess.
+ *
+ * Stock lands in `raw_materials_warehouse_stock`, keyed by warehouse. gds no
+ * longer writes the legacy `rawmaterials_stock`; see the 2026-08-12 cut-over in
+ * docs/DEPLOYMENT.md. `location_id` on the item row IS still written, because
+ * the legacy app reads it.
  */
 class WarehouseEntry extends Component
 {
     public const MAX_SCAN = 10;
-    public const LOCATION_ID = 1;      // Ogba — the only raw-materials store location
-    public const LOCATION = 'Ogba';
 
+    public ?int $gate_id = null;
     public string $dateIso = '';
     public string $scan = '';
 
@@ -36,6 +47,14 @@ class WarehouseEntry extends Component
     public function mount(): void
     {
         $this->dateIso = now()->format('Y-m-d');
+        $this->gate_id = $this->gates()->first()?->id;
+    }
+
+    /** Inbound gates on raw-materials warehouses this user may use. */
+    #[Computed]
+    public function gates()
+    {
+        return GateAccess::warehouseGates(auth()->user(), 'raw-materials', WarehouseGate::IN);
     }
 
     public function maxScan(): int
@@ -138,6 +157,25 @@ class WarehouseEntry extends Component
             return;
         }
 
+        // Re-resolve from the granted set, so a stale or tampered id cannot
+        // book stock into a warehouse this user was never given.
+        $gate = $this->gates()->firstWhere('id', $this->gate_id);
+        if (! $gate) {
+            session()->flash('err', 'That entrance is no longer available to you.');
+
+            return;
+        }
+
+        $warehouse = $gate->warehouse;
+        $legacyLocationId = $warehouse?->legacy_location_id;
+        if (! $legacyLocationId) {
+            // The legacy app reads `location_id`; writing a row without one
+            // would make the item invisible to it.
+            session()->flash('err', 'That warehouse has no legacy store id — it cannot take raw-material entries yet.');
+
+            return;
+        }
+
         // Without the backdate permission the date is forced to today,
         // regardless of what the client submitted.
         $dateIso = $this->canBackdate() ? $this->dateIso : now()->format('Y-m-d');
@@ -174,23 +212,19 @@ class WarehouseEntry extends Component
                     'username' => $username,
                     'productid' => $delivery->productid,
                     'weight' => $delivery->weight,
-                    'location_id' => self::LOCATION_ID,
+                    // Both: the store for the legacy app, the gate for gds.
+                    'location_id' => $legacyLocationId,
+                    'gate_id' => $gate->id,
                     'dateofcreation' => $date,
                     'status' => null,
                 ]);
 
-                $stock = RawMaterialStock::where('productid', $delivery->productid)->first();
-                if ($stock) {
-                    $stock->increment('quantity', 1, ['weight' => $stock->weight + $delivery->weight]);
-                } else {
-                    RawMaterialStock::create([
-                        'location' => self::LOCATION,
-                        'productid' => $delivery->productid,
-                        'quantity' => 1,
-                        'weight' => $delivery->weight,
-                        'modification' => $username,
-                    ]);
-                }
+                RawMaterialsStock::apply(
+                    (int) $warehouse->id,
+                    (int) $delivery->productid,
+                    1,
+                    (float) $delivery->weight
+                );
 
                 $stored++;
             }
@@ -200,7 +234,8 @@ class WarehouseEntry extends Component
 
         $this->items = [];
         $this->scanError = '';
-        session()->flash('ok', $stored . ' item' . ($stored === 1 ? '' : 's') . ' entered into store.');
+        session()->flash('ok', $stored . ' item' . ($stored === 1 ? '' : 's')
+            . ' entered into ' . ($warehouse->name ?? 'store') . '.');
     }
 
     #[Layout('core::layouts.admin')]

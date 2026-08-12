@@ -72,19 +72,58 @@ warehouses — separate stock, separate gates, separate staff anyway.
 - "Oregun Store" appears in the legacy factory-entrance table but is a store, not
   a factory; imported inactive so history resolves without offering it.
 
-### ⚠️ Still to do — the raw-materials screens
+### The raw-materials screens are on the gates
 
-The tables, gates, grants and stock table are in place, **but the four RM screens
-still use their hard-coded constants** (`LOCATION_ID = 1`,
-`EXIT_LOCATION = 'Rawmaterial Store'`) and still write `rawmaterials_stock`:
+All four now pick a gate instead of hard-coding a location, and move
+`raw_materials_warehouse_stock` instead of `rawmaterials_stock`:
 
-- Raw Materials → Warehouse Entry, Warehouse Exit, Factory Entrance,
-  Factory Returns, and their reports.
+| Screen | Was | Now |
+| --- | --- | --- |
+| Warehouse Entry | `LOCATION_ID = 1` | inbound gate on an RM warehouse |
+| Warehouse Exit | `EXIT_LOCATION = 'Rawmaterial Store'` | outbound gate on an RM warehouse |
+| Factory Entrance | all rows minus a hard-coded exclusion list | granted inbound factory gates |
+| Factory Returns | `LOCATION_ID = 1` | inbound gate — a return lands back in a store |
 
-They work exactly as before this deploy — nothing regressed — but they do not yet
-offer the new gates, and RM stock is therefore maintained in the old table only.
-`raw_materials_warehouse_stock` is seeded and correct as of the migration, and
-will go stale until those screens are moved over. **Do not report from it yet.**
+`location_id` is still written on every row, because the legacy app reads it;
+`gate_id` is written alongside. Factory Entrance's legacy exclusions (PM2, PM3,
+Oregun Store) are now data rather than a constant — those gates were imported
+against BPL factories or, for Oregun Store, inactive because it is not a factory.
+
+The reports gain a **gate filter** (Warehouse Entry, Warehouse Exit, Factory
+Entrance). It narrows to movements booked through gds — historic rows have no
+gate, deliberately — so the existing **Location** filter remains the one that
+covers all of history.
+
+### ⚠️ The raw-materials tables are MyISAM
+
+`rawmaterials_warehouse_entry`, `rawmaterials_warehouse_exit`,
+`factory_entrance_rawmaterials` and `return_approval` are all MyISAM, which has
+**no transactions**. A `DB::transaction()` around them is a lie — a failure
+part-way through leaves the rows written. This is why those screens serialise on
+`GET_LOCK` rather than pretending to be atomic.
+
+It is also why deriving stock from the barcodes matters: if a batch
+half-completes, the totals can be put right.
+
+```
+php artisan bil:reconcile-rm-stock            # report
+php artisan bil:reconcile-rm-stock --fix      # repair
+```
+
+**Run it after any incident on these screens.** It is also the only safe way to
+verify them — a test cannot wrap them in a transaction and roll back, because the
+bil-side rows survive.
+
+### Still on the legacy stock table
+
+Three screens still write `rawmaterials_stock` and not the new table: **Stock
+Transfer**, **Damaged Goods**, and the **Warehouse Stock report**'s inline edit
+and delete. They were not in scope for this pass.
+
+Because stock derives from the barcodes, this is recoverable rather than
+corrupting — those screens still update the barcode rows correctly, so
+`bil:reconcile-rm-stock` brings the new totals back in line. Run it after using
+any of the three until they are migrated too.
 
 ### After deploying
 

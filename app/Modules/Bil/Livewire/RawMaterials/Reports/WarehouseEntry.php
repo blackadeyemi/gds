@@ -3,9 +3,11 @@
 namespace Modules\Bil\Livewire\RawMaterials\Reports;
 
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Models\WarehouseGate;
 use Livewire\Attributes\Title;
 use Modules\Bil\Models\RawMaterialItem;
-use Modules\Bil\Models\RawMaterialStock;
+use Modules\Bil\Support\RawMaterialsStock;
+use Modules\Core\Models\Warehouse;
 
 /**
  * Reports → Warehouse Entry. Raw material received into the warehouse, over
@@ -39,9 +41,19 @@ class WarehouseEntry extends RawMaterialReport
         return 'Raw material received into the warehouse (live in-store items).';
     }
 
+
+    /**
+     * Gates, for the filter.
+     *
+     * Only gds movements carry a `gate_id` — the legacy app never recorded which
+     * gate was used, and the historic rows were deliberately not backfilled with
+     * a guess. So this filter narrows to movements booked through gds; the
+     * Location filter is still the one that covers all of history.
+     */
     protected function options(): array
     {
         return $this->optCache ??= [
+            'gates' => WarehouseGate::ordered()->pluck('name', 'id')->all(),
             'suppliers' => DB::connection('bil')->table('rawmaterials_supplier')
                 ->orderBy('suppliername')->pluck('suppliername', 'suppliercode')->all(),
             'products' => DB::connection('bil')->table('rawmaterials_products')
@@ -58,6 +70,7 @@ class WarehouseEntry extends RawMaterialReport
         return [
             'supplier' => ['label' => 'Supplier', 'options' => $o['suppliers']],
             'location' => ['label' => 'Location', 'options' => $o['locations']],
+            'gate' => ['label' => 'Entrance Gate', 'options' => $o['gates']],
             'product' => ['label' => 'Product', 'options' => $o['products']],
         ];
     }
@@ -77,6 +90,7 @@ class WarehouseEntry extends RawMaterialReport
         $this->applyDate($q, 'r.dateofcreation');
         $this->applyFilters($q, [
             'supplier' => 'r.suppliercode',
+            'gate' => 'r.gate_id',
             'location' => 'r.location_id',
             'product' => 'r.productid',
         ]);
@@ -98,6 +112,7 @@ class WarehouseEntry extends RawMaterialReport
         $this->applyDate($q, 'r.dateofcreation');
         $this->applyFilters($q, [
             'supplier' => 'r.suppliercode',
+            'gate' => 'r.gate_id',
             'location' => 'r.location_id',
             'product' => 'r.productid',
         ]);
@@ -224,12 +239,25 @@ class WarehouseEntry extends RawMaterialReport
 
         $item->update(['weight' => $newWeight]);
 
-        // Shift the stock aggregate by the weight change (quantity unchanged).
-        $stock = RawMaterialStock::where('productid', $item->productid)->first();
-        if ($stock) {
-            $stock->weight = max(0, (float) $stock->weight + $delta);
-            $stock->save();
+        // Shift the warehouse's stock by the weight change (quantity unchanged).
+        if ($warehouseId = $this->warehouseIdFor($item->location_id)) {
+            RawMaterialsStock::apply($warehouseId, (int) $item->productid, 0, $delta);
         }
+    }
+
+    /**
+     * The warehouse behind a legacy `location_id`.
+     *
+     * Movement rows still carry the legacy store id because the legacy app
+     * reads it; stock is keyed by warehouse, so the two are mapped here.
+     */
+    protected function warehouseIdFor($legacyLocationId): ?int
+    {
+        if (! $legacyLocationId) {
+            return null;
+        }
+
+        return Warehouse::where('legacy_location_id', $legacyLocationId)->value('id');
     }
 
     protected function performDelete(int $id): void
@@ -239,12 +267,9 @@ class WarehouseEntry extends RawMaterialReport
             return;
         }
 
-        // Decrement the stock aggregate, then remove the in-store item.
-        $stock = RawMaterialStock::where('productid', $item->productid)->first();
-        if ($stock) {
-            $stock->quantity = max(0, (int) $stock->quantity - 1);
-            $stock->weight = max(0, (float) $stock->weight - (float) $item->weight);
-            $stock->save();
+        // Take it back out of the warehouse's stock, then remove the item.
+        if ($warehouseId = $this->warehouseIdFor($item->location_id)) {
+            RawMaterialsStock::apply($warehouseId, (int) $item->productid, -1, -(float) $item->weight);
         }
 
         $item->delete();

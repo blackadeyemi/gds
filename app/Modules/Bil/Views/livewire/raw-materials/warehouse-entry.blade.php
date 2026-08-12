@@ -11,12 +11,28 @@
         <div class="card" style="border-color:var(--danger);color:var(--danger);margin-bottom:1rem;padding:0.7rem 1.25rem;">{{ session('err') }}</div>
     @endif
 
+    @if ($this->gates()->isEmpty())
+        <div class="card card-pad" style="border-color:var(--warning,#b45309);margin-bottom:1rem;">
+            <strong>No store entrances are assigned to you.</strong>
+            <p class="text-muted text-sm" style="margin:.35rem 0 0;">
+                An administrator grants these per user under Admin &rarr; Users, and each gate must belong to a raw-materials warehouse.
+            </p>
+        </div>
+    @endif
+
     <div class="card card-pad">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;max-width:520px;">
             <div class="form-group">
                 <label class="form-label">User</label>
                 <input type="text" class="form-control" value="{{ auth()->user()?->username }}" disabled>
             </div>
+            @include('bil::partials.gate-select', [
+                'label' => 'Entrance',
+                'gates' => $this->gates(),
+                'field' => 'gate_id',
+                'group' => fn ($g) => $g->warehouse?->name ?? 'Unassigned',
+                'empty' => 'No entrances assigned',
+            ])
             <div class="form-group">
                 <label class="form-label">Date</label>
                 @include('bil::partials.date-field', ['model' => 'dateIso', 'disabled' => ! $this->canBackdate()])

@@ -3,6 +3,8 @@
 namespace Modules\Bil\Livewire\RawMaterials;
 
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Models\FactoryGate;
+use Modules\Core\Support\GateAccess;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -32,9 +34,6 @@ class FactoryEntrance extends Component
         return 'bil.raw_materials.factory_entrance';
     }
 
-    /** Factory lines not offered for raw-material entrance (legacy exclusions). */
-    protected const EXCLUDED = ['PM2', 'PM3', 'Oregun Store'];
-
     public const MAX_SCAN = 10; // barcodes per submit
 
     public string $dateIso = '';
@@ -49,7 +48,7 @@ class FactoryEntrance extends Component
     public function mount(): void
     {
         $this->dateIso = now()->format('Y-m-d');
-        $this->locationId = $this->locations()->first()->id ?? null;
+        $this->locationId = $this->locations()->first()?->id;
     }
 
     public function canBackdate(): bool
@@ -62,14 +61,35 @@ class FactoryEntrance extends Component
         return self::MAX_SCAN;
     }
 
-    /** Selectable factory locations. */
+    /**
+     * Inbound factory gates this user may use.
+     *
+     * The legacy screen listed every row of `factoryentrance_details` minus a
+     * hard-coded exclusion list (PM2, PM3, Oregun Store). Those exclusions are
+     * now data: the paper-machine gates belong to BPL factories and "Oregun
+     * Store" is not a factory at all, so it was imported inactive — and access
+     * is granted per user rather than assumed.
+     */
     #[Computed]
     public function locations()
     {
+        return GateAccess::factoryGates(auth()->user(), FactoryGate::IN);
+    }
+
+    /**
+     * The legacy `factoryentrance_details` id for a gate.
+     *
+     * `factory_entrance_rawmaterials.location_id` still points there and the
+     * legacy app reads it, so gds keeps writing it alongside `gate_id`.
+     */
+    protected function legacyLocationId($gate): ?int
+    {
+        if (! $gate?->legacy_name) {
+            return null;
+        }
+
         return DB::connection('bil')->table('factoryentrance_details')
-            ->whereNotIn('factoryname', self::EXCLUDED)
-            ->orderBy('id')
-            ->get(['id', 'factoryname']);
+            ->where('entrancelocation', $gate->legacy_name)->value('id');
     }
 
     /** Legacy shift date: a scan before 07:00 belongs to the previous day. */
@@ -161,7 +181,16 @@ class FactoryEntrance extends Component
     /** Record each scanned barcode's factory entrance. */
     public function save(): void
     {
-        if ($this->items === [] || $this->locationId === null || ! $this->ensureShiftOpen()) {
+        // Re-resolve from the granted set: a stale or tampered id must not be
+        // able to book material into a factory this user was never given.
+        $gate = $this->locations()->firstWhere('id', $this->locationId);
+        if ($gate && ! ($legacyLocationId = $this->legacyLocationId($gate))) {
+            session()->flash('err', 'That gate has no legacy entrance id — the legacy screens would not see these entries.');
+
+            return;
+        }
+
+        if ($this->items === [] || ! $gate || ! $this->ensureShiftOpen()) {
             return;
         }
 
@@ -191,7 +220,8 @@ class FactoryEntrance extends Component
                     $record = RawMaterialItem::where('barcode', $barcode)->first();
                     RawMaterialFactoryEntrance::create([
                         'user_name' => $username,
-                        'location_id' => $this->locationId,
+                        'location_id' => $legacyLocationId,
+                        'gate_id' => $gate->id,
                         'entrance_date' => $date,
                         'barcode' => $barcode,
                         'product_id' => $record?->productid,

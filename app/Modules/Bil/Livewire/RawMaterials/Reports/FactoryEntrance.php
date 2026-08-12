@@ -3,6 +3,7 @@
 namespace Modules\Bil\Livewire\RawMaterials\Reports;
 
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Models\FactoryGate;
 use Livewire\Attributes\Title;
 use Modules\Bil\Models\RawMaterialFactoryEntrance;
 
@@ -37,9 +38,19 @@ class FactoryEntrance extends RawMaterialReport
         return 'Raw material scanned onto the factory floor.';
     }
 
+
+    /**
+     * Gates, for the filter.
+     *
+     * Only gds movements carry a `gate_id` — the legacy app never recorded which
+     * gate was used, and the historic rows were deliberately not backfilled with
+     * a guess. So this filter narrows to movements booked through gds; the
+     * Location filter is still the one that covers all of history.
+     */
     protected function options(): array
     {
         return $this->optCache ??= [
+            'gates' => FactoryGate::ordered()->pluck('name', 'id')->all(),
             'factories' => DB::connection('bil')->table('factoryentrance_details')
                 ->orderBy('id')->pluck('factoryname', 'id')->all(),
             'products' => DB::connection('bil')->table('rawmaterials_products')
@@ -60,6 +71,7 @@ class FactoryEntrance extends RawMaterialReport
             'group' => ['label' => 'Group', 'options' => $o['groups']],
             'subgroup' => ['label' => 'Sub Group', 'options' => $o['subgroups']],
             'product' => ['label' => 'Product', 'options' => $o['products']],
+            'gate' => ['label' => 'Factory Gate', 'options' => $o['gates']],
             'status' => ['label' => 'Status', 'options' => ['consumed' => 'Consumed', 'return' => 'Returned']],
         ];
     }
@@ -81,6 +93,7 @@ class FactoryEntrance extends RawMaterialReport
         $this->applyDate($q, 'f.entrance_date');
         $this->applyFilters($q, [
             'factory' => 'f.location_id',
+            'gate' => 'f.gate_id',
             'product' => 'f.product_id',
             'status' => 'f.status',
         ]);
@@ -99,6 +112,7 @@ class FactoryEntrance extends RawMaterialReport
         $this->applyDate($q, 'f.entrance_date');
         $this->applyFilters($q, [
             'factory' => 'f.location_id',
+            'gate' => 'f.gate_id',
             'product' => 'f.product_id',
             'group' => 'p.groupid',
             'subgroup' => 'p.subgroupid',

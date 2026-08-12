@@ -3,12 +3,15 @@
 namespace Modules\Bil\Livewire\RawMaterials;
 
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Modules\Bil\Models\RawMaterialItem;
-use Modules\Bil\Models\RawMaterialStock;
 use Modules\Bil\Models\RawMaterialWarehouseExit;
+use Modules\Bil\Support\RawMaterialsStock;
+use Modules\Core\Models\WarehouseGate;
+use Modules\Core\Support\GateAccess;
 
 /**
  * Raw Materials → Warehouse Exit. Rebuilt from the legacy Store Exit
@@ -25,10 +28,9 @@ use Modules\Bil\Models\RawMaterialWarehouseExit;
  */
 class WarehouseExit extends Component
 {
-    public const LOCATION_ID = 1;      // Ogba — the only raw-materials store location
-    public const EXIT_LOCATION = 'Rawmaterial Store';
     public const MAX_SCAN = 10;        // barcodes per submit
 
+    public ?int $gate_id = null;
     public string $dateIso = '';
     public string $scan = '';
 
@@ -40,6 +42,14 @@ class WarehouseExit extends Component
     public function mount(): void
     {
         $this->dateIso = now()->format('Y-m-d');
+        $this->gate_id = $this->gates()->first()?->id;
+    }
+
+    /** Outbound gates on raw-materials warehouses this user may use. */
+    #[Computed]
+    public function gates()
+    {
+        return GateAccess::warehouseGates(auth()->user(), 'raw-materials', WarehouseGate::OUT);
     }
 
     public function canBackdate(): bool
@@ -116,6 +126,23 @@ class WarehouseExit extends Component
             return;
         }
 
+        // Re-resolve from the granted set, so a stale or tampered id cannot
+        // issue stock out of a warehouse this user was never given.
+        $gate = $this->gates()->firstWhere('id', $this->gate_id);
+        if (! $gate) {
+            session()->flash('err', 'That exit is no longer available to you.');
+
+            return;
+        }
+
+        $warehouse = $gate->warehouse;
+        $legacyLocationId = $warehouse?->legacy_location_id;
+        if (! $legacyLocationId) {
+            session()->flash('err', 'That warehouse has no legacy store id — it cannot issue raw material yet.');
+
+            return;
+        }
+
         $date = $this->canBackdate()
             ? str_replace('-', '/', $this->dateIso)
             : $this->shiftDate();
@@ -147,21 +174,25 @@ class WarehouseExit extends Component
                         'user' => $username,
                         'barcode' => $barcode,
                         'dateofcreation' => $date,
-                        'location_id' => self::LOCATION_ID,
+                        // Both: the store for the legacy app, the gate for gds.
+                        'location_id' => $legacyLocationId,
+                        'gate_id' => $gate->id,
                         'status' => null,
                     ]);
                 }
 
                 RawMaterialItem::where('barcode', $barcode)->update(['status' => 'Exited']);
 
-                // Reduce the stock aggregate for this product (clamped at 0).
+                // Take it back out of the warehouse's stock. Not clamped at
+                // zero: the totals derive from the barcodes, so a negative is a
+                // real discrepancy worth seeing rather than hiding.
                 if ($record) {
-                    $stock = RawMaterialStock::where('productid', $record->productid)->first();
-                    if ($stock) {
-                        $stock->quantity = max(0, (int) $stock->quantity - 1);
-                        $stock->weight = max(0, (float) $stock->weight - (float) $record->weight);
-                        $stock->save();
-                    }
+                    RawMaterialsStock::apply(
+                        (int) $warehouse->id,
+                        (int) $record->productid,
+                        -1,
+                        -(float) $record->weight
+                    );
                 }
 
                 $exited++;
@@ -172,7 +203,8 @@ class WarehouseExit extends Component
 
         $this->items = [];
         $this->scanError = '';
-        session()->flash('ok', $exited . ' item' . ($exited === 1 ? '' : 's') . ' exited from store.');
+        session()->flash('ok', $exited . ' item' . ($exited === 1 ? '' : 's')
+            . ' exited from ' . ($warehouse->name ?? 'store') . '.');
     }
 
     #[Layout('core::layouts.admin')]

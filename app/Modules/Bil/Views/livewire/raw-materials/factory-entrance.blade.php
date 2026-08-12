@@ -11,20 +11,28 @@
         <div class="card" style="border-color:var(--danger);color:var(--danger);margin-bottom:1rem;padding:0.7rem 1.25rem;">{{ session('err') }}</div>
     @endif
 
+    @if ($this->locations->isEmpty())
+        <div class="card card-pad" style="border-color:var(--warning,#b45309);margin-bottom:1rem;">
+            <strong>No factory gates are assigned to you.</strong>
+            <p class="text-muted text-sm" style="margin:.35rem 0 0;">
+                An administrator grants these per user under Admin &rarr; Users, and each gate must belong to a factory.
+            </p>
+        </div>
+    @endif
+
     <div class="card card-pad">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.75rem;">
             <div class="form-group">
                 <label class="form-label">User</label>
                 <input type="text" class="form-control" value="{{ auth()->user()?->username }}" disabled>
             </div>
-            <div class="form-group">
-                <label class="form-label">Location</label>
-                <select class="form-control" wire:model="locationId">
-                    @foreach ($this->locations as $loc)
-                        <option value="{{ $loc->id }}">{{ $loc->factoryname }}</option>
-                    @endforeach
-                </select>
-            </div>
+            @include('bil::partials.gate-select', [
+                'label' => 'Factory Gate',
+                'gates' => $this->locations,
+                'field' => 'locationId',
+                'group' => fn ($g) => $g->factory?->name ?? 'Unassigned',
+                'empty' => 'No factory gates assigned',
+            ])
             <div class="form-group">
                 <label class="form-label">Date</label>
                 @include('bil::partials.date-field', ['model' => 'dateIso', 'disabled' => ! $this->canBackdate()])
