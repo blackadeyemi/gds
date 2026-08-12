@@ -6,16 +6,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * A pallet received into the finished-goods warehouse (bil.store_entrance,
- * 1.17M rows).
+ * A LEGACY finished-goods receipt (bil.store_entrance, 1.17M rows).
  *
- * The last barcode-level step of a pallet's life: Conversion Output mints it,
- * Factory Exit sends it, this receives it. After here stock is counted in
- * bundles, not barcodes — `sales_loading` carries its own load barcode, not the
- * pallet's — so nothing downstream references a row here.
+ * Superseded by FgWarehouseReceipt. gds no longer writes this table — see the
+ * 2026-08-12 cut-over in docs/DEPLOYMENT.md — but the legacy app still does, so
+ * it is still read in two places, both of which would be wrong to skip:
  *
- * `barcode` is UNIQUE: a pallet is received once. Receiving also moves the
- * `storebundle` and `storebundle_floor` totals — see FinishedGoodsStock.
+ *   - the receiving screen, so a pallet the legacy app already took in cannot
+ *     be received a second time in gds;
+ *   - the delete guards on the Conversion Output and Factory Exit reports, so a
+ *     pallet the legacy warehouse holds cannot have its history deleted.
+ *
+ * Its `entrancelocation` is a bare name string; the gate it refers to is now a
+ * row in `warehouse_entrances`, matched on `legacy_name`.
  */
 class StoreEntrance extends Model
 {
@@ -34,11 +37,5 @@ class StoreEntrance extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(FinishedGoodsProduct::class, 'productid', 'productid');
-    }
-
-    /** Gates are matched by name, not id — see StoreEntranceLocation. */
-    public function location(): BelongsTo
-    {
-        return $this->belongsTo(StoreEntranceLocation::class, 'entrancelocation', 'entrancelocation');
     }
 }

@@ -10,26 +10,25 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 use Modules\Bil\Models\FactoryConversion;
 use Modules\Bil\Models\FactoryExit as FactoryExitModel;
-use Modules\Bil\Models\FactoryExitLocation;
+use Modules\Core\Support\GateAccess;
 
 /**
  * BIL → Finished Goods → Factory Exit. Rebuild of the legacy
  * factory_exit_beta.php ("Item Send (to Warehouse)").
  *
- * Pallets are scanned as they pass the gate. A barcode is only accepted if it
- * exists in `factory_conversion` (it was actually produced) and is not already
- * in `factory_exit` (a pallet leaves once — the column is UNIQUE). Product and
- * bundle count are read off the conversion row, never typed.
+ * Pallets are scanned as they pass the gate — the middle step of a pallet's
+ * life: Conversion Output mints it, Factory Exit sends it, Warehouse Entrance
+ * receives it.
  *
- * Saving does what the legacy Factory\Out::insertScanning did:
- *   - insert a `factory_exit` row per pallet, barcode upper-cased;
- *   - stamp `status` = 'yes' when the store already holds the barcode, which
- *     only happens on an out-of-order scan;
- *   - flip `factory_conversion.status` to 'yes' so the production screens stop
- *     showing the pallet as still on the floor.
+ * A barcode is accepted only if it exists in `factory_conversion` (it was
+ * actually produced) and is not already in `factory_exit` (UNIQUE — a pallet
+ * leaves once). Product and bundle count are read off the pallet, never typed.
  *
- * Date: `backdate` holders pick any date; everyone else books against the shift
- * date, where a scan before 07:00 still belongs to the previous day.
+ * Gates come from `factory_exit_locations` and are limited to the
+ * ones this user has been granted — see GateAccess. The legacy screen
+ * hard-coded that by user level; it is now ticked per user in the user editor.
+ * The exit writes both `exit_location_id` and the legacy `exitlocation` name,
+ * because the legacy app and the 1.2M historic rows both read the name.
  */
 #[Layout('core::layouts.admin')]
 #[Title('Factory Exit')]
@@ -40,11 +39,11 @@ class FactoryExit extends Component
     /** The legacy screen laid out 25 barcode boxes per submit. */
     public const MAX_SCAN = 25;
 
-    public string $exitlocation = '';
+    public ?int $exit_location_id = null;
     public string $dateIso = '';
     public string $scan = '';
 
-    /** Scanned pallets pending save: [['barcode','productname','bundles'], …]. */
+    /** Scanned pallets pending save: [['barcode','productid','productname','bundles'], …]. */
     public array $items = [];
 
     public string $scanError = '';
@@ -52,17 +51,14 @@ class FactoryExit extends Component
     public function mount(): void
     {
         $this->dateIso = now()->format('Y-m-d');
-        $this->exitlocation = (string) ($this->locations()->keys()->first() ?? '');
+        $this->exit_location_id = $this->locations()->first()?->id;
     }
 
-    /** Gate names, grouped under their factory for the picker. */
+    /** Exit gates this user may use, grouped under their factory in the picker. */
     #[Computed]
     public function locations()
     {
-        return FactoryExitLocation::orderBy('factoryname')->orderBy('exitlocation')
-            ->get()->mapWithKeys(fn ($l) => [
-                $l->exitlocation => $l->factoryname . ' — ' . $l->exitlocation,
-            ]);
+        return GateAccess::exitLocationsFor(auth()->user());
     }
 
     public function canBackdate(): bool
@@ -77,10 +73,7 @@ class FactoryExit extends Component
 
     /* ---------------- Scanning ---------------- */
 
-    /**
-     * Validate a scanned barcode: produced, and not already out of the factory.
-     * Mirrors the legacy Barcode\Send::finishGoods lookup.
-     */
+    /** Validate a scanned barcode: produced, and not already out of the factory. */
     public function addScan(): void
     {
         $this->scanError = '';
@@ -156,12 +149,15 @@ class FactoryExit extends Component
         }
 
         $this->validate(
-            ['exitlocation' => 'required|string'],
-            ['exitlocation.required' => 'Pick the gate the pallets are leaving through.']
+            ['exit_location_id' => 'required|integer'],
+            ['exit_location_id.required' => 'Pick the gate the pallets are leaving through.']
         );
 
-        if (! $this->locations()->has($this->exitlocation)) {
-            session()->flash('err', 'That exit location no longer exists.');
+        // Re-resolve from the granted set, so a stale or tampered id can't book
+        // an exit through a gate this user was never given.
+        $location = $this->locations()->firstWhere('id', $this->exit_location_id);
+        if (! $location) {
+            session()->flash('err', 'That exit location is no longer available to you.');
 
             return;
         }
@@ -177,7 +173,7 @@ class FactoryExit extends Component
         $saved = 0;
         $skipped = [];
 
-        $conn->transaction(function () use ($conn, $date, $username, $now, &$saved, &$skipped) {
+        $conn->transaction(function () use ($conn, $location, $date, $username, $now, &$saved, &$skipped) {
             foreach ($this->items as $item) {
                 $barcode = $item['barcode'];
 
@@ -191,7 +187,6 @@ class FactoryExit extends Component
                     continue;
                 }
 
-                // Re-derive the pallet rather than trusting the posted state.
                 $pallet = FactoryConversion::where('barcode', $barcode)->first();
                 if (! $pallet) {
                     $skipped[] = $barcode;
@@ -199,22 +194,24 @@ class FactoryExit extends Component
                     continue;
                 }
 
-                $received = $conn->table('store_entrance')->where('barcode', $barcode)->exists();
+                $received = $conn->table('store_entrance')->where('barcode', $barcode)->exists()
+                    || DB::connection('core')->table('finished_goods_warehouse_receipts')
+                        ->where('barcode', $barcode)->exists();
 
                 FactoryExitModel::create([
                     'username' => $username,
                     'productid' => (int) $pallet->productid,
-                    'exitlocation' => $this->exitlocation,
+                    // The legacy name stays authoritative for the legacy app and
+                    // for the 1.2M historic rows; the id is the new link.
+                    'exitlocation' => $location->legacy_name ?: $location->name,
+                    'exit_location_id' => $location->id,
                     'barcode' => $barcode,
                     'bundles' => (int) $pallet->bundles,
                     'dateofexit' => $date,
-                    // Only set when the store somehow received it first; the
-                    // store-entrance screen fills it in the normal order.
                     'status' => $received ? FactoryExitModel::RECEIVED : null,
                     'timestamp' => $now,
                 ]);
 
-                // The pallet is no longer on the factory floor.
                 $pallet->update(['status' => 'yes']);
 
                 $saved++;

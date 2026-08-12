@@ -2,6 +2,7 @@
 
 namespace Modules\Core\Livewire\Admin;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
@@ -11,7 +12,9 @@ use Modules\Core\Models\Company;
 use Modules\Core\Models\Department;
 use Modules\Core\Models\Division;
 use Modules\Core\Models\Role;
+use Modules\Core\Models\FactoryExitLocation;
 use Modules\Core\Models\User;
+use Modules\Core\Models\WarehouseEntrance;
 
 #[Title('User Management')]
 class Users extends DataGrid
@@ -24,6 +27,17 @@ class Users extends DataGrid
     public ?int $department_id = null;
     public ?int $division_id = null;
     public ?string $password = null;
+
+    /**
+     * Which finished-goods gates this user may pick from, as arrays of ids.
+     *
+     * This is NOT access control — `page:` middleware already decides who may
+     * open the receiving and exit screens. It decides which gates appear in the
+     * dropdown once they are there, replacing the legacy `switch` on user level
+     * that hard-coded "level 16 sees Store FB" and friends.
+     */
+    public array $entrance_ids = [];
+    public array $exit_location_ids = [];
 
     public function pageKey(): string { return 'admin.users'; }
     public function pageLabel(): string { return 'User Management'; }
@@ -121,6 +135,27 @@ class Users extends DataGrid
         return (int) optional(Role::find($this->role_id))->legacy_level === 1;
     }
 
+    /**
+     * Warehouse gates offered in the editor, grouped by warehouse.
+     *
+     * Unassigned gates are shown but flagged: they can be ticked, they simply
+     * cannot be used to receive until they belong to a warehouse.
+     */
+    #[Computed]
+    public function entranceOptions()
+    {
+        return WarehouseEntrance::with('warehouse')->ordered()->get()
+            ->groupBy(fn ($e) => $e->warehouse?->name ?? 'Unassigned');
+    }
+
+    /** Factory exit gates offered in the editor, grouped by factory. */
+    #[Computed]
+    public function exitLocationOptions()
+    {
+        return FactoryExitLocation::with('factory')->ordered()->get()
+            ->groupBy(fn ($l) => $l->factory?->name ?? 'Unassigned');
+    }
+
     protected function rules(): array
     {
         $scoped = ! $this->isAdminRole();
@@ -143,6 +178,10 @@ class Users extends DataGrid
                 Rule::exists('divisions', 'id')->where('department_id', $this->department_id),
             ],
             'password' => [$this->editingId ? 'nullable' : 'required', 'nullable', 'string', 'min:4'],
+            'entrance_ids' => ['array'],
+            'entrance_ids.*' => ['integer', 'exists:warehouse_entrances,id'],
+            'exit_location_ids' => ['array'],
+            'exit_location_ids.*' => ['integer', 'exists:factory_exit_locations,id'],
         ];
     }
 
@@ -156,6 +195,8 @@ class Users extends DataGrid
         $this->department_id = null;
         $this->division_id = null;
         $this->password = null;
+        $this->entrance_ids = [];
+        $this->exit_location_ids = [];
     }
 
     protected function fillForm(int $id): void
@@ -169,10 +210,21 @@ class Users extends DataGrid
         $this->department_id = $u->department_id;
         $this->division_id = $u->division_id;
         $this->password = null;
+
+        // Checkbox state wants strings — Livewire compares loosely on render but
+        // strictly in `in_array` checks in the blade.
+        $this->entrance_ids = DB::connection('core')->table('warehouse_entrance_user')
+            ->where('user_id', $id)->pluck('entrance_id')->map('intval')->all();
+        $this->exit_location_ids = DB::connection('core')->table('factory_exit_location_user')
+            ->where('user_id', $id)->pluck('exit_location_id')->map('intval')->all();
     }
 
     protected function performDelete(int $id): void
     {
+        DB::connection('core')->table('warehouse_entrance_user')
+            ->where('user_id', $id)->delete();
+        DB::connection('core')->table('factory_exit_location_user')
+            ->where('user_id', $id)->delete();
         User::whereKey($id)->delete();
     }
 
@@ -203,8 +255,39 @@ class Users extends DataGrid
         $u->save();
 
         $u->syncRoles($role ? [$role] : []);
+        $this->syncGates((int) $u->userid);
 
         $this->showModal = false;
         session()->flash('ok', $this->editingId ? 'User updated.' : 'User added.');
+    }
+
+    /**
+     * Replace this user's gate grants with what was ticked.
+     *
+     * Delete-then-insert rather than a diff: the sets are tiny (single digits),
+     * and the whole thing runs in one transaction so a user is never briefly
+     * left with no gates.
+     */
+    protected function syncGates(int $userId): void
+    {
+        $core = DB::connection('core');
+
+        $core->transaction(function () use ($core, $userId) {
+            $core->table('warehouse_entrance_user')->where('user_id', $userId)->delete();
+            if ($this->entrance_ids !== []) {
+                $core->table('warehouse_entrance_user')->insert(
+                    array_map(fn ($id) => ['entrance_id' => (int) $id, 'user_id' => $userId],
+                        array_unique($this->entrance_ids))
+                );
+            }
+
+            $core->table('factory_exit_location_user')->where('user_id', $userId)->delete();
+            if ($this->exit_location_ids !== []) {
+                $core->table('factory_exit_location_user')->insert(
+                    array_map(fn ($id) => ['exit_location_id' => (int) $id, 'user_id' => $userId],
+                        array_unique($this->exit_location_ids))
+                );
+            }
+        });
     }
 }

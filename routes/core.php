@@ -5,10 +5,13 @@ use Modules\Core\Controllers\AuthController;
 use Modules\Core\Livewire\Admin\Companies;
 use Modules\Core\Livewire\Admin\Departments;
 use Modules\Core\Livewire\Admin\Factories;
+use Modules\Core\Livewire\Admin\FactoryExitLocations;
 use Modules\Core\Livewire\Admin\Divisions;
 use Modules\Core\Livewire\Admin\Roles;
 use Modules\Core\Livewire\Admin\Staffs;
 use Modules\Core\Livewire\Admin\Users;
+use Modules\Core\Livewire\Admin\WarehouseEntrances;
+use Modules\Core\Livewire\Admin\Warehouses;
 use Modules\Core\Livewire\Settings\Appearance;
 use Modules\Core\Livewire\Settings\DataViews;
 use Modules\Core\Livewire\Settings\ServiceTypes;
@@ -37,6 +40,11 @@ Route::middleware('auth')->group(function () {
         // department, division, staff); the lines and projects beneath them
         // live under BIL > Machines.
         Route::get('/factories', Factories::class)->middleware('page:admin.factories')->name('admin.factories');
+        // Warehouses are the storage sibling of factories: a company owns
+        // both, and each owns the gates goods move through.
+        Route::get('/warehouses', Warehouses::class)->middleware('page:admin.warehouses')->name('admin.warehouses');
+        Route::get('/warehouse-entrances', WarehouseEntrances::class)->middleware('page:admin.warehouse_entrances')->name('admin.warehouse_entrances');
+        Route::get('/exit-locations', FactoryExitLocations::class)->middleware('page:admin.factory_exit_locations')->name('admin.factory_exit_locations');
         Route::get('/divisions', Divisions::class)->middleware('page:admin.divisions')->name('admin.divisions');
         Route::get('/staff', Staffs::class)->middleware('page:admin.staff')->name('admin.staff');
         Route::get('/roles', Roles::class)->middleware('page:admin.roles')->name('admin.roles');

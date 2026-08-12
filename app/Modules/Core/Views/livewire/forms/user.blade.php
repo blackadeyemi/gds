@@ -62,3 +62,26 @@
     <input type="password" class="form-control" wire:model="password" placeholder="{{ $editingId ? '••••••••' : 'Set a password' }}" autocomplete="new-password">
     @error('password') <div class="form-error">{{ $message }}</div> @enderror
 </div>
+
+{{--
+    Which finished-goods gates this user sees in the dropdowns. Not access
+    control — the page permission decides who may open those screens at all;
+    this narrows the list once they are there.
+--}}
+@include('core::partials.gate-checklist', [
+    'label' => 'Warehouse entrances',
+    'hint' => 'Gates this user can receive through. None ticked = no gates, so the receiving screen has nothing to pick.',
+    'groups' => $this->entranceOptions,
+    'field' => 'entrance_ids',
+    'selected' => $entrance_ids,
+    'errorKey' => 'entrance_ids',
+])
+
+@include('core::partials.gate-checklist', [
+    'label' => 'Factory exit locations',
+    'hint' => 'Gates this user can send pallets out through.',
+    'groups' => $this->exitLocationOptions,
+    'field' => 'exit_location_ids',
+    'selected' => $exit_location_ids,
+    'errorKey' => 'exit_location_ids',
+])

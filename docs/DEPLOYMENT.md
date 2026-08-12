@@ -5,6 +5,155 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-08-12 — Warehouses rebuilt as core structure; finished-goods stock replaced
+
+**Two migrations, and a deliberate break with the legacy stock tables.**
+
+```
+2026_08_12_100000_create_warehouses_and_gates
+2026_08_12_110000_create_finished_goods_warehouse_stock
+```
+
+### What was wrong
+
+The legacy model had no warehouse in it. `storebundle` hard-coded a single
+`warehousecode = '01'`; `storebundle_floor` hard-coded three floors; which floor
+a gate fed was a PHP string comparison against one location name; and who could
+use which gate was a `switch` on the legacy user level. Gates themselves were
+name pairs in `storeentrance_details` / `factoryexit_details`.
+
+### What replaces it
+
+Warehouses and gates are **core structure, not a finished-goods concern** — a
+company owns factories where goods are made and warehouses where they are
+stored, and each owns the gates goods move through. BPL stores goods too, so
+scoping these per module would mean a `bpl_warehouse` twin of every table.
+
+| Table | Holds |
+| --- | --- |
+| `warehouses` | a warehouse, owned by a company (sibling of `factories`) |
+| `warehouse_entrances` | a gate goods are received through |
+| `warehouse_entrance_user` | which entrances a user may pick |
+| `factory_exit_locations` | a gate goods leave a factory through |
+| `factory_exit_location_user` | which of those a user may pick |
+| `finished_goods_warehouse_receipts` | replaces `store_entrance` |
+| `finished_goods_warehouse_stock` | replaces `storebundle` + `storebundle_floor` |
+
+Receipts and stock stay **module-specific** because `productid` means a
+different thing per module — bil.products here, bpl_products for BPL. A shared
+stock table would need a discriminator and would be wrong the first time someone
+omitted it. BPL gets its own pair over the same warehouses and entrances.
+
+`warehouses` also supersedes the legacy `storelocations`, a rack-line layout
+abandoned in April 2018 (560 rows, last written 2018-04-17, referenced by no
+legacy PHP or JS). Left in place untouched as dead data.
+
+### ⚠️ Clean cut: gds stops writing the legacy stock tables
+
+gds no longer writes `store_entrance`, `storebundle` or `storebundle_floor`.
+The legacy app still owns them. **From this deploy the two diverge** for anything
+received through gds — that is the intended behaviour, not a bug, but it means:
+
+- Legacy stock screens go stale for gds receipts. They stay correct only for
+  what the legacy screen itself takes in.
+- The **Warehouse Entrance report shows gds receipts only.** The 1.17M legacy
+  `store_entrance` rows are not merged in — the schemas differ and blending two
+  sources is how a number nobody can reproduce gets created. The legacy report
+  remains the place to look at anything received before the cut-over.
+- Both apps are still read where it matters: the receiving screen refuses a
+  pallet the legacy app already took in, and the delete guards on the Conversion
+  Output and Factory Exit reports check **both** receipt tables.
+
+Plan to retire the legacy receiving screen soon after this ships; running both
+in parallel means stock lives in two places.
+
+### The gain: stock is now derivable
+
+Every bundle in `finished_goods_warehouse_stock` arrived on a receipt, so the
+totals are exactly `SUM(bundles)` per warehouse per product. The legacy totals
+were not — nothing recorded which floor a bundle had been counted onto, so drift
+was permanent and undetectable.
+
+```
+php artisan bil:reconcile-fg-stock            # report
+php artisan bil:reconcile-fg-stock --fix      # repair
+```
+
+Verified before shipping: corrupting a total is detected and repaired exactly,
+and a receive/un-receive round trip balances to zero.
+
+### The pipeline is now a strict chain
+
+Conversion Output → Factory Exit → Warehouse Entrance. Factory Exit validates
+against `factory_conversion`; **Warehouse Entrance now validates against
+`factory_exit`**. A pallet that never left the factory cannot be received.
+
+This is a change in behaviour: the legacy screen validated against production
+and let the warehouse receive a pallet whose gate scan was missed. Missed exits
+must now be scanned at the gate first — the screen says so rather than just
+refusing. Tell the warehouse team before this goes live.
+
+`date_of_entrance` keeps the legacy rule (the pallet's exit date, so a
+next-morning scan still lands on the right day); with the exit now mandatory
+that date always exists.
+
+### Per-user gates replace the user-level switch
+
+Which gates appear in a dropdown is granted per user, ticked in Admin → Users.
+This is **not** access control — the `page:` middleware still decides who may
+open a screen — it narrows the list once they are there. Admin sees every gate.
+
+**Nothing is granted by this migration.** After deploying, every operator needs
+their gates ticked or their dropdown will be empty; the screens say so plainly
+rather than failing silently.
+
+### Migration notes
+
+- The 1.2M-row `exit_location_id` backfill runs as one `CASE` pass (~5 min);
+  `exitlocation` is an unindexed varchar, so an update per gate would be a full
+  scan each. **All 1,201,223 rows resolve**, including four spellings from
+  March–April 2017 that `factoryexit_details` never held.
+- One of those is not a variant: **Bil-2 really had a gate**, later dropped from
+  the legacy table but still named by 16 pallets whose barcodes carry B2. It is
+  recreated inactive so history resolves without offering it to anyone.
+- `exitlocation` itself is left alone — the legacy app reads it, and the old
+  spellings are what actually happened.
+
+### After deploying
+
+```
+php artisan migrate
+php artisan gds:sync-pages
+php artisan gds:sync-data-views
+```
+
+Then, in order:
+
+1. **Create the warehouses** (Admin → Warehouses). Nothing is seeded — the
+   legacy data had no warehouse concept to derive them from.
+2. **Attach each entrance to one** (Admin → Warehouse Entrances). The three
+   imported gates arrive unassigned and **cannot receive until attached**.
+3. **Grant gates per user** (Admin → Users).
+4. Grant the new pages: `admin.warehouses`, `admin.warehouse_entrances`,
+   `admin.factory_exit_locations`.
+
+### What to check afterwards
+
+- `bil:reconcile-fg-stock` reports no drift.
+- A receive moves `finished_goods_warehouse_stock` by exactly the pallet's
+  bundle count, and deleting the receipt puts it back.
+- An operator sees only their granted gates; an admin sees all.
+- The legacy Item Send / Item Receive screens still save — nothing they use
+  changed.
+
+### If it goes wrong
+
+`php artisan migrate:rollback --step=2` drops the new tables and the
+`exit_location_id` column. **Check for gds receipts first** — rolling back
+discards them, and the legacy tables have no record of those pallets.
+
+---
+
 ## 2026-08-08 — Finished Goods: Warehouse Entrance + its report (moves stock)
 
 Code only — **no migration, no schema change**. `store_entrance`,

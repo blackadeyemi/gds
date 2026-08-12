@@ -33,6 +33,10 @@ return [
         ['key' => 'admin.departments', 'label' => 'Departments', 'module' => 'Admin', 'route' => 'admin.departments', 'abilities' => $crud],
         ['key' => 'admin.companies',   'label' => 'Companies',   'module' => 'Admin', 'route' => 'admin.companies',   'abilities' => $crud],
         ['key' => 'admin.factories',   'label' => 'Factories',   'module' => 'Admin', 'route' => 'admin.factories',   'abilities' => $crud],
+        // Warehouses and gates: the storage side of the same structure.
+        ['key' => 'admin.warehouses',  'label' => 'Warehouses',  'module' => 'Admin', 'route' => 'admin.warehouses',  'abilities' => $crud],
+        ['key' => 'admin.warehouse_entrances', 'label' => 'Warehouse Entrances', 'module' => 'Admin', 'route' => 'admin.warehouse_entrances', 'abilities' => $crud],
+        ['key' => 'admin.factory_exit_locations', 'label' => 'Exit Locations', 'module' => 'Admin', 'route' => 'admin.factory_exit_locations', 'abilities' => $crud],
         ['key' => 'admin.divisions',   'label' => 'Divisions',   'module' => 'Admin', 'route' => 'admin.divisions',   'abilities' => $crud],
         ['key' => 'admin.staff',       'label' => 'Staff',       'module' => 'Admin', 'route' => 'admin.staff',       'abilities' => $crud],
 
@@ -65,8 +69,8 @@ return [
         // deleted and re-made rather than corrected in place.
         ['key' => 'bil.finished_goods.reports.conversion_output', 'label' => 'Conversion Output', 'module' => 'BIL / Finished Goods Reports', 'route' => 'bil.finished-goods.reports.conversion-output', 'abilities' => ['view', 'delete', 'export']],
         ['key' => 'bil.finished_goods.reports.factory_exit', 'label' => 'Factory Exit', 'module' => 'BIL / Finished Goods Reports', 'route' => 'bil.finished-goods.reports.factory-exit', 'abilities' => ['view', 'delete', 'export']],
-        // Deleting a receipt also reverses the warehouse and floor stock totals,
-        // so `delete` here is a stock permission, not just a tidy-up one.
+        // Deleting a receipt also takes its bundles back out of the warehouse
+        // stock, so `delete` here is a stock permission, not a tidy-up one.
         ['key' => 'bil.finished_goods.reports.warehouse_entrance', 'label' => 'Warehouse Entrance', 'module' => 'BIL / Finished Goods Reports', 'route' => 'bil.finished-goods.reports.warehouse-entrance', 'abilities' => ['view', 'delete', 'export']],
 
         // BIL — Raw Materials

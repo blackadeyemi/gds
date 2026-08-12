@@ -202,10 +202,14 @@ class ConversionOutput extends RawMaterialReport
             $page = $this->currentPageBarcodes();
 
             if ($page !== []) {
-                $hits = array_flip(
+                // Both receipt tables are real during the cut-over: gds
+                // writes the new one, the legacy app still writes the old.
+                $hits = array_flip(array_merge(
                     DB::connection('bil')->table('store_entrance')
+                        ->whereIn('barcode', $page)->distinct()->pluck('barcode')->all(),
+                    DB::connection('core')->table('finished_goods_warehouse_receipts')
                         ->whereIn('barcode', $page)->distinct()->pluck('barcode')->all()
-                );
+                ));
                 foreach ($page as $code) {
                     $this->receivedCache[$code] = isset($hits[$code]);
                 }
@@ -217,7 +221,9 @@ class ConversionOutput extends RawMaterialReport
         }
 
         return $this->receivedCache[$barcode] = DB::connection('bil')->table('store_entrance')
-            ->where('barcode', $barcode)->exists();
+            ->where('barcode', $barcode)->exists()
+            || DB::connection('core')->table('finished_goods_warehouse_receipts')
+                ->where('barcode', $barcode)->exists();
     }
 
     /** Barcodes on the page currently being rendered. */

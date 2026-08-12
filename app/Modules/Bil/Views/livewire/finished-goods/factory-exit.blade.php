@@ -11,6 +11,16 @@
         <div class="card" style="border-color:var(--danger);color:var(--danger);margin-bottom:1rem;padding:0.7rem 1.25rem;">{{ session('err') }}</div>
     @endif
 
+    @if ($this->locations()->isEmpty())
+        <div class="card card-pad" style="border-color:var(--warning,#b45309);margin-bottom:1rem;">
+            <strong>No exit locations are assigned to you.</strong>
+            <p class="text-muted text-sm" style="margin:.35rem 0 0;">
+                An administrator grants these per user under Admin → Users, and each location must belong to a
+                factory (Finished Goods → Setup → Exit Locations).
+            </p>
+        </div>
+    @endif
+
     <div class="card card-pad">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;max-width:720px;">
             <div class="form-group">
@@ -19,12 +29,20 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Exit Location</label>
-                <select class="form-control" wire:model="exitlocation">
-                    @foreach ($this->locations() as $value => $label)
-                        <option value="{{ $value }}">{{ $label }}</option>
-                    @endforeach
-                </select>
-                @error('exitlocation') <div class="form-error">{{ $message }}</div> @enderror
+                @if ($this->locations()->isEmpty())
+                    <input type="text" class="form-control" value="No exit locations assigned" disabled>
+                @else
+                    <select class="form-control" wire:model="exit_location_id">
+                        @foreach ($this->locations()->groupBy(fn ($l) => $l->factory?->name ?? 'Unassigned') as $factory => $group)
+                            <optgroup label="{{ $factory }}">
+                                @foreach ($group as $location)
+                                    <option value="{{ $location->id }}">{{ $location->name }}</option>
+                                @endforeach
+                            </optgroup>
+                        @endforeach
+                    </select>
+                @endif
+                @error('exit_location_id') <div class="form-error">{{ $message }}</div> @enderror
             </div>
             <div class="form-group">
                 <label class="form-label">Date</label>

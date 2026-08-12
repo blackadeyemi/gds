@@ -11,6 +11,16 @@
         <div class="card" style="border-color:var(--danger);color:var(--danger);margin-bottom:1rem;padding:0.7rem 1.25rem;">{{ session('err') }}</div>
     @endif
 
+    @if ($this->entrances()->isEmpty())
+        <div class="card card-pad" style="border-color:var(--warning,#b45309);margin-bottom:1rem;">
+            <strong>No warehouse entrances are assigned to you.</strong>
+            <p class="text-muted text-sm" style="margin:.35rem 0 0;">
+                An administrator grants these per user under Admin → Users. An entrance must also belong to a
+                warehouse before it can receive — see Finished Goods → Setup → Warehouse Entrances.
+            </p>
+        </div>
+    @endif
+
     <div class="card card-pad">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;max-width:720px;">
             <div class="form-group">
@@ -18,23 +28,30 @@
                 <input type="text" class="form-control" value="{{ auth()->user()?->username }}" disabled>
             </div>
             <div class="form-group">
-                <label class="form-label">Entrance Location</label>
-                <select class="form-control" wire:model="entrancelocation">
-                    @foreach ($this->locations() as $value => $label)
-                        <option value="{{ $value }}">{{ $label }}</option>
-                    @endforeach
-                </select>
-                @error('entrancelocation') <div class="form-error">{{ $message }}</div> @enderror
+                <label class="form-label">Entrance</label>
+                @if ($this->entrances()->isEmpty())
+                    <input type="text" class="form-control" value="No entrances assigned" disabled>
+                @else
+                    <select class="form-control" wire:model="entrance_id">
+                        @foreach ($this->entrances()->groupBy(fn ($e) => $e->warehouse?->name ?? 'Unassigned') as $warehouse => $group)
+                            <optgroup label="{{ $warehouse }}">
+                                @foreach ($group as $entrance)
+                                    <option value="{{ $entrance->id }}">{{ $entrance->name }}</option>
+                                @endforeach
+                            </optgroup>
+                        @endforeach
+                    </select>
+                @endif
+                @error('entrance_id') <div class="form-error">{{ $message }}</div> @enderror
             </div>
             <div class="form-group">
                 <label class="form-label">Date</label>
                 @include('bil::partials.date-field', ['model' => 'dateIso', 'disabled' => ! $this->canBackdate()])
                 <div class="text-muted text-sm" style="margin-top:.25rem;">
-                    @if ($this->canBackdate())
-                        Used only for pallets with no factory exit — otherwise the exit date wins.
-                    @else
-                        Shift date — needs the “backdate” permission to change.
-                    @endif
+                    Receipts are dated by the pallet's factory exit — this is only a fallback.
+                    @unless ($this->canBackdate())
+                        Needs the “backdate” permission to change.
+                    @endunless
                 </div>
             </div>
         </div>
@@ -58,6 +75,7 @@
                         <th>Barcode</th>
                         <th style="width:80px">Status</th>
                         <th>Product</th>
+                        <th style="width:120px">Exited</th>
                         <th style="width:110px">Bundles</th>
                         <th class="col-actions">Remove</th>
                     </tr>
@@ -69,6 +87,7 @@
                             <td>{{ $item['barcode'] }}</td>
                             <td><span class="badge badge-success">OK</span></td>
                             <td>{{ $item['productname'] }}</td>
+                            <td class="text-muted text-sm">{{ $item['exitDate'] }}</td>
                             <td>{{ $item['bundles'] }}</td>
                             <td class="col-actions">
                                 <button type="button" class="btn btn-danger btn-icon btn-sm" wire:click="removeItem({{ $i }})" title="Remove">

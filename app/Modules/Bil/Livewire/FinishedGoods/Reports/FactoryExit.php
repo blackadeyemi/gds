@@ -6,8 +6,9 @@ use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Title;
 use Modules\Bil\Livewire\RawMaterials\Reports\RawMaterialReport;
 use Modules\Bil\Models\FactoryExit as FactoryExitModel;
-use Modules\Bil\Models\FactoryExitLocation;
 use Modules\Bil\Models\FinishedGoodsProduct;
+use Modules\Core\Models\Factory;
+use Modules\Core\Models\FactoryExitLocation;
 
 /**
  * BIL → Finished Goods → Reports → Factory Exit. Rebuild of the legacy
@@ -63,9 +64,13 @@ class FactoryExit extends RawMaterialReport
     }
 
     /**
-     * Factories and gates come from factoryexit_details — the same three rows
-     * the entry screen offers, so a filter can never name a gate nothing was
-     * ever scanned through.
+     * Gates come from `factory_exit_locations` on the core connection, so they
+     * are resolved in PHP rather than joined: `factory_exit` lives on bil and
+     * MySQL cannot join two connections in one statement.
+     *
+     * Inactive gates are still offered as FILTERS — the retired Bil-2 gate has
+     * 16 historic exits, and a report you cannot filter to is one that hides
+     * them.
      */
     protected function options(): array
     {
@@ -73,14 +78,34 @@ class FactoryExit extends RawMaterialReport
             return $this->optCache;
         }
 
-        $gates = FactoryExitLocation::orderBy('factoryname')->orderBy('exitlocation')->get();
+        $gates = FactoryExitLocation::with('factory')->ordered()->get();
 
         return $this->optCache = [
-            'factories' => $gates->pluck('factoryname', 'factoryname')->all(),
-            'locations' => $gates->pluck('exitlocation', 'exitlocation')->all(),
+            'factories' => Factory::orderBy('name')->pluck('name', 'id')->all(),
+            'locations' => $gates->pluck('name', 'id')->all(),
             'products' => FinishedGoodsProduct::query()->active()
                 ->orderBy('productname')->pluck('productname', 'productname')->all(),
+            'gates' => $gates->mapWithKeys(fn ($g) => [$g->id => [
+                'name' => $g->name,
+                'factory' => $g->factory?->name ?? '-',
+                'factory_id' => $g->factory_id,
+            ]])->all(),
         ];
+    }
+
+    /** Gate id => its factory's name, for rows the join cannot reach. */
+    protected function gateFactory($id): string
+    {
+        return $this->options()['gates'][(int) $id]['factory'] ?? '-';
+    }
+
+    /** Gate ids belonging to a factory — how the factory filter is applied. */
+    protected function gateIdsForFactory($factoryId): array
+    {
+        return array_keys(array_filter(
+            $this->options()['gates'],
+            fn ($g) => (int) $g['factory_id'] === (int) $factoryId
+        ));
     }
 
     public function filterDefs(): array
@@ -98,8 +123,9 @@ class FactoryExit extends RawMaterialReport
      * `dateofexit` is a varchar in Y/m/d form, which sorts correctly as a
      * string, so the range compares directly — as the legacy report did.
      *
-     * factoryexit_details is joined only to resolve the gate's factory: the exit
-     * row stores the location name, not a factory.
+     * Gates are filtered by `exit_location_id`, the indexed column the rebuild
+     * added and backfilled across all 1.2M rows — including four spellings from
+     * 2017 that predate the gate table.
      */
     protected function base()
     {
@@ -107,11 +133,10 @@ class FactoryExit extends RawMaterialReport
 
         return DB::connection('bil')->table('factory_exit as e')
             ->leftJoin('products as p', 'e.productid', '=', 'p.productid')
-            ->leftJoin('factoryexit_details as d', 'e.exitlocation', '=', 'd.exitlocation')
             ->when($this->dateFrom !== '', fn ($q) => $q->where('e.dateofexit', '>=', str_replace('-', '/', $this->dateFrom)))
             ->when($this->dateTo !== '', fn ($q) => $q->where('e.dateofexit', '<=', str_replace('-', '/', $this->dateTo)))
-            ->when($f['factory'] ?? '', fn ($q, $v) => $q->where('d.factoryname', $v))
-            ->when($f['location'] ?? '', fn ($q, $v) => $q->where('e.exitlocation', $v))
+            ->when($f['factory'] ?? '', fn ($q, $v) => $q->whereIn('e.exit_location_id', $this->gateIdsForFactory($v)))
+            ->when($f['location'] ?? '', fn ($q, $v) => $q->where('e.exit_location_id', $v))
             ->when($f['product'] ?? '', fn ($q, $v) => $q->where('p.productname', $v))
             ->when($this->search !== '', fn ($q) => $q->where(function ($w) {
                 $term = '%' . $this->search . '%';
@@ -130,15 +155,18 @@ class FactoryExit extends RawMaterialReport
                 'type' => 'table',
                 'columns' => [
                     ['Barcode', 'barcode'],
-                    ['Factory', 'factoryname'],
+                    ['Factory', 'exit_location_id', fn ($r) => e($this->gateFactory($r->exit_location_id))],
                     ['Location', 'exitlocation'],
                     ['Product Code', 'productcode'],
                     ['Product', 'productname'],
                     ['Bundles', 'bundles'],
                 ],
                 'searchable' => ['e.barcode', 'p.productname', 'p.productcode', 'e.exitlocation'],
+                // Factory is resolved per row from the core connection, so it
+                // cannot be sorted on in SQL.
+                'sortable' => ['barcode', 'exitlocation', 'productcode', 'productname', 'bundles'],
                 'query' => fn () => $this->base()
-                    ->select('e.id', 'e.barcode', 'd.factoryname', 'e.exitlocation',
+                    ->select('e.id', 'e.barcode', 'e.exit_location_id', 'e.exitlocation',
                         'p.productcode', 'p.productname', 'e.bundles')
                     // id is chronological, so newest-first via the PK — fast on
                     // any range, unlike ordering by the varchar date.
@@ -209,10 +237,14 @@ class FactoryExit extends RawMaterialReport
             $page = $this->currentPageBarcodes();
 
             if ($page !== []) {
-                $hits = array_flip(
+                // Both receipt tables are real during the cut-over: gds
+                // writes the new one, the legacy app still writes the old.
+                $hits = array_flip(array_merge(
                     DB::connection('bil')->table('store_entrance')
+                        ->whereIn('barcode', $page)->distinct()->pluck('barcode')->all(),
+                    DB::connection('core')->table('finished_goods_warehouse_receipts')
                         ->whereIn('barcode', $page)->distinct()->pluck('barcode')->all()
-                );
+                ));
                 foreach ($page as $code) {
                     $this->receivedCache[$code] = isset($hits[$code]);
                 }
@@ -224,7 +256,9 @@ class FactoryExit extends RawMaterialReport
         }
 
         return $this->receivedCache[$barcode] = DB::connection('bil')->table('store_entrance')
-            ->where('barcode', $barcode)->exists();
+            ->where('barcode', $barcode)->exists()
+            || DB::connection('core')->table('finished_goods_warehouse_receipts')
+                ->where('barcode', $barcode)->exists();
     }
 
     /** Barcodes on the page currently being rendered. */

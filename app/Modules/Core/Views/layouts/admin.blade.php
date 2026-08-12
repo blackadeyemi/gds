@@ -428,6 +428,24 @@
                         <span class="label">Factories</span>
                     </a>
                     @endcanPage
+                    @canPage('admin.factory_exit_locations')
+                    <a href="{{ url('/admin/exit-locations') }}" class="nav-link {{ $is('admin/exit-locations*') }}" title="Exit Locations">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+                        <span class="label">Exit Locations</span>
+                    </a>
+                    @endcanPage
+                    @canPage('admin.warehouses')
+                    <a href="{{ url('/admin/warehouses') }}" class="nav-link {{ $is('admin/warehouses*') }}" title="Warehouses">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V9l9-5 9 5v12"/><path d="M3 21h18"/><rect x="9" y="13" width="6" height="8"/></svg>
+                        <span class="label">Warehouses</span>
+                    </a>
+                    @endcanPage
+                    @canPage('admin.warehouse_entrances')
+                    <a href="{{ url('/admin/warehouse-entrances') }}" class="nav-link {{ $is('admin/warehouse-entrances*') }}" title="Warehouse Entrances">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M8 17l-5-5 5-5M3 12h12"/></svg>
+                        <span class="label">Warehouse Entrances</span>
+                    </a>
+                    @endcanPage
                     @canPage('admin.staff')
                     <a href="{{ url('/admin/staff') }}" class="nav-link {{ $is('admin/staff*') }}" title="Staff">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>

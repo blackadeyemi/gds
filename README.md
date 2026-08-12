@@ -29,7 +29,7 @@ Three connections, one MySQL server:
 
 | Connection | Holds |
 | --- | --- |
-| `core` | The app's own data — users, roles, pages, and the Company → Factory → Line → Project machine hierarchy |
+| `core` | The app's own data — users, roles, pages, the Company → Factory → Line → Project machine hierarchy, and warehouses with the gates goods move through |
 | `bil` | The legacy BIL schema, still shared live with the old app |
 | `bpl` | The legacy BPL schema |
 
@@ -70,7 +70,7 @@ docs/DEPLOYMENT.md              release runbooks, newest first
 scripts/verify_*.php            standalone checks a release is verified with
 ```
 
-Currently 49 registered pages and 14 data grids.
+Currently 52 registered pages and 17 data grids.
 
 ### Two base classes do most of the work
 

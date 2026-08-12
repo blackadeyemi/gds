@@ -8,31 +8,34 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
-use Modules\Bil\Models\FactoryConversion;
-use Modules\Bil\Models\StoreEntrance;
-use Modules\Bil\Models\StoreEntranceLocation;
+use Modules\Bil\Models\FactoryExit as FactoryExitModel;
+use Modules\Bil\Models\FgWarehouseReceipt;
 use Modules\Bil\Support\FinishedGoodsStock;
+use Modules\Core\Support\GateAccess;
 
 /**
- * BIL → Finished Goods → Warehouse Entrance. Rebuild of the legacy
- * store_entrance_beta.php ("Item Receive").
+ * BIL → Finished Goods → Warehouse Entrance. Rebuilt from the legacy
+ * store_entrance_beta.php ("Item Receive"), onto the new warehouse model.
  *
- * Pallets are scanned as the warehouse takes them in — the last barcode-level
- * step of a pallet's life. Unlike the other two scanning screens this one MOVES
- * STOCK: every receipt also adds its bundles to the warehouse total
- * (`storebundle`) and to the receiving floor (`storebundle_floor`), both shared
- * live with the legacy app. See Modules\Bil\Support\FinishedGoodsStock.
+ * THE PIPELINE IS NOW A STRICT CHAIN
+ * Conversion Output → Factory Exit → Warehouse Entrance. Factory Exit validates
+ * against `factory_conversion`; this validates against **`factory_exit`**. A
+ * pallet that never left the factory cannot be received, so the three stages can
+ * no longer disagree about where a pallet is.
  *
- * Contracts reproduced from the legacy Store\Entrance::insertScanning:
- *   - a barcode is accepted if it exists in `factory_conversion` and is not
- *     already in `store_entrance` (UNIQUE — a pallet is received once).
- *     Note it is checked against CONVERSION, not factory exit: the warehouse can
- *     receive a pallet whose gate scan was missed or comes later.
- *   - `dateofentrance` is the pallet's EXIT date when it has one, falling back
- *     to the date on the form. The receipt is dated by when the pallet left the
- *     factory, so a next-morning scan still lands on the right day.
- *   - `factory_exit.status` and `factory_conversion.status` are both flipped to
- *     'yes', marking the pallet received and off the floor.
+ * That is a deliberate change from the legacy screen, which validated against
+ * production and let the warehouse receive a pallet whose gate scan was missed —
+ * the reason `factory_exit.status` had an out-of-order case at all. Missed exits
+ * must now be scanned at the gate first.
+ *
+ * RECEIVING MOVES STOCK. Bundles land in `finished_goods_warehouse_stock` for the
+ * warehouse behind the chosen entrance. Unlike the legacy totals this one is
+ * derivable — every bundle has a receipt behind it — so `bil:reconcile-fg-stock`
+ * can prove or repair it. See Modules\Bil\Support\FinishedGoodsStock.
+ *
+ * `date_of_entrance` keeps the legacy rule: the pallet's EXIT date, so a pallet
+ * scanned in the next morning still lands on the day it left the factory. With
+ * the exit now mandatory that date always exists.
  */
 #[Layout('core::layouts.admin')]
 #[Title('Warehouse Entrance')]
@@ -43,11 +46,11 @@ class WarehouseEntrance extends Component
     /** The legacy screen laid out 25 barcode boxes per submit. */
     public const MAX_SCAN = 25;
 
-    public string $entrancelocation = '';
+    public ?int $entrance_id = null;
     public string $dateIso = '';
     public string $scan = '';
 
-    /** Scanned pallets pending save: [['barcode','productid','productname','bundles'], …]. */
+    /** Scanned pallets pending save: [['barcode','productid','productname','bundles','exitDate']]. */
     public array $items = [];
 
     public string $scanError = '';
@@ -55,17 +58,14 @@ class WarehouseEntrance extends Component
     public function mount(): void
     {
         $this->dateIso = now()->format('Y-m-d');
-        $this->entrancelocation = (string) ($this->locations()->keys()->first() ?? '');
+        $this->entrance_id = $this->entrances()->first()?->id;
     }
 
-    /** Gates, labelled with the store floor they belong to. */
+    /** Entrances this user may receive through, each with its warehouse. */
     #[Computed]
-    public function locations()
+    public function entrances()
     {
-        return StoreEntranceLocation::orderBy('storefloor')->orderBy('entrancelocation')
-            ->get()->mapWithKeys(fn ($l) => [
-                $l->entrancelocation => $l->storefloor . ' — ' . $l->entrancelocation,
-            ]);
+        return GateAccess::entrancesFor(auth()->user());
     }
 
     public function canBackdate(): bool
@@ -81,8 +81,9 @@ class WarehouseEntrance extends Component
     /* ---------------- Scanning ---------------- */
 
     /**
-     * Validate a scanned barcode: produced, and not already received.
-     * Mirrors the legacy Barcode\Entrance::finishGoods lookup.
+     * Validate a scanned barcode: it must have LEFT THE FACTORY, and not have
+     * been received already — in the new receipts table or the legacy one, since
+     * both are real during the cut-over.
      */
     public function addScan(): void
     {
@@ -106,28 +107,43 @@ class WarehouseEntrance extends Component
             return;
         }
 
-        $entrance = StoreEntrance::where('barcode', $barcode)->first();
-        if ($entrance) {
-            $when = $entrance->timestamp
-                ? Carbon::createFromTimestamp($entrance->timestamp)->format('d M Y')
-                : $entrance->dateofentrance;
-            $this->scanError = 'Already received on ' . $when . '.';
+        $receipt = FgWarehouseReceipt::where('barcode', $barcode)->first();
+        if ($receipt) {
+            $this->scanError = 'Already received on ' . $receipt->date_of_entrance->format('d M Y') . '.';
 
             return;
         }
 
-        $pallet = FactoryConversion::with('product')->where('barcode', $barcode)->first();
-        if (! $pallet) {
-            $this->scanError = 'Barcode not found in conversion output.';
+        // Receipts made by the legacy app still count as received.
+        $legacy = DB::connection('bil')->table('store_entrance')
+            ->where('barcode', $barcode)->value('timestamp');
+        if ($legacy !== null) {
+            $this->scanError = 'Already received on ' . Carbon::createFromTimestamp((int) $legacy)->format('d M Y')
+                . ' (legacy screen).';
+
+            return;
+        }
+
+        $exit = FactoryExitModel::with('product')->where('barcode', $barcode)->first();
+        if (! $exit) {
+            // Say which step is missing rather than just "not found" — the
+            // operator can then get it scanned out and come back.
+            $produced = DB::connection('bil')->table('factory_conversion')
+                ->where('barcode', $barcode)->exists();
+
+            $this->scanError = $produced
+                ? 'Not yet sent from the factory — scan it at Factory Exit first.'
+                : 'Barcode not found in conversion output.';
 
             return;
         }
 
         $this->items[] = [
             'barcode' => $barcode,
-            'productid' => (int) $pallet->productid,
-            'productname' => $pallet->product->productname ?? '—',
-            'bundles' => (int) $pallet->bundles,
+            'productid' => (int) $exit->productid,
+            'productname' => $exit->product->productname ?? '—',
+            'bundles' => (int) $exit->bundles,
+            'exitDate' => (string) $exit->dateofexit,
         ];
     }
 
@@ -147,7 +163,7 @@ class WarehouseEntrance extends Component
     {
         $now = now();
 
-        return ($now->hour < 7 ? $now->copy()->subDay() : $now)->format('Y/m/d');
+        return ($now->hour < 7 ? $now->copy()->subDay() : $now)->format('Y-m-d');
     }
 
     /* ---------------- Save ---------------- */
@@ -159,74 +175,83 @@ class WarehouseEntrance extends Component
         }
 
         $this->validate(
-            ['entrancelocation' => 'required|string'],
-            ['entrancelocation.required' => 'Pick the gate the pallets are coming in through.']
+            ['entrance_id' => 'required|integer'],
+            ['entrance_id.required' => 'Pick the entrance the pallets are coming in through.']
         );
 
-        if (! $this->locations()->has($this->entrancelocation)) {
-            session()->flash('err', 'That entrance location no longer exists.');
+        // Re-resolve from the granted set, so a stale or tampered id can't
+        // receive through an entrance this user was never given — and cannot
+        // move a warehouse's stock they have no business touching.
+        $entrance = $this->entrances()->firstWhere('id', $this->entrance_id);
+        if (! $entrance) {
+            session()->flash('err', 'That entrance is no longer available to you.');
 
             return;
         }
 
-        // Non-backdaters always book against the shift date.
-        $fallbackDate = $this->canBackdate()
-            ? str_replace('-', '/', $this->dateIso)
-            : $this->shiftDate();
-        $username = (string) (auth()->user()?->username ?? auth()->user()?->name ?? '');
-        $now = now()->getTimestamp();
+        // `usable()` already guarantees this, but the stock movement depends on
+        // it, so it is asserted rather than assumed.
+        if (! $entrance->warehouse_id) {
+            session()->flash('err', 'That entrance is not attached to a warehouse yet.');
 
-        $conn = DB::connection('bil');
+            return;
+        }
+
+        $fallbackDate = $this->canBackdate() ? $this->dateIso : $this->shiftDate();
+        $user = auth()->user();
+        $username = (string) ($user?->username ?? $user?->name ?? '');
+
         $saved = 0;
         $skipped = [];
 
-        $conn->transaction(function () use ($conn, $fallbackDate, $username, $now, &$saved, &$skipped) {
+        DB::connection('core')->transaction(function () use ($entrance, $fallbackDate, $user, $username, &$saved, &$skipped) {
             foreach ($this->items as $item) {
                 $barcode = $item['barcode'];
 
-                // Re-check server-side: the list was built when the pallet was
-                // scanned, and another station may have received it since.
-                // `barcode` is UNIQUE, so without this the whole batch would
-                // roll back on one stale row.
-                if (StoreEntrance::where('barcode', $barcode)->exists()) {
+                // Re-check server-side: another station may have received it
+                // since it was scanned. `barcode` is UNIQUE, so without this the
+                // whole batch would roll back on one stale row.
+                if (FgWarehouseReceipt::where('barcode', $barcode)->exists()) {
                     $skipped[] = $barcode;
 
                     continue;
                 }
 
-                // Re-derive the pallet rather than trusting the posted state:
-                // the bundle count drives the stock totals.
-                $pallet = FactoryConversion::where('barcode', $barcode)->first();
-                if (! $pallet) {
+                // Re-derive from the exit rather than trusting the posted state:
+                // the bundle count drives the stock total.
+                $exit = FactoryExitModel::where('barcode', $barcode)->first();
+                if (! $exit) {
                     $skipped[] = $barcode;
 
                     continue;
                 }
 
-                $productid = (int) $pallet->productid;
-                $bundles = (int) $pallet->bundles;
+                $productid = (int) $exit->productid;
+                $bundles = (int) $exit->bundles;
 
-                // Date the receipt by when the pallet left the factory, so a
-                // pallet scanned in the next morning still lands on its own day.
-                $exitDate = $conn->table('factory_exit')
-                    ->where('barcode', $barcode)->value('dateofexit');
-
-                StoreEntrance::create([
-                    'username' => $username,
-                    'productid' => $productid,
-                    'entrancelocation' => $this->entrancelocation,
+                FgWarehouseReceipt::create([
                     'barcode' => $barcode,
+                    'entrance_id' => $entrance->id,
+                    // Denormalised so the receipt keeps pointing at the right
+                    // stock even if the entrance later moves warehouse.
+                    'warehouse_id' => $entrance->warehouse_id,
+                    'productid' => $productid,
                     'bundles' => $bundles,
-                    'dateofentrance' => $exitDate ?: $fallbackDate,
-                    'timestamp' => $now,
+                    // The exit date is authoritative; the form date is only a
+                    // fallback, which the mandatory exit makes near-unreachable.
+                    'date_of_entrance' => $this->exitDate($exit->dateofexit) ?? $fallbackDate,
+                    'user_id' => $user?->userid,
+                    'username' => $username,
                 ]);
 
-                // Stock moves with the receipt, in the same transaction.
-                FinishedGoodsStock::apply($productid, $bundles, $this->entrancelocation, $username, $now);
+                FinishedGoodsStock::apply($entrance->warehouse_id, $productid, $bundles);
 
-                // The pallet is received, and no longer on the factory floor.
-                $conn->table('factory_exit')->where('barcode', $barcode)->update(['status' => 'yes']);
-                $pallet->update(['status' => 'yes']);
+                // Keep the legacy pipeline columns honest: the pallet is
+                // received and no longer on the factory floor.
+                DB::connection('bil')->table('factory_exit')
+                    ->where('barcode', $barcode)->update(['status' => 'yes']);
+                DB::connection('bil')->table('factory_conversion')
+                    ->where('barcode', $barcode)->update(['status' => 'yes']);
 
                 $saved++;
             }
@@ -236,11 +261,27 @@ class WarehouseEntrance extends Component
         $this->scanError = '';
 
         if ($saved > 0) {
-            session()->flash('ok', $saved . ' pallet' . ($saved === 1 ? '' : 's') . ' received into the warehouse.');
+            session()->flash('ok', $saved . ' pallet' . ($saved === 1 ? '' : 's')
+                . ' received into ' . ($entrance->warehouse?->name ?? 'the warehouse') . '.');
         }
         if ($skipped !== []) {
-            session()->flash('err', count($skipped) . ' skipped (already received or no longer in conversion output): '
+            session()->flash('err', count($skipped) . ' skipped (already received, or the exit was removed): '
                 . implode(', ', $skipped));
+        }
+    }
+
+    /** Legacy `Y/m/d` exit date → the ISO date the new column stores. */
+    protected function exitDate(?string $legacy): ?string
+    {
+        $legacy = trim((string) $legacy);
+        if ($legacy === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::createFromFormat('Y/m/d', $legacy)->format('Y-m-d');
+        } catch (\Throwable) {
+            return null;
         }
     }
 
