@@ -11,6 +11,7 @@ use Livewire\Component;
 use Modules\Bil\Models\FactoryExit as FactoryExitModel;
 use Modules\Bil\Models\FgWarehouseReceipt;
 use Modules\Bil\Support\FinishedGoodsStock;
+use Modules\Core\Models\WarehouseGate;
 use Modules\Core\Support\GateAccess;
 
 /**
@@ -65,7 +66,7 @@ class WarehouseEntrance extends Component
     #[Computed]
     public function entrances()
     {
-        return GateAccess::entrancesFor(auth()->user());
+        return GateAccess::warehouseGates(auth()->user(), 'finished-goods', WarehouseGate::IN);
     }
 
     public function canBackdate(): bool

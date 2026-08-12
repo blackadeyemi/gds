@@ -4,6 +4,7 @@ namespace Modules\Bil\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Core\Models\FactoryGate;
 
 /**
  * One pallet leaving the factory for the warehouse (bil.factory_exit, 1.2M rows).
@@ -40,10 +41,16 @@ class FactoryExit extends Model
         return $this->belongsTo(FinishedGoodsProduct::class, 'productid', 'productid');
     }
 
-    /** Exit locations are matched by name, not id — see FactoryExitLocation. */
-    public function location(): BelongsTo
+    /**
+     * The gate the pallet left through.
+     *
+     * `exit_location_id` was added and backfilled across all 1.2M rows by the
+     * 2026-08-12 rebuild; `exitlocation` is kept alongside it because the legacy
+     * app reads the name.
+     */
+    public function gate(): BelongsTo
     {
-        return $this->belongsTo(FactoryExitLocation::class, 'exitlocation', 'exitlocation');
+        return $this->belongsTo(FactoryGate::class, 'exit_location_id');
     }
 
     public function isReceived(): bool

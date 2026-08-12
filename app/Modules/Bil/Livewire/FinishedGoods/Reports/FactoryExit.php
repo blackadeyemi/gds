@@ -8,7 +8,7 @@ use Modules\Bil\Livewire\RawMaterials\Reports\RawMaterialReport;
 use Modules\Bil\Models\FactoryExit as FactoryExitModel;
 use Modules\Bil\Models\FinishedGoodsProduct;
 use Modules\Core\Models\Factory;
-use Modules\Core\Models\FactoryExitLocation;
+use Modules\Core\Models\FactoryGate;
 
 /**
  * BIL → Finished Goods → Reports → Factory Exit. Rebuild of the legacy
@@ -78,7 +78,7 @@ class FactoryExit extends RawMaterialReport
             return $this->optCache;
         }
 
-        $gates = FactoryExitLocation::with('factory')->ordered()->get();
+        $gates = FactoryGate::with('factory')->direction(FactoryGate::OUT)->ordered()->get();
 
         return $this->optCache = [
             'factories' => Factory::orderBy('name')->pluck('name', 'id')->all(),

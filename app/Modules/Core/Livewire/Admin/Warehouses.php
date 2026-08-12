@@ -21,6 +21,7 @@ use Modules\Core\Models\Warehouse;
 class Warehouses extends DataGrid
 {
     public ?int $company_id = null;
+    public ?string $module = null;
     public string $name = '';
     public ?string $code = null;
     public int $sort_order = 0;
@@ -41,14 +42,18 @@ class Warehouses extends DataGrid
                 'type' => 'table',
                 'columns' => [
                     ['Warehouse', 'name'],
+                    ['Stores', 'module', fn ($r) => $r->module
+                        ? '<span class="badge ' . ($r->moduleIsImplemented() ? 'badge-success' : 'badge-muted') . '">'
+                            . e($r->moduleLabel()) . ($r->moduleIsImplemented() ? '' : ' (not built)') . '</span>'
+                        : '<span class="badge badge-danger">Not set</span>'],
                     ['Code', 'code', fn ($r) => $r->code ? '<span class="badge badge-muted">' . e($r->code) . '</span>' : '—'],
                     ['Company', 'company.name', fn ($r) => e($r->company?->name ?? '—')],
-                    ['Entrances', 'entrances_count'],
+                    ['Gates', 'gates_count'],
                     ['Status', 'is_active', fn ($r) => '<span class="badge ' . ($r->is_active ? 'badge-success' : 'badge-muted') . '">' . ($r->is_active ? 'active' : 'inactive') . '</span>'],
                 ],
-                'query' => fn () => Warehouse::query()->with('company')->withCount('entrances'),
+                'query' => fn () => Warehouse::query()->with('company')->withCount('gates'),
                 'searchable' => ['name', 'code'],
-                'sortable' => ['name', 'code', 'sort_order', 'is_active'],
+                'sortable' => ['name', 'module', 'code', 'sort_order', 'is_active'],
             ],
             'by_company' => [
                 'label' => 'Summary (by company)',
@@ -71,12 +76,30 @@ class Warehouses extends DataGrid
         return Company::orderBy('name')->get();
     }
 
+    /**
+     * What a warehouse can store. Modules with no stock table behind them are
+     * still offered but flagged, so it is obvious a warehouse created against
+     * one cannot receive yet rather than silently doing nothing.
+     */
+    #[Computed]
+    public function modules()
+    {
+        $implemented = config('warehouses.implemented', []);
+
+        return collect(config('warehouses.modules'))
+            ->map(fn ($label, $key) => in_array($key, $implemented, true) ? $label : $label . ' (not built yet)')
+            ->all();
+    }
+
     protected function rules(): array
     {
         $ignore = $this->editingId ? ',' . $this->editingId : '';
 
         return [
             'company_id' => ['required', 'exists:companies,id'],
+            // What the warehouse stores. Required, because it decides which
+            // product master its stock refers to — see config/warehouses.php.
+            'module' => ['required', 'in:' . implode(',', array_keys(config('warehouses.modules')))],
             'name' => ['required', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:20', 'unique:warehouses,code' . $ignore],
             'sort_order' => ['integer', 'min:0'],
@@ -87,6 +110,7 @@ class Warehouses extends DataGrid
     protected function resetForm(): void
     {
         $this->company_id = null;
+        $this->module = null;
         $this->name = '';
         $this->code = null;
         $this->sort_order = 0;
@@ -97,25 +121,26 @@ class Warehouses extends DataGrid
     {
         $w = Warehouse::findOrFail($id);
         $this->company_id = $w->company_id;
+        $this->module = $w->module;
         $this->name = $w->name;
         $this->code = $w->code;
         $this->sort_order = (int) $w->sort_order;
         $this->is_active = (bool) $w->is_active;
     }
 
-    /** A warehouse can't go while entrances still sit under it. */
+    /** A warehouse can't go while gates still sit under it. */
     public function deleteGuard($row): ?string
     {
-        $c = $row->entrances_count ?? 0;
+        $c = $row->gates_count ?? 0;
 
         return $c > 0
-            ? 'In use by ' . $c . ' ' . Str::plural('entrance', $c) . ' — cannot delete.'
+            ? 'In use by ' . $c . ' ' . Str::plural('gate', $c) . ' — cannot delete.'
             : null;
     }
 
     protected function findRow(int $id)
     {
-        return Warehouse::withCount('entrances')->find($id);
+        return Warehouse::withCount('gates')->find($id);
     }
 
     protected function performDelete(int $id): void

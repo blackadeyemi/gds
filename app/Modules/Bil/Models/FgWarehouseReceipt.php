@@ -5,7 +5,7 @@ namespace Modules\Bil\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\Warehouse;
-use Modules\Core\Models\WarehouseEntrance;
+use Modules\Core\Models\WarehouseGate;
 
 /**
  * A finished-goods pallet received into a warehouse
@@ -41,7 +41,7 @@ class FgWarehouseReceipt extends Model
 
     public function entrance(): BelongsTo
     {
-        return $this->belongsTo(WarehouseEntrance::class, 'entrance_id');
+        return $this->belongsTo(WarehouseGate::class, 'entrance_id');
     }
 
     public function warehouse(): BelongsTo

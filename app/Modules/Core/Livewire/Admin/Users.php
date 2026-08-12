@@ -12,9 +12,9 @@ use Modules\Core\Models\Company;
 use Modules\Core\Models\Department;
 use Modules\Core\Models\Division;
 use Modules\Core\Models\Role;
-use Modules\Core\Models\FactoryExitLocation;
+use Modules\Core\Models\FactoryGate;
 use Modules\Core\Models\User;
-use Modules\Core\Models\WarehouseEntrance;
+use Modules\Core\Models\WarehouseGate;
 
 #[Title('User Management')]
 class Users extends DataGrid
@@ -144,16 +144,16 @@ class Users extends DataGrid
     #[Computed]
     public function entranceOptions()
     {
-        return WarehouseEntrance::with('warehouse')->ordered()->get()
-            ->groupBy(fn ($e) => $e->warehouse?->name ?? 'Unassigned');
+        return WarehouseGate::with('warehouse')->ordered()->get()
+            ->groupBy(fn ($e) => ($e->warehouse?->name ?? 'Unassigned') . ' — ' . $e->directionLabel());
     }
 
     /** Factory exit gates offered in the editor, grouped by factory. */
     #[Computed]
     public function exitLocationOptions()
     {
-        return FactoryExitLocation::with('factory')->ordered()->get()
-            ->groupBy(fn ($l) => $l->factory?->name ?? 'Unassigned');
+        return FactoryGate::with('factory')->ordered()->get()
+            ->groupBy(fn ($l) => ($l->factory?->name ?? 'Unassigned') . ' — ' . $l->directionLabel());
     }
 
     protected function rules(): array
@@ -179,9 +179,9 @@ class Users extends DataGrid
             ],
             'password' => [$this->editingId ? 'nullable' : 'required', 'nullable', 'string', 'min:4'],
             'entrance_ids' => ['array'],
-            'entrance_ids.*' => ['integer', 'exists:warehouse_entrances,id'],
+            'entrance_ids.*' => ['integer', 'exists:warehouse_gates,id'],
             'exit_location_ids' => ['array'],
-            'exit_location_ids.*' => ['integer', 'exists:factory_exit_locations,id'],
+            'exit_location_ids.*' => ['integer', 'exists:factory_gates,id'],
         ];
     }
 
@@ -213,17 +213,17 @@ class Users extends DataGrid
 
         // Checkbox state wants strings — Livewire compares loosely on render but
         // strictly in `in_array` checks in the blade.
-        $this->entrance_ids = DB::connection('core')->table('warehouse_entrance_user')
-            ->where('user_id', $id)->pluck('entrance_id')->map('intval')->all();
-        $this->exit_location_ids = DB::connection('core')->table('factory_exit_location_user')
-            ->where('user_id', $id)->pluck('exit_location_id')->map('intval')->all();
+        $this->entrance_ids = DB::connection('core')->table('warehouse_gate_user')
+            ->where('user_id', $id)->pluck('gate_id')->map('intval')->all();
+        $this->exit_location_ids = DB::connection('core')->table('factory_gate_user')
+            ->where('user_id', $id)->pluck('gate_id')->map('intval')->all();
     }
 
     protected function performDelete(int $id): void
     {
-        DB::connection('core')->table('warehouse_entrance_user')
+        DB::connection('core')->table('warehouse_gate_user')
             ->where('user_id', $id)->delete();
-        DB::connection('core')->table('factory_exit_location_user')
+        DB::connection('core')->table('factory_gate_user')
             ->where('user_id', $id)->delete();
         User::whereKey($id)->delete();
     }
@@ -273,18 +273,18 @@ class Users extends DataGrid
         $core = DB::connection('core');
 
         $core->transaction(function () use ($core, $userId) {
-            $core->table('warehouse_entrance_user')->where('user_id', $userId)->delete();
+            $core->table('warehouse_gate_user')->where('user_id', $userId)->delete();
             if ($this->entrance_ids !== []) {
-                $core->table('warehouse_entrance_user')->insert(
-                    array_map(fn ($id) => ['entrance_id' => (int) $id, 'user_id' => $userId],
+                $core->table('warehouse_gate_user')->insert(
+                    array_map(fn ($id) => ['gate_id' => (int) $id, 'user_id' => $userId],
                         array_unique($this->entrance_ids))
                 );
             }
 
-            $core->table('factory_exit_location_user')->where('user_id', $userId)->delete();
+            $core->table('factory_gate_user')->where('user_id', $userId)->delete();
             if ($this->exit_location_ids !== []) {
-                $core->table('factory_exit_location_user')->insert(
-                    array_map(fn ($id) => ['exit_location_id' => (int) $id, 'user_id' => $userId],
+                $core->table('factory_gate_user')->insert(
+                    array_map(fn ($id) => ['gate_id' => (int) $id, 'user_id' => $userId],
                         array_unique($this->exit_location_ids))
                 );
             }

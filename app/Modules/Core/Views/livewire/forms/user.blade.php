@@ -69,8 +69,8 @@
     this narrows the list once they are there.
 --}}
 @include('core::partials.gate-checklist', [
-    'label' => 'Warehouse entrances',
-    'hint' => 'Gates this user can receive through. None ticked = no gates, so the receiving screen has nothing to pick.',
+    'label' => 'Warehouse gates',
+    'hint' => 'Gates this user can move goods through. None ticked = no gates, so the scanning screens have nothing to pick.',
     'groups' => $this->entranceOptions,
     'field' => 'entrance_ids',
     'selected' => $entrance_ids,
@@ -78,8 +78,8 @@
 ])
 
 @include('core::partials.gate-checklist', [
-    'label' => 'Factory exit locations',
-    'hint' => 'Gates this user can send pallets out through.',
+    'label' => 'Factory gates',
+    'hint' => 'Gates this user can send goods out through, or receive raw material at.',
     'groups' => $this->exitLocationOptions,
     'field' => 'exit_location_ids',
     'selected' => $exit_location_ids,

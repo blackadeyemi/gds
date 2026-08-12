@@ -10,6 +10,7 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 use Modules\Bil\Models\FactoryConversion;
 use Modules\Bil\Models\FactoryExit as FactoryExitModel;
+use Modules\Core\Models\FactoryGate;
 use Modules\Core\Support\GateAccess;
 
 /**
@@ -24,7 +25,7 @@ use Modules\Core\Support\GateAccess;
  * actually produced) and is not already in `factory_exit` (UNIQUE — a pallet
  * leaves once). Product and bundle count are read off the pallet, never typed.
  *
- * Gates come from `factory_exit_locations` and are limited to the
+ * Gates come from `factory_gates` (direction `out`) and are limited to the
  * ones this user has been granted — see GateAccess. The legacy screen
  * hard-coded that by user level; it is now ticked per user in the user editor.
  * The exit writes both `exit_location_id` and the legacy `exitlocation` name,
@@ -58,7 +59,7 @@ class FactoryExit extends Component
     #[Computed]
     public function locations()
     {
-        return GateAccess::exitLocationsFor(auth()->user());
+        return GateAccess::factoryGates(auth()->user(), FactoryGate::OUT);
     }
 
     public function canBackdate(): bool

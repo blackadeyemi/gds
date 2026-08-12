@@ -8,6 +8,20 @@
     @error('company_id') <div class="form-error">{{ $message }}</div> @enderror
 </div>
 <div class="form-group">
+    <label class="form-label">Stores</label>
+    <select class="form-control" wire:model="module">
+        <option value="">— Select what it stores —</option>
+        @foreach ($this->modules as $value => $label)
+            <option value="{{ $value }}">{{ $label }}</option>
+        @endforeach
+    </select>
+    <div class="text-muted text-sm" style="margin-top:.25rem;">
+        Decides which product master this warehouse's stock refers to, and which screens offer its gates.
+        A module marked <em>not built yet</em> can be chosen, but nothing can be received into it.
+    </div>
+    @error('module') <div class="form-error">{{ $message }}</div> @enderror
+</div>
+<div class="form-group">
     <label class="form-label">Warehouse name</label>
     <input type="text" class="form-control" wire:model="name" placeholder="e.g. Store FB" autofocus>
     @error('name') <div class="form-error">{{ $message }}</div> @enderror

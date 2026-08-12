@@ -9,7 +9,7 @@ use Modules\Bil\Models\FgWarehouseReceipt;
 use Modules\Bil\Models\FinishedGoodsProduct;
 use Modules\Bil\Support\FinishedGoodsStock;
 use Modules\Core\Models\Warehouse;
-use Modules\Core\Models\WarehouseEntrance as WarehouseEntranceModel;
+use Modules\Core\Models\WarehouseGate;
 
 /**
  * BIL → Finished Goods → Reports → Warehouse Entrance, over the rebuilt
@@ -76,7 +76,7 @@ class WarehouseEntrance extends RawMaterialReport
     {
         return $this->optCache ??= [
             'warehouses' => Warehouse::ordered()->pluck('name', 'id')->all(),
-            'entrances' => WarehouseEntranceModel::ordered()->pluck('name', 'id')->all(),
+            'entrances' => WarehouseGate::ordered()->pluck('name', 'id')->all(),
             'products' => FinishedGoodsProduct::query()->active()
                 ->orderBy('productname')->pluck('productname', 'productid')->all(),
         ];
@@ -102,7 +102,7 @@ class WarehouseEntrance extends RawMaterialReport
         $f = $this->filters;
 
         return DB::connection('core')->table('finished_goods_warehouse_receipts as r')
-            ->leftJoin('warehouse_entrances as e', 'r.entrance_id', '=', 'e.id')
+            ->leftJoin('warehouse_gates as e', 'r.entrance_id', '=', 'e.id')
             ->leftJoin('warehouses as w', 'r.warehouse_id', '=', 'w.id')
             ->when($this->dateFrom !== '', fn ($q) => $q->where('r.date_of_entrance', '>=', $this->dateFrom))
             ->when($this->dateTo !== '', fn ($q) => $q->where('r.date_of_entrance', '<=', $this->dateTo))

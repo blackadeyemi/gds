@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *     pallet the legacy warehouse holds cannot have its history deleted.
  *
  * Its `entrancelocation` is a bare name string; the gate it refers to is now a
- * row in `warehouse_entrances`, matched on `legacy_name`.
+ * row in `warehouse_gates`, matched on `legacy_name`.
  */
 class StoreEntrance extends Model
 {

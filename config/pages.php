@@ -35,8 +35,8 @@ return [
         ['key' => 'admin.factories',   'label' => 'Factories',   'module' => 'Admin', 'route' => 'admin.factories',   'abilities' => $crud],
         // Warehouses and gates: the storage side of the same structure.
         ['key' => 'admin.warehouses',  'label' => 'Warehouses',  'module' => 'Admin', 'route' => 'admin.warehouses',  'abilities' => $crud],
-        ['key' => 'admin.warehouse_entrances', 'label' => 'Warehouse Entrances', 'module' => 'Admin', 'route' => 'admin.warehouse_entrances', 'abilities' => $crud],
-        ['key' => 'admin.factory_exit_locations', 'label' => 'Exit Locations', 'module' => 'Admin', 'route' => 'admin.factory_exit_locations', 'abilities' => $crud],
+        ['key' => 'admin.warehouse_gates', 'label' => 'Warehouse Gates', 'module' => 'Admin', 'route' => 'admin.warehouse_gates', 'abilities' => $crud],
+        ['key' => 'admin.factory_gates', 'label' => 'Factory Gates', 'module' => 'Admin', 'route' => 'admin.factory_gates', 'abilities' => $crud],
         ['key' => 'admin.divisions',   'label' => 'Divisions',   'module' => 'Admin', 'route' => 'admin.divisions',   'abilities' => $crud],
         ['key' => 'admin.staff',       'label' => 'Staff',       'module' => 'Admin', 'route' => 'admin.staff',       'abilities' => $crud],
 

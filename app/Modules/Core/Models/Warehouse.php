@@ -26,10 +26,11 @@ class Warehouse extends Model
     use SoftDeletes;
 
     protected $connection = 'core';
-    protected $fillable = ['company_id', 'name', 'code', 'sort_order', 'is_active'];
+    protected $fillable = ['company_id', 'module', 'legacy_location_id', 'name', 'code', 'sort_order', 'is_active'];
 
     protected $casts = [
         'company_id' => 'integer',
+        'legacy_location_id' => 'integer',
         'is_active' => 'boolean',
         'sort_order' => 'integer',
     ];
@@ -39,10 +40,33 @@ class Warehouse extends Model
         return $this->belongsTo(Company::class);
     }
 
-    public function entrances(): HasMany
+    public function gates(): HasMany
     {
-        return $this->hasMany(WarehouseEntrance::class, 'warehouse_id')
+        return $this->hasMany(WarehouseGate::class, 'warehouse_id')
             ->orderBy('sort_order')->orderBy('name');
+    }
+
+    /** Human label for what this warehouse stores. */
+    public function moduleLabel(): string
+    {
+        return config('warehouses.modules')[$this->module] ?? '—';
+    }
+
+    /**
+     * Can this warehouse actually hold stock yet?
+     *
+     * A module with no stock table behind it is a placeholder — the warehouse
+     * can be created and named, but nothing can be received into it. Better to
+     * say so than to accept a scan that goes nowhere.
+     */
+    public function moduleIsImplemented(): bool
+    {
+        return in_array($this->module, config('warehouses.implemented', []), true);
+    }
+
+    public function scopeForModule($query, string $module)
+    {
+        return $query->where('module', $module);
     }
 
     public function scopeActive($query)

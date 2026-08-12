@@ -5,6 +5,102 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-08-12 (b) — Gates gain direction; warehouses gain a module; raw materials imported
+
+Two further migrations, on top of the same day's rebuild:
+
+```
+2026_08_12_120000_consolidate_gates_and_add_warehouse_module
+2026_08_12_130000_import_raw_materials_warehouses_and_stock
+```
+
+### Direction folded into the gate
+
+The first cut modelled only the two gates finished goods needed. Raw materials
+needs the other two — out of a warehouse (Warehouse Exit) and into a factory
+(Factory Entrance, Factory Returns). Four gate tables plus four grant pivots is
+the same shape four times over, and would put four checklists in the user editor.
+
+A gate is a place; which way goods are going is an attribute of the movement.
+`both` is a real case — one elevator or roller door often serves either way.
+
+```
+warehouse_entrances        -> warehouse_gates      (+ direction)
+factory_exit_locations     -> factory_gates        (+ direction)
+warehouse_entrance_user    -> warehouse_gate_user  (entrance_id -> gate_id)
+factory_exit_location_user -> factory_gate_user    (exit_location_id -> gate_id)
+```
+
+Safe renames: the tables shipped hours earlier, hold only imported gates, and
+nothing outside gds reads them.
+
+### `warehouses.module` — what a warehouse stores
+
+Not cosmetic. The module decides which product master a warehouse's stock refers
+to and which stock table holds it, which is why the stock tables are per module
+in the first place. The list lives in **`config/warehouses.php`**, not a lookup
+table, because adding a module needs its stock table, product picker and screens
+— a row added in Settings would look like it worked and then have nowhere to put
+stock. Modules without a stock table behind them are still offered but labelled
+*"not built yet"*.
+
+**A warehouse holds one module.** A building storing two kinds is two
+warehouses — separate stock, separate gates, separate staff anyway.
+
+### Raw materials imported onto the same model
+
+| Legacy | Now |
+| --- | --- |
+| `rawmaterial_store_location` (Ogba, Oregun) | `warehouses` with module `raw-materials`, keeping `legacy_location_id` |
+| `rawmaterials_storeexit_details` | warehouse gates, direction `out` |
+| `factoryentrance_details` | factory gates, direction `in` |
+| `rawmaterials_stock` (keyed by a location NAME) | `raw_materials_warehouse_stock` (keyed by warehouse) |
+
+- `gate_id` added to `rawmaterials_warehouse_entry`, `rawmaterials_warehouse_exit`,
+  `factory_entrance_rawmaterials` and `return_approval`.
+- **Factory entrances backfilled exactly** — 178,634 rows, because `location_id`
+  already pointed at `factoryentrance_details`.
+- **Warehouse entries and exits are NOT backfilled.** Their `location_id` is the
+  store, not a gate, and the legacy app never recorded which gate was used.
+  Inventing one would be fiction; historic rows keep a null gate and report "—".
+- RM warehouses got **one receiving gate each** (`Ogba Entrance`,
+  `Oregun Entrance`), because the legacy app had no such table — entry booked
+  straight against the store. Rename or add to them as needed.
+- New RM stock seeded from the **in-store barcodes**, not from
+  `rawmaterials_stock` — that aggregate had drifted ~8.5x, which is what its own
+  reconcile command exists to fix. Seeded 117 products / 13,551 units at Ogba.
+- "Oregun Store" appears in the legacy factory-entrance table but is a store, not
+  a factory; imported inactive so history resolves without offering it.
+
+### ⚠️ Still to do — the raw-materials screens
+
+The tables, gates, grants and stock table are in place, **but the four RM screens
+still use their hard-coded constants** (`LOCATION_ID = 1`,
+`EXIT_LOCATION = 'Rawmaterial Store'`) and still write `rawmaterials_stock`:
+
+- Raw Materials → Warehouse Entry, Warehouse Exit, Factory Entrance,
+  Factory Returns, and their reports.
+
+They work exactly as before this deploy — nothing regressed — but they do not yet
+offer the new gates, and RM stock is therefore maintained in the old table only.
+`raw_materials_warehouse_stock` is seeded and correct as of the migration, and
+will go stale until those screens are moved over. **Do not report from it yet.**
+
+### After deploying
+
+```
+php artisan migrate
+php artisan gds:sync-pages
+php artisan gds:sync-data-views
+```
+
+Grant the renamed pages: `admin.warehouses`, `admin.warehouse_gates`,
+`admin.factory_gates`. Then set a **module on every warehouse** — the two RM ones
+are set by the migration, but any finished-goods warehouse you create needs it,
+and its gates will not appear on the receiving screen without it.
+
+---
+
 ## 2026-08-12 — Warehouses rebuilt as core structure; finished-goods stock replaced
 
 **Two migrations, and a deliberate break with the legacy stock tables.**
