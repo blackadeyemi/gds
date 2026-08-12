@@ -5,7 +5,9 @@ namespace Modules\Bil\Livewire\FinishedGoods;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
+use Modules\Bil\Models\FgWarehouseStock;
 use Modules\Bil\Support\FinishedGoodsStock;
+use Modules\Bil\Support\FinishedGoodsStockMovements;
 use Modules\Core\Livewire\DataGrid;
 use Modules\Core\Models\Warehouse;
 
@@ -38,11 +40,18 @@ class Stock extends DataGrid
     public string $warehouseLabel = '';
     public int $currentBundles = 0;
 
+    /* ---- movement detail modal ---- */
+    public bool $showMovements = false;
+    public ?int $detailWarehouseId = null;
+    public ?int $detailProductId = null;
+    public string $movementTab = 'incoming';
+
     public function pageKey(): string { return 'bil.finished_goods.stock'; }
     public function pageLabel(): string { return 'Finished Goods Stock'; }
     public function pageSubtitle(): string { return 'Bundles held per product, per warehouse. Corrections are recorded as adjustments.'; }
     public function editable(): bool { return true; }
     public function formView(): ?string { return 'bil::livewire.forms.fg-stock'; }
+    public function extraView(): ?string { return 'bil::partials.fg-stock-movements'; }
 
     /** Highest quantity first — the default question this page answers. */
     public function defaultSort(): array { return ['bundles', 'desc']; }
@@ -79,13 +88,74 @@ class Stock extends DataGrid
                     ['Products', 'products'],
                     ['Bundles', 'bundles'],
                 ],
-                'query' => fn () => DB::connection('core')
-                    ->table('finished_goods_warehouse_stock as s')
+                'query' => fn () => FgWarehouseStock::query()
+                    ->from('finished_goods_warehouse_stock as s')
                     ->leftJoin('warehouses as w', 's.warehouse_id', '=', 'w.id')
                     ->selectRaw("COALESCE(w.name, '—') as warehouse_name,
                                  COUNT(*) as products, SUM(s.bundles) as bundles")
                     ->groupBy('warehouse_name'),
             ],
+        ];
+    }
+
+    /* ---------------- Movement detail ---------------- */
+
+    public function hasLeadingRowActions(): bool
+    {
+        return true;
+    }
+
+    public function leadingRowActions($row): string
+    {
+        return '<button type="button" class="btn btn-ghost btn-icon btn-sm"'
+            . ' wire:click="showMovements(' . (int) $row->id . ')" title="View movements">'
+            . '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+            . ' stroke-linecap="round" stroke-linejoin="round">'
+            . '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'
+            . '</svg></button>';
+    }
+
+    public function showMovements(int $id): void
+    {
+        $row = DB::connection('core')->table('finished_goods_warehouse_stock')->find($id);
+        if (! $row) {
+            return;
+        }
+
+        $this->detailWarehouseId = (int) $row->warehouse_id;
+        $this->detailProductId = (int) $row->productid;
+        $this->productLabel = (string) ($row->productname ?? '—');
+        $this->warehouseLabel = (string) (Warehouse::find($row->warehouse_id)?->name ?? '—');
+        $this->currentBundles = (int) $row->bundles;
+        $this->movementTab = 'incoming';
+        $this->showMovements = true;
+    }
+
+    public function closeMovements(): void
+    {
+        $this->showMovements = false;
+        $this->detailWarehouseId = null;
+        $this->detailProductId = null;
+    }
+
+    /**
+     * Movements read live, never stored.
+     *
+     * These already exist as rows — receipts, adjustments, orders, loadings,
+     * deliveries, returns — so caching them onto the stock row would duplicate
+     * data that has an owner and go stale the moment it changed. Reading them
+     * on open also means the modal and the reconciled total can never disagree.
+     */
+    #[Computed]
+    public function movements(): array
+    {
+        if (! $this->detailWarehouseId || ! $this->detailProductId) {
+            return ['incoming' => [], 'outgoing' => []];
+        }
+
+        return [
+            'incoming' => FinishedGoodsStockMovements::incoming($this->detailWarehouseId, $this->detailProductId),
+            'outgoing' => FinishedGoodsStockMovements::outgoing($this->detailProductId),
         ];
     }
 
@@ -99,7 +169,9 @@ class Stock extends DataGrid
      */
     protected function base()
     {
-        return DB::connection('core')->table('finished_goods_warehouse_stock as s')
+        // Eloquent rather than the query builder: the grid blade calls
+        // `$row->getKey()` for row actions, which a stdClass has not got.
+        return FgWarehouseStock::query()->from('finished_goods_warehouse_stock as s')
             ->leftJoin('warehouses as w', 's.warehouse_id', '=', 'w.id')
             ->select('s.id', 's.warehouse_id', 's.productid', 's.productname', 's.productcode',
                 's.bundles', 's.updated_at', 'w.name as warehouse_name');
