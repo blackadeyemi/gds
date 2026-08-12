@@ -48,7 +48,13 @@ class Stock extends DataGrid
 
     public function pageKey(): string { return 'bil.finished_goods.stock'; }
     public function pageLabel(): string { return 'Finished Goods Stock'; }
-    public function pageSubtitle(): string { return 'Bundles held per product, per warehouse. Corrections are recorded as adjustments.'; }
+    public function pageSubtitle(): string
+    {
+        $counted = $this->ordersCountedAt();
+
+        return 'Bundles held per product, per warehouse. Corrections are recorded as adjustments.'
+            . ($counted ? ' Order counts recounted ' . $counted . '.' : '');
+    }
     public function editable(): bool { return true; }
     public function formView(): ?string { return 'bil::livewire.forms.fg-stock'; }
     public function extraView(): ?string { return 'bil::partials.fg-stock-movements'; }
@@ -69,6 +75,10 @@ class Stock extends DataGrid
                     ['Bundles', 'bundles', fn ($r) => $r->bundles < 0
                         ? '<span class="badge badge-danger">' . number_format($r->bundles) . '</span>'
                         : number_format($r->bundles)],
+                    ['Orders (90d)', 'orders_90d', fn ($r) => $r->orders_90d
+                        ? number_format($r->orders_90d)
+                        : '<span class="text-muted">0</span>'],
+                    ['Ordered qty (90d)', 'ordered_qty_90d', fn ($r) => number_format($r->ordered_qty_90d)],
                     ['Last Changed', 'updated_at', fn ($r) => $r->updated_at
                         ? e(\Illuminate\Support\Carbon::parse($r->updated_at)->format('d M Y H:i'))
                         : '—'],
@@ -76,7 +86,8 @@ class Stock extends DataGrid
                 // Every column sorts, including the product — which is only
                 // possible because the name is denormalised onto the row;
                 // products live on `bil` and cannot be joined from `core`.
-                'sortable' => ['productcode', 'productname', 'warehouse_name', 'bundles', 'updated_at'],
+                'sortable' => ['productcode', 'productname', 'warehouse_name', 'bundles',
+                    'orders_90d', 'ordered_qty_90d', 'updated_at'],
                 'searchable' => ['s.productname', 's.productcode', 'w.name'],
                 'query' => fn () => $this->base(),
             ],
@@ -174,7 +185,17 @@ class Stock extends DataGrid
         return FgWarehouseStock::query()->from('finished_goods_warehouse_stock as s')
             ->leftJoin('warehouses as w', 's.warehouse_id', '=', 'w.id')
             ->select('s.id', 's.warehouse_id', 's.productid', 's.productname', 's.productcode',
-                's.bundles', 's.updated_at', 'w.name as warehouse_name');
+                's.bundles', 's.orders_90d', 's.ordered_qty_90d', 's.orders_counted_at',
+                's.updated_at', 'w.name as warehouse_name');
+    }
+
+    /** When the order counts were last recounted — a stale figure should show. */
+    #[Computed]
+    public function ordersCountedAt(): ?string
+    {
+        $at = DB::connection('core')->table('finished_goods_warehouse_stock')->max('orders_counted_at');
+
+        return $at ? \Illuminate\Support\Carbon::parse($at)->diffForHumans() : null;
     }
 
     #[Computed]

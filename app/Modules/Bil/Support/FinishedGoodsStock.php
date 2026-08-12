@@ -191,17 +191,36 @@ class FinishedGoodsStock
      */
     public static function loadedSinceCutover(): array
     {
-        return DB::connection('bil')->table('sales_loading as l')
+        $loaded = DB::connection('bil')->table('sales_loading as l')
             ->join('sales_order_details as d', 'l.sod_id', '=', 'd.id')
             ->where('l.dateofloading', '>=', str_replace('-', '/', self::cutover()))
-            // A returned load is reversed by the legacy screen, which stamps a
-            // status; only live rows have taken stock out.
-            ->whereNull('l.status')
+            // NB: `sales_loading.status` is NOT a state flag — it holds a DATE
+            // (582,792 of 583,096 rows have one). Filtering on NULL here, as an
+            // earlier cut did, excluded every completed load and meant stock
+            // never went down. Every loading row took goods out; what comes
+            // back is `sales_loading_return`, netted off below.
             ->groupBy('d.productid')
             ->selectRaw('d.productid, SUM(l.quantityloaded) as bundles')
-            ->pluck('bundles', 'productid')
-            ->map(fn ($b) => (int) $b)
-            ->all();
+            ->pluck('bundles', 'productid');
+
+        // Goods taken back off a load never left, so they must not count.
+        $unloaded = DB::connection('bil')->table('sales_loading_return as lr')
+            ->join('sales_order_details as d', 'lr.sod_id', '=', 'd.id')
+            ->join('sales_loading as l', 'lr.loading_id', '=', 'l.id')
+            ->where('l.dateofloading', '>=', str_replace('-', '/', self::cutover()))
+            ->groupBy('d.productid')
+            ->selectRaw('d.productid, SUM(lr.quantityunloaded) as bundles')
+            ->pluck('bundles', 'productid');
+
+        $out = [];
+        foreach ($loaded as $productid => $bundles) {
+            $net = (int) $bundles - (int) ($unloaded[$productid] ?? 0);
+            if ($net !== 0) {
+                $out[$productid] = $net;
+            }
+        }
+
+        return $out;
     }
 
     /** The FG warehouse loadings are attributed to — see the class note. */
