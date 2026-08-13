@@ -30,6 +30,68 @@ class ShiftService
     }
 
     /**
+     * The enabled windows of a context, in order, as ['name','start','end'].
+     * Empty when the context has never been synced.
+     *
+     * Unlike status(), this ignores `is_active`. Some callers need to know what
+     * the windows SAY without being gated by them: Conversion Output stamps a
+     * pallet with the shift it was made on whether or not the area is enforced,
+     * and the waste run is keyed on that same value. Turning enforcement on and
+     * off must not change which shift a pallet belongs to.
+     */
+    public function windows(string $key): array
+    {
+        $ctx = $this->context($key);
+
+        if (! $ctx) {
+            return [];
+        }
+
+        return $ctx->windows->where('is_enabled', true)
+            ->sortBy('sort_order')
+            ->map(fn ($w) => [
+                'name' => $w->name,
+                'start' => substr((string) $w->start_time, 0, 5),
+                'end' => substr((string) $w->end_time, 0, 5),
+            ])->values()->all();
+    }
+
+    /**
+     * Which window a moment falls in, regardless of `is_active` — or null when
+     * the context is unconfigured or the moment falls in no window.
+     */
+    public function windowAt(string $key, ?Carbon $at = null): ?array
+    {
+        $at ??= Carbon::now(config('app.timezone'));
+        $ctx = $this->context($key);
+
+        if (! $ctx) {
+            return null;
+        }
+
+        foreach ($ctx->windows->where('is_enabled', true)->sortBy('sort_order') as $w) {
+            if ($w->containsAt($at)) {
+                return [
+                    'name' => $w->name,
+                    'start' => substr((string) $w->start_time, 0, 5),
+                    'end' => substr((string) $w->end_time, 0, 5),
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * `HH:MM` at which this context's day begins — the start of its first
+     * window, which is the boundary a production date rolls over on.
+     */
+    public function dayBoundary(string $key): ?string
+    {
+        return $this->windows($key)[0]['start'] ?? null;
+    }
+
+    /**
      * Full status for a context key:
      *   configured, gated, open, current (window name|null),
      *   next_open_at (Carbon|null), next_window (name|null), label, windows[]

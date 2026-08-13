@@ -12,6 +12,8 @@
 @endphp
 
 <div>
+    @include('core::partials.shift-guard')
+
     <div class="page-head">
         <h1>Conversion Output</h1>
         <p>Record pallets coming off a line and print their barcode labels.</p>

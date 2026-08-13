@@ -11,6 +11,7 @@ use Livewire\Component;
 use Modules\Bil\Models\ConversionWasteEntry;
 use Modules\Bil\Models\ConversionWasteRun;
 use Modules\Bil\Support\ConversionWaste as Waste;
+use Modules\Core\Concerns\EnforcesShift;
 use Modules\Core\Models\MachineLine;
 use Modules\Core\Models\WasteCause;
 use Modules\Core\Models\WasteOrigin;
@@ -43,6 +44,18 @@ use Modules\Core\Models\WasteOrigin;
 #[Title('Conversion Waste')]
 class ConversionWaste extends Component
 {
+    use EnforcesShift;
+
+    /**
+     * Its own context, separate from Conversion Output's: waste is often
+     * weighed at the end of a shift, so the window that suits recording it is
+     * not necessarily the window production runs in. Off by default.
+     */
+    public function shiftKey(): ?string
+    {
+        return self::PAGE_KEY;
+    }
+
     /** Identity of the run being worked on — see Waste::key(). */
     public ?string $runKey = null;
 
@@ -333,6 +346,10 @@ class ConversionWaste extends Component
      */
     public function save(): void
     {
+        if (! $this->ensureShiftOpen()) {
+            return;
+        }
+
         $run = $this->run;
 
         if (! $run) {
@@ -453,6 +470,10 @@ class ConversionWaste extends Component
      */
     public function confirm(): void
     {
+        if (! $this->ensureShiftOpen()) {
+            return;
+        }
+
         if (! $this->canConfirm()) {
             session()->flash('err', 'You do not have permission to confirm waste.');
 

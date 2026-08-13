@@ -22,5 +22,20 @@ return [
     'contexts' => [
         ['key' => 'bil.raw_materials.factory_entrance', 'label' => 'BIL Raw Materials Factory Entrance', 'module' => 'BIL', 'windows' => $dayNight],
         ['key' => 'bil.raw_materials.consumption',      'label' => 'BIL Raw Materials Consumption',      'module' => 'BIL', 'windows' => $dayNight],
+
+        /*
+        | Conversion. These two do more than gate a page: their windows define
+        | what "day" and "night" MEAN for a converting line, which is what the
+        | production date and the waste run are keyed on. Editing the times here
+        | moves the boundary for both screens at once, so they stay in agreement.
+        |
+        | The window NAMES matter as well as the times — a window is matched to
+        | the shift value stored in `factory_conversion.shift` by lowercasing its
+        | name, so Day/Night must keep those names. Renaming one falls back to
+        | the built-in 07:00/19:00 boundary rather than writing a value the
+        | legacy app cannot read. See ConversionWaste::shiftWindows().
+        */
+        ['key' => 'bil.finished_goods.conversion_output', 'label' => 'BIL Conversion Output', 'module' => 'BIL', 'windows' => $dayNight],
+        ['key' => 'bil.finished_goods.conversion_waste',  'label' => 'BIL Conversion Waste',  'module' => 'BIL', 'windows' => $dayNight],
     ],
 ];

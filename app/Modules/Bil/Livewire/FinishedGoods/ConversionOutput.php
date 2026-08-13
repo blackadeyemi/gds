@@ -11,6 +11,7 @@ use Modules\Bil\Models\ConversionSetup;
 use Modules\Bil\Models\FactoryConversion;
 use Modules\Bil\Models\FinishedGoodsProduct;
 use Modules\Bil\Support\ConversionWaste as Waste;
+use Modules\Core\Concerns\EnforcesShift;
 use Modules\Core\Models\MachineLine;
 
 /**
@@ -35,6 +36,22 @@ use Modules\Core\Models\MachineLine;
 #[Title('Conversion Output')]
 class ConversionOutput extends Component
 {
+    use EnforcesShift;
+
+    /**
+     * Shift windows for this area, configurable in Settings → Shifts.
+     *
+     * Registering the context does two things: it lets an admin ENFORCE the
+     * windows (off by default — the area stays open anytime until they turn it
+     * on), and it makes the window times the single definition of what "day"
+     * and "night" mean for a converting line. The waste run is keyed on that
+     * same value, so both screens read the one configuration.
+     */
+    public function shiftKey(): ?string
+    {
+        return self::PAGE_KEY;
+    }
+
     public ?int $line_id = null;
     public string $shift = 'day';
     public string $dateIso = '';
@@ -47,9 +64,11 @@ class ConversionOutput extends Component
 
     public function mount(): void
     {
-        $this->dateIso = now()->format('Y-m-d');
-        // Day runs 07:00-18:59; outside that the operator is on nights.
-        $this->shift = (now()->hour >= 7 && now()->hour < 19) ? 'day' : 'night';
+        // Both from the configured shift windows, so the pallet is stamped with
+        // the same date and shift the waste queue will key its run on.
+        $current = Waste::currentRun();
+        $this->dateIso = $current['date'];
+        $this->shift = $current['shift'];
     }
 
     /* ---------------- Options ---------------- */
@@ -179,7 +198,7 @@ class ConversionOutput extends Component
             return null;
         }
 
-        $date = $this->canBackdate() ? $this->dateIso : now()->format('Y-m-d');
+        $date = $this->canBackdate() ? $this->dateIso : Waste::currentRun()['date'];
 
         return $this->wasteBlocker((int) $this->product->productid, $date);
     }
@@ -188,6 +207,10 @@ class ConversionOutput extends Component
 
     public function generate(): void
     {
+        if (! $this->ensureShiftOpen()) {
+            return;
+        }
+
         $setup = $this->setup;
         $product = $this->product;
         $place = $this->placement;
@@ -214,8 +237,11 @@ class ConversionOutput extends Component
             return;
         }
 
-        // Non-backdaters always book against today.
-        $date = $this->canBackdate() ? $this->dateIso : now()->format('Y-m-d');
+        // Non-backdaters always book against the CURRENT PRODUCTION date —
+        // which between midnight and the shift boundary is yesterday, not
+        // today. Using the calendar date there would file the pallet under a
+        // run the waste queue is not tracking.
+        $date = $this->canBackdate() ? $this->dateIso : Waste::currentRun()['date'];
         $dateSlash = str_replace('-', '/', $date);
         $bundles = (int) $setup->bundles;
 

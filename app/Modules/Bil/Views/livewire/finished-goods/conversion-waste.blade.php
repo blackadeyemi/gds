@@ -17,6 +17,8 @@
 @endphp
 
 <div>
+    @include('core::partials.shift-guard')
+
     <div class="page-head">
         <h1>Conversion Waste</h1>
         <p>Weigh the waste off each run, then confirm it. A run is one line converting one product in one shift — it appears here because pallets were booked against it. <strong>Conversion Output will not start the next run on a line until the previous one is confirmed.</strong></p>

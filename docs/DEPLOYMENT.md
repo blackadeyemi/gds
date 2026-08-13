@@ -68,6 +68,27 @@ before it is made and records who made it:
 
 Restrict `settings.waste:edit` accordingly.
 
+### Shift windows now define what "day" and "night" mean
+
+Conversion Output and Conversion Waste are registered as shift contexts
+(`gds:sync-shift-contexts`), so both appear in **Settings → Shifts**.
+
+Their windows do more than gate a page. The Day window's START is the boundary a
+**production date** rolls over on — 07:00 by default, reproducing the legacy
+`functions/production_date.php` — and the window a moment falls in is the shift
+a pallet is stamped with. Conversion Output and the waste run read the same
+configuration, so they cannot disagree about which run a pallet belongs to.
+
+Both are **inactive by default**: the windows describe the shifts without
+enforcing them, exactly as before. Turning a context Active additionally stops
+the page being used outside its windows (`bypass-shift` exempts a role).
+
+⚠️ The window **names** matter as well as the times. A window is matched to the
+value stored in `factory_conversion.shift` by lowercasing its name, and the
+legacy app reads that column — so **keep them named Day and Night**. A renamed
+window is ignored and the built-in 07:00/19:00 split is used instead, rather
+than writing a shift value nothing else can read.
+
 ### New abilities (run `php artisan gds:sync-pages`)
 
 | Page | Ability | Who needs it |
@@ -85,8 +106,9 @@ the previous run's waste still unrecorded.
 ### After deploying
 
 ```
-php artisan migrate --force      # creates 4 tables, seeds 13 causes + 2 origins
-php artisan gds:sync-pages       # 3 new pages, 6 new permissions
+php artisan migrate --force            # 5 tables (4 waste + app_settings)
+php artisan gds:sync-pages             # 3 new pages, 8 new permissions
+php artisan gds:sync-shift-contexts    # 2 new shift contexts, inactive
 php artisan optimize:clear
 ```
 

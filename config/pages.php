@@ -69,10 +69,10 @@ return [
 
         // BIL — Finished Goods
         ['key' => 'bil.finished_goods.products', 'label' => 'Products', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.products', 'abilities' => $crud],
-        ['key' => 'bil.finished_goods.conversion_output', 'label' => 'Conversion Output', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.conversion-output', 'abilities' => $entry],
+        ['key' => 'bil.finished_goods.conversion_output', 'label' => 'Conversion Output', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.conversion-output', 'abilities' => ['view', 'backdate', 'bypass-shift']],
         // Entry plus the two supervisory acts that close and re-open a run, and
         // the bypass that lets production continue when a run cannot be closed.
-        ['key' => 'bil.finished_goods.conversion_waste', 'label' => 'Conversion Waste', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.conversion-waste', 'abilities' => ['view', 'confirm', 'reopen', 'bypass-waste-lock']],
+        ['key' => 'bil.finished_goods.conversion_waste', 'label' => 'Conversion Waste', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.conversion-waste', 'abilities' => ['view', 'confirm', 'reopen', 'bypass-waste-lock', 'bypass-shift']],
         ['key' => 'bil.finished_goods.factory_exit', 'label' => 'Factory Exit', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.factory-exit', 'abilities' => $entry, 'gates' => 'factory'],
         // Stock lines are created by movement and never deleted, so no create
         // or delete ability; `edit` records an adjustment.

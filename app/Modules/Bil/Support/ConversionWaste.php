@@ -6,6 +6,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Bil\Models\ConversionWasteRun;
 use Modules\Core\Support\Settings;
+use Modules\Core\Support\ShiftService;
 
 /**
  * The rules behind conversion waste: what a run is, which runs still owe waste,
@@ -50,28 +51,91 @@ class ConversionWaste
 
     /* ---------------- Current production date + shift ---------------- */
 
+    /** The shift context whose windows define day and night for a line. */
+    public const SHIFT_KEY = 'bil.finished_goods.conversion_output';
+
+    /** The shift values `factory_conversion.shift` is allowed to hold. */
+    public const SHIFTS = ['day', 'night'];
+
+    /** Fallback boundary when the context is unconfigured — the legacy 07:00. */
+    public const DEFAULT_BOUNDARY = '07:00';
+
+    /**
+     * The configured windows, as `shift value => ['start','end']`.
+     *
+     * A window is matched to a stored shift value by lowercasing its NAME.
+     * `factory_conversion.shift` holds 'day'/'night' and the legacy app reads
+     * it, so a window renamed to anything else is ignored rather than written
+     * through — the times are configurable, the vocabulary is not.
+     *
+     * Empty when nothing usable is configured, which puts every caller on the
+     * built-in boundary instead.
+     */
+    public static function shiftWindows(): array
+    {
+        $out = [];
+
+        foreach ((new ShiftService())->windows(self::SHIFT_KEY) as $w) {
+            $value = strtolower(trim($w['name']));
+            if (in_array($value, self::SHIFTS, true)) {
+                $out[$value] = ['start' => $w['start'], 'end' => $w['end']];
+            }
+        }
+
+        return $out;
+    }
+
     /**
      * The production date and shift right now.
      *
-     * A production day runs 07:00 → 06:59, so between midnight and 07:00 the
-     * work belongs to YESTERDAY's night shift. This mirrors the legacy
-     * functions/production_date.php exactly, because Conversion Output still
-     * stamps `dateofproduction` that way and the two must agree about which run
-     * a pallet belongs to.
+     * A production day runs from the start of the first shift window to the
+     * moment before it comes round again — 07:00 → 06:59 by default — so
+     * between midnight and that boundary the work belongs to YESTERDAY. This
+     * reproduces the legacy functions/production_date.php, which is what
+     * Conversion Output still stamps `dateofproduction` with; the two have to
+     * agree about which run a pallet belongs to or the waste queue is wrong.
+     *
+     * Configured in Settings → Shifts (BIL Conversion Output). Changing the
+     * times there moves the boundary for both screens at once.
      */
     public static function currentRun(): array
     {
         $now = now();
-        $hour = (int) $now->format('G');
+        $windows = self::shiftWindows();
 
-        if ($hour < 7) {
-            return ['date' => $now->copy()->subDay()->format('Y-m-d'), 'shift' => 'night'];
+        $boundary = $windows['day']['start']
+            ?? (new ShiftService())->dayBoundary(self::SHIFT_KEY)
+            ?? self::DEFAULT_BOUNDARY;
+
+        [$bh, $bm] = array_map('intval', explode(':', $boundary) + [0, 0]);
+        $dayStart = $now->copy()->setTime($bh, $bm, 0);
+
+        // Before the day begins, this is still yesterday's production date.
+        $date = $now->lt($dayStart)
+            ? $now->copy()->subDay()->format('Y-m-d')
+            : $now->format('Y-m-d');
+
+        return ['date' => $date, 'shift' => self::currentShift($now)];
+    }
+
+    /** Which shift a moment falls in — 'day' or 'night'. */
+    public static function currentShift(?\Illuminate\Support\Carbon $at = null): string
+    {
+        $at ??= now();
+
+        $window = (new ShiftService())->windowAt(self::SHIFT_KEY, $at);
+        if ($window) {
+            $value = strtolower(trim($window['name']));
+            if (in_array($value, self::SHIFTS, true)) {
+                return $value;
+            }
         }
 
-        return [
-            'date' => $now->format('Y-m-d'),
-            'shift' => $hour < 19 ? 'day' : 'night',
-        ];
+        // Unconfigured, renamed, or a gap between windows — fall back to the
+        // legacy 07:00-19:00 split rather than guessing.
+        $hour = (int) $at->format('G');
+
+        return ($hour >= 7 && $hour < 19) ? 'day' : 'night';
     }
 
     /* ---------------- Runs, from production ---------------- */
