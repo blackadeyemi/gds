@@ -10,6 +10,7 @@ use Livewire\Component;
 use Modules\Core\Models\Department;
 use Modules\Core\Models\Division;
 use Modules\Core\Models\MachineLine;
+use Modules\Core\Support\MachineMaps;
 use Modules\Core\Models\MachineProject;
 use Modules\Core\Models\ServiceType;
 use Modules\Core\Models\Staff;
@@ -192,7 +193,7 @@ class Services extends Component
         // The legacy report keys off the *end* date, not the start.
         $date = $end->format('Y/m/d');
 
-        DB::connection('bil')->table('factory_machine_maintenance')->insert([
+        $row = [
             'jobtitle' => $this->jobtitle,
             'jobid' => $this->generateJobId($line, $end),
             'linename' => $line->name,
@@ -208,14 +209,60 @@ class Services extends Component
             'note' => $this->note,
             'duration' => $this->durationJson($start, $end),
             'service_type_id' => $this->service_type_id,
-            // The BEFORE INSERT trigger would derive these from the names, but
-            // writing them directly keeps this page correct on its own terms.
+            // Written for completeness, but NOT authoritative: the BEFORE INSERT
+            // trigger recomputes every one of these from the name columns and
+            // wins. If a name is not in the machine_map_* lookups the trigger
+            // stores NULL — silently discarding the correct id set here. Hence
+            // the read-back below.
             'line_id' => $line->id,
             'project_id' => $project->id,
             'subproject_id' => $subproject?->id,
             'division_id' => $staff->division_id,
             'staff_id' => $staff->id,
-        ]);
+        ];
+
+        /*
+         * Strict: a job that resolves to nobody is not recorded.
+         *
+         * 976 legacy rows already name staff the hierarchy has never heard of,
+         * and they are left as they are. gds does not add to them — if the
+         * trigger cannot attribute this job, the insert is rolled back and the
+         * operator is told which name is unknown, rather than filing work
+         * against nothing.
+         *
+         * The rebuild is deliberately NOT attempted here: it uses RENAME TABLE,
+         * which implicitly commits in MySQL and would break out of this
+         * transaction.
+         */
+        try {
+            DB::connection('bil')->transaction(function () use ($row) {
+                $id = DB::connection('bil')->table('factory_machine_maintenance')->insertGetId($row);
+
+                $unresolved = MachineMaps::unresolved('factory_machine_maintenance', $id, [
+                    'line_id' => 'linename',
+                    'project_id' => 'project',
+                    'subproject_id' => 'subproject',
+                    'division_id' => 'division',
+                    'staff_id' => 'staff',
+                ]);
+
+                if ($unresolved !== []) {
+                    throw new \RuntimeException(implode('; ', array_map(
+                        fn ($name, $col) => '"' . $name . '" (' . str_replace('_id', '', $col) . ')',
+                        $unresolved,
+                        array_keys($unresolved)
+                    )));
+                }
+            });
+        } catch (\RuntimeException $e) {
+            $this->addError('staff_id',
+                'This job could not be attributed: ' . $e->getMessage()
+                . ' is not in the machines hierarchy, so the record would belong to nobody. '
+                . 'Add it under BIL → Machines, or ask an administrator to run '
+                . '`php artisan gds:rebuild-machine-maps` if it was added recently.');
+
+            return;
+        }
 
         session()->flash('ok', 'Service job logged.');
         $this->reset(['jobtitle', 'note', 'startTime', 'endTime']);

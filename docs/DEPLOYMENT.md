@@ -5,6 +5,57 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-08-13 (d) — The machine maps now track the hierarchy, and gds is strict
+
+A follow-on from `gds:check-machine-maps`. Two problems it exposed:
+
+**1. The maps were a snapshot.** `machine_map_*` were built once by the split
+migration and never refreshed. The triggers RECOMPUTE the ids from the name
+columns and win — so a line or staff member added in gds afterwards was unknown
+to the trigger, which stored NULL and **discarded the correct id gds had
+supplied**. Nothing errored; the record simply belonged to nobody.
+
+Now refreshed automatically whenever a Factory, MachineLine, MachineProject,
+Division or Staff is saved, deleted or restored
+(`Core\Providers\MachineMapsServiceProvider`), hooked on the MODEL so a change
+made anywhere keeps them correct.
+
+```
+php artisan gds:rebuild-machine-maps            # all six
+php artisan gds:rebuild-machine-maps --kind=staff
+```
+
+This is the "re-run the map build" step after a production data refresh — until
+now there was no command for it, only the migration.
+
+Safe on a live system: each map is built alongside the old one and swapped in
+with an atomic `RENAME TABLE`, so a legacy insert never finds it missing. (A
+`DROP` + `CREATE` would fail every concurrent insert whose trigger hit the gap.)
+
+**2. gds could file work against nobody.** Services now reads the row back after
+insert and **rolls back** if the trigger left an id null, naming the unknown
+value. Historic rows are left alone — 976 of them name staff the hierarchy has
+never had — but gds does not add to them.
+
+The rebuild is deliberately not attempted mid-save: it uses `RENAME TABLE`, which
+implicitly commits in MySQL and would break out of the transaction.
+
+### After deploying
+
+```
+php artisan gds:rebuild-machine-maps
+php artisan gds:check-machine-maps      # exit 1 if anything is unresolved
+```
+
+### What to check afterwards
+
+Add a staff member under BIL → Machines → Staff, then log a service job against
+them. Before this change the job saved with a null `staff_id`; now it saves
+attributed. Removing them from `machine_map_staff` by hand makes the save refuse
+with the reason.
+
+---
+
 ## 2026-08-13 (c) — `gds:check-machine-maps`: a preflight for the data refresh
 
 A refresh loads production data over `bil`/`bpl` while the **machines hierarchy**
