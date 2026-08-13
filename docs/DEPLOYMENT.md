@@ -5,6 +5,64 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-08-13 (c) — `gds:check-machine-maps`: a preflight for the data refresh
+
+A refresh loads production data over `bil`/`bpl` while the **machines hierarchy**
+is carried across from another environment. The legacy app writes NAMES
+(`linename`, `factory`, `project`, `staff`) and triggers resolve them to core ids
+through the `machine_map_*` tables — so any name the hierarchy has never seen
+resolves to NULL. Silently.
+
+Usually cosmetic. **For Conversion Waste it is not:** a run is keyed on
+`factory_conversion.line_id`, and pallets with a null line form no run at all —
+they never reach the waste queue, never need confirming, and never block. The
+control fails OPEN. This command is how that announces itself.
+
+```
+php artisan gds:check-machine-maps          # exit 1 if anything is unresolved
+php artisan gds:check-machine-maps --all    # list every unresolved value
+php artisan gds:check-machine-maps --strict # count legacy placeholders too
+```
+
+Run it **after** loading production data and re-running the split, since the maps
+are built from production's names — coverage can only be judged with both halves
+in place.
+
+### How it works
+
+The checks are **derived from the triggers at runtime**, not hardcoded, so they
+cannot drift from the schema. (Hardcoding missed `staff_id` on the first attempt:
+it matches on two columns, `division_nm` + `staff_nm`, not one.)
+
+Resolution is tested **in SQL**, with the same join the trigger does, so MySQL's
+collation rules apply. Checking in PHP is stricter than the database and reports
+names as missing that in fact resolve — "Aluminium Foil" matches "ALUMINIUM FOIL"
+in a case-insensitive collation.
+
+### Reading the output
+
+Legacy placeholders are reported separately and do **not** fail the check — no
+amount of editing the hierarchy would fix them:
+
+- `factory_usage_rawmaterials.project` holds the literal `'machine'` on 120,971
+  of its 121,043 rows (100%); the column is not holding a project.
+- `factory_machine_maintenance.subproject` holds the string `'null'` on 436 rows.
+
+A real gap names something that should exist. On this dataset, two:
+
+| Gap | Rows | What it is |
+|---|---|---|
+| `factory_machine_maintenance.staff_id` | 976 | **10 people missing from BIL > Machines > Staff** |
+| `factory_machine_maintenance.project_id` | 1 | "OMET 6", one job from Feb 2021 on a list that only ever had OMET 1–5 |
+
+### Fixing a gap
+
+Add the missing line / project / staff in **BIL > Machines**, then re-run the map
+build. Do **not** edit the legacy rows — the trigger resolves them on the next
+write.
+
+---
+
 ## 2026-08-13 — Conversion Waste, and the confirmation that gates production
 
 Rebuild of the legacy `factory_production_waste.php`, on a different shape.

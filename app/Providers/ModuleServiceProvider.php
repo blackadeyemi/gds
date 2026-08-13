@@ -10,6 +10,7 @@ use Modules\Bil\Console\SeedFinishedGoodsStock;
 use Modules\Bil\Console\ReconcileFinishedGoodsStock;
 use Modules\Bil\Console\ReconcileRawMaterialsStock;
 use Modules\Bil\Console\ReconcileWarehouseStock;
+use Modules\Core\Console\CheckMachineMaps;
 use Modules\Core\Console\MigrateLegacyAuth;
 use Modules\Core\Console\SyncDataViews;
 use Modules\Core\Console\SyncPages;
@@ -31,7 +32,7 @@ class ModuleServiceProvider extends ServiceProvider
     public function boot(): void
     {
         if ($this->app->runningInConsole()) {
-            $this->commands([SyncDataViews::class, MigrateLegacyAuth::class, ReconcileWarehouseStock::class, ReconcileFinishedGoodsStock::class, BackfillFinishedGoodsReceipts::class, SeedFinishedGoodsStock::class, RefreshFinishedGoodsOrderFrequency::class, ReconcileRawMaterialsStock::class, SyncShiftContexts::class, SyncPages::class]);
+            $this->commands([SyncDataViews::class, MigrateLegacyAuth::class, CheckMachineMaps::class, ReconcileWarehouseStock::class, ReconcileFinishedGoodsStock::class, BackfillFinishedGoodsReceipts::class, SeedFinishedGoodsStock::class, RefreshFinishedGoodsOrderFrequency::class, ReconcileRawMaterialsStock::class, SyncShiftContexts::class, SyncPages::class]);
         }
 
         $modules = base_path('app/Modules');
