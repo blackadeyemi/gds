@@ -5,6 +5,162 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-08-13 — Conversion Waste, and the confirmation that gates production
+
+Rebuild of the legacy `factory_production_waste.php`, on a different shape.
+
+### What shipped
+
+- **BIL → Finished Goods → Conversion Waste** (`/bil/finished-goods/conversion-waste`)
+- **BIL → Finished Goods → Reports → Conversion Waste**
+- **Settings → Waste** (`/settings/waste`) — the causes and origins vocabulary
+- A confirmation rule that stops **Conversion Output** starting a new run on a
+  line until the previous run's waste is confirmed.
+
+Nothing is migrated: the legacy `bil.factory_waste` table is **empty** (0 rows),
+so gds owns all four new tables outright and the legacy screen keeps its own.
+
+### The idea: waste hangs off a RUN
+
+A **run** is one line converting one product, on one date, in one shift.
+`(line_id, production_date, shift, productid)` is unique.
+
+Runs are **derived, not declared** — a run exists because pallets were booked
+against it in `factory_conversion`. A row in `conversion_waste_runs` is created
+only when someone enters waste or confirms, so *no row* means *nobody has looked
+at this yet*, which is exactly the state that should block the next run.
+
+Runs are ordered by the last pallet booked (`MAX(factory_conversion.id)`), not by
+date and shift alone. That is what makes a **mid-shift product change** work: two
+runs can share a line, date and shift and still have an unambiguous order,
+because one's pallets were booked before the other's. No changeover log is
+consulted — production itself says which came first.
+
+### ⚠️ `WASTE_CONFIRMATION_START` — set this per environment
+
+```
+WASTE_CONFIRMATION_START=2026-08-13
+```
+
+**This is the setting that matters.** There are 1.2M historic pallets with no
+waste recorded against them. A rule of "the previous run must be confirmed"
+applied to all of history would block every line on day one and never let go.
+
+Production before this date is history: visible in the reports, never a blocker.
+Set it to the day the feature goes live in that environment. The fallback in
+`config/waste.php` is a fixed date rather than `now()`, deliberately — so the
+boundary cannot quietly move every time the app boots.
+
+### New abilities (run `php artisan gds:sync-pages`)
+
+| Page | Ability | Who needs it |
+|---|---|---|
+| `bil.finished_goods.conversion_waste` | `view` | anyone entering waste |
+| | `confirm` | whoever closes a run — the supervisory act |
+| | `reopen` | whoever may correct a confirmed run |
+| | `bypass-waste-lock` | **production must not halt because a supervisor is away** |
+| `settings.waste` | `view`, `edit` | whoever maintains causes/origins |
+
+`bypass-waste-lock` is the escape hatch, and it is a permission rather than a
+button anyone can click. Grant it deliberately — a holder can book pallets with
+the previous run's waste still unrecorded.
+
+### After deploying
+
+```
+php artisan migrate --force      # creates 4 tables, seeds 13 causes + 2 origins
+php artisan gds:sync-pages       # 3 new pages, 6 new permissions
+php artisan optimize:clear
+```
+
+Then, in the Roles UI, grant `confirm` (and decide about `bypass-waste-lock`)
+to whichever role supervises the lines. **Until someone holds `confirm`, no run
+can be closed and every line will block after its first run.**
+
+### What to check afterwards
+
+- Settings → Waste lists **13 causes** and **2 origins** (Jumbo Roll → grade
+  types, Raw Materials → groups).
+- On Conversion Waste, picking **Jumbo Roll** on a row offers 20 grade types;
+  **Raw Materials** offers 8 groups. Origin is per row, not per form.
+- Book a pallet, then try to book a different product on the same line: the
+  Conversion Output button is disabled with the reason shown, for anyone without
+  the bypass.
+- Enter the waste, confirm the run, and the line frees immediately.
+- Reports → Conversion Waste → **Runs & confirmation** shows open runs. A run
+  with no entries and no confirmation is not "no waste" — it is nobody having
+  looked, and this is the only view that tells the two apart.
+
+### If it goes wrong
+
+The block is the only thing that touches existing behaviour. To lift it without
+rolling anything back, either grant `bypass-waste-lock` broadly, or push
+`WASTE_CONFIRMATION_START` into the future — both leave the data intact.
+
+To remove it entirely: `php artisan migrate:rollback --step=1` drops the four
+tables. `factory_conversion` is untouched by any of this.
+
+---
+
+## 2026-08-13 (a) — Index audit of the legacy schema
+
+Reports over `factory_conversion` and `factory_exit` took ~4s to open. An audit
+of every table in `bil`/`bpl`/`core` against the columns gds filters, joins and
+sorts on found the cause: **the legacy schema indexed identity and foreign keys
+but never the dates** — and every report opens on a date range.
+
+### What shipped
+
+One migration, `2026_08_13_..._index_legacy_hot_columns`, adding six indexes:
+
+| Table | Index | Why |
+|---|---|---|
+| `factory_conversion` | `(barcode)` | read on **every scan**; 1.2M rows, near-unique |
+| `factory_conversion` | `(dateofproduction, id)` | Conversion Output + Factory Floor Stock |
+| `factory_exit` | `(dateofexit, id)` | Factory Exit report |
+| `sales_loading` | `(dateofloading)` | stock ledger + movements modal |
+| `sales_loading_return` | `(loading_id)` | the unload join in `loadedSinceCutover()` |
+| `sales_order` | `(dateoforder)` | 90-day order window + movements modal |
+
+Chosen by measurement: every column added has a worst-case bucket under 1% of
+its table. The categorical filters beside them (`factory`, `shift`, `linename`,
+`exitlocation`, the RM `status` columns) measured 30–100% and are **deliberately
+left alone** — MySQL would ignore such an index and the writes would still pay.
+The MyISAM raw-materials tables are untouched: `ADD INDEX` locks them for the
+rebuild, which is not worth a maybe on a live shared database.
+
+### Two query-shape fixes that came with it
+
+- `>= x AND <= x` is **not** collapsed to an equality by MySQL; `BETWEEN x AND x`
+  is. The reports that hand-rolled the pair could not use the new index for
+  their `ORDER BY`. All now route through `applyDate()`.
+- Ordering by `id` while filtering on the date forces a choice between two
+  indexes, and with **server-side prepared statements** MySQL plans
+  `BETWEEN ? AND ?` without knowing the values — so it picked a backwards
+  primary-key scan and walked the whole table. The same SQL ran in 5ms with
+  literals and 3,200ms with bindings. The listings now order **along** the
+  `(date, id)` index. Rows and their order are unchanged.
+
+`applyDate()` also no longer ignores one-sided ranges — asking for "from 1
+January" with no end date previously returned all time.
+
+### After deploying
+
+```
+php artisan migrate --force      # ~30s; ALGORITHM=INPLACE, LOCK=NONE
+php artisan optimize:clear
+```
+
+Additive and index-only — the legacy PHP app reading the same tables sees
+nothing but faster queries. Writes continue during the build.
+
+### What to check afterwards
+
+Conversion Output and Factory Exit reports open in well under 200ms on any
+range. Scanning a barcode at Factory Exit is immediate.
+
+---
+
 ## 2026-08-12 (b) — Gates gain direction; warehouses gain a module; raw materials imported
 
 Two further migrations, on top of the same day's rebuild:

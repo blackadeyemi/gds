@@ -241,6 +241,12 @@
                                 <span class="label">Conversion Output</span>
                             </a>
                             @endcanPage
+                            @canPage('bil.finished_goods.conversion_waste')
+                            <a href="{{ route('bil.finished-goods.conversion-waste') }}" class="nav-link {{ $is('bil/finished-goods/conversion-waste*') }}" title="Conversion Waste">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
+                                <span class="label">Conversion Waste</span>
+                            </a>
+                            @endcanPage
                             @canPage('bil.finished_goods.factory_exit')
                             <a href="{{ route('bil.finished-goods.factory-exit') }}" class="nav-link {{ $is('bil/finished-goods/factory-exit*') }}" title="Factory Exit">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
@@ -270,6 +276,11 @@
                                     @canPage('bil.finished_goods.reports.conversion_output')
                                     <a href="{{ route('bil.finished-goods.reports.conversion-output') }}" class="nav-link {{ $is('bil/finished-goods/reports/conversion-output*') }}" title="Conversion Output">
                                         <span class="label">Conversion Output</span>
+                                    </a>
+                                    @endcanPage
+                                    @canPage('bil.finished_goods.reports.conversion_waste')
+                                    <a href="{{ route('bil.finished-goods.reports.conversion-waste') }}" class="nav-link {{ $is('bil/finished-goods/reports/conversion-waste*') }}" title="Conversion Waste">
+                                        <span class="label">Conversion Waste</span>
                                     </a>
                                     @endcanPage
                                     @canPage('bil.finished_goods.reports.factory_exit')
@@ -518,6 +529,12 @@
                     <a href="{{ url('/settings/shifts') }}" class="nav-link {{ $is('settings/shifts*') }}" title="Shift Settings">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
                         <span class="label">Shift Settings</span>
+                    </a>
+                    @endcanPage
+                    @canPage('settings.waste')
+                    <a href="{{ url('/settings/waste') }}" class="nav-link {{ $is('settings/waste*') }}" title="Waste Settings">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
+                        <span class="label">Waste Settings</span>
                     </a>
                     @endcanPage
                 </div>

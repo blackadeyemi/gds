@@ -10,6 +10,7 @@ use Livewire\Component;
 use Modules\Bil\Models\ConversionSetup;
 use Modules\Bil\Models\FactoryConversion;
 use Modules\Bil\Models\FinishedGoodsProduct;
+use Modules\Bil\Support\ConversionWaste as Waste;
 use Modules\Core\Models\MachineLine;
 
 /**
@@ -132,6 +133,57 @@ class ConversionOutput extends Component
         unset($this->setup, $this->product, $this->placement);
     }
 
+    /* ---------------- Waste confirmation ---------------- */
+
+    /**
+     * Why this line may not start a run right now, or null.
+     *
+     * A run is one line converting one product in one shift, and its waste has
+     * to be confirmed before the next run on that line can begin — including
+     * when the "next run" is the same shift with a different product, because a
+     * changeover ends a run too. See Support\ConversionWaste.
+     *
+     * Holders of the waste bypass are never stopped: production must not halt
+     * because a supervisor is unavailable, so the escape hatch is a permission
+     * rather than an override anyone can click.
+     */
+    protected function wasteBlocker(int $productid, string $date): ?string
+    {
+        if (auth()->user()?->canDo(ConversionWaste::PAGE_KEY, 'bypass-waste-lock')) {
+            return null;
+        }
+
+        $blocker = Waste::blockingRun((int) $this->line_id, $date, $this->shift, $productid);
+
+        if (! $blocker) {
+            return null;
+        }
+
+        return sprintf(
+            'Waste has not been confirmed for the previous run on this line — %s, %s shift, %s. '
+            . 'Record it on Conversion Waste and confirm that run before booking more pallets.',
+            $blocker['line_name'] ?: ('line #' . $blocker['line_id']),
+            strtolower($blocker['shift']),
+            \Illuminate\Support\Carbon::parse($blocker['date'])->format('d/m/Y')
+        );
+    }
+
+    /**
+     * The same check, for the view — so the screen says the run is blocked
+     * before the operator fills the form in, not after they press Generate.
+     */
+    #[Computed]
+    public function wasteBlock(): ?string
+    {
+        if (! $this->line_id || ! $this->product) {
+            return null;
+        }
+
+        $date = $this->canBackdate() ? $this->dateIso : now()->format('Y-m-d');
+
+        return $this->wasteBlocker((int) $this->product->productid, $date);
+    }
+
     /* ---------------- Generate ---------------- */
 
     public function generate(): void
@@ -166,6 +218,16 @@ class ConversionOutput extends Component
         $date = $this->canBackdate() ? $this->dateIso : now()->format('Y-m-d');
         $dateSlash = str_replace('-', '/', $date);
         $bundles = (int) $setup->bundles;
+
+        // A line cannot start a new run while the previous one still owes its
+        // waste. Checked HERE — after validation but before the sequence lock —
+        // so nothing is minted and no barcode number is consumed by a run that
+        // is about to be refused.
+        if ($blocker = $this->wasteBlocker($product->productid, $date)) {
+            session()->flash('err', $blocker);
+
+            return;
+        }
 
         // Per-bundle spec, snapshotted onto the row like the legacy screen.
         $specs = json_encode([

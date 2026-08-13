@@ -51,6 +51,9 @@ return [
         ['key' => 'settings.data_views', 'label' => 'Data Views',     'module' => 'Settings', 'route' => 'settings.data-views', 'abilities' => $access],
         ['key' => 'settings.shifts',     'label' => 'Shift Settings', 'module' => 'Settings', 'route' => 'settings.shifts',     'abilities' => $access],
         ['key' => 'settings.service_types', 'label' => 'Service Types', 'module' => 'Settings', 'route' => 'settings.service-types', 'abilities' => $crud],
+        // One page holding two lists (causes + origins), edited inline — so
+        // 'edit' is the whole write ability; there is no separate create/delete.
+        ['key' => 'settings.waste',      'label' => 'Waste Settings', 'module' => 'Settings', 'route' => 'settings.waste',      'abilities' => ['view', 'edit']],
 
         // BIL — Machines (Company > Factory > Line > Project)
         ['key' => 'bil.machines.statistics', 'label' => 'Statistics', 'module' => 'BIL / Machines', 'route' => 'bil.machines.statistics', 'abilities' => $snapshot],
@@ -67,6 +70,9 @@ return [
         // BIL — Finished Goods
         ['key' => 'bil.finished_goods.products', 'label' => 'Products', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.products', 'abilities' => $crud],
         ['key' => 'bil.finished_goods.conversion_output', 'label' => 'Conversion Output', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.conversion-output', 'abilities' => $entry],
+        // Entry plus the two supervisory acts that close and re-open a run, and
+        // the bypass that lets production continue when a run cannot be closed.
+        ['key' => 'bil.finished_goods.conversion_waste', 'label' => 'Conversion Waste', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.conversion-waste', 'abilities' => ['view', 'confirm', 'reopen', 'bypass-waste-lock']],
         ['key' => 'bil.finished_goods.factory_exit', 'label' => 'Factory Exit', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.factory-exit', 'abilities' => $entry, 'gates' => 'factory'],
         // Stock lines are created by movement and never deleted, so no create
         // or delete ability; `edit` records an adjustment.
@@ -74,6 +80,7 @@ return [
         // Pallets made but not yet sent on — read-only, since it is a view
         // over conversion output rather than a table of its own.
         ['key' => 'bil.finished_goods.reports.factory_floor_stock', 'label' => 'Factory Floor Stock', 'module' => 'BIL / Finished Goods Reports', 'route' => 'bil.finished-goods.reports.factory-floor-stock', 'abilities' => ['view', 'export']],
+        ['key' => 'bil.finished_goods.reports.conversion_waste', 'label' => 'Conversion Waste', 'module' => 'BIL / Finished Goods Reports', 'route' => 'bil.finished-goods.reports.conversion-waste', 'abilities' => $snapshot],
         ['key' => 'bil.finished_goods.warehouse_entrance', 'label' => 'Warehouse Entrance', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.warehouse-entrance', 'abilities' => $entry, 'gates' => 'warehouse'],
 
         // BIL — Finished Goods Reports. No `edit`: a pallet's weights come from
@@ -128,5 +135,8 @@ return [
         'backdate' => 'Backdate',
         'approve' => 'Approve',
         'bypass-shift' => 'Bypass shift',
+        'confirm' => 'Confirm',
+        'reopen' => 'Re-open',
+        'bypass-waste-lock' => 'Bypass waste lock',
     ],
 ];

@@ -15,6 +15,7 @@ use Modules\Core\Livewire\Admin\Warehouses;
 use Modules\Core\Livewire\Settings\Appearance;
 use Modules\Core\Livewire\Settings\DataViews;
 use Modules\Core\Livewire\Settings\ServiceTypes;
+use Modules\Core\Livewire\Settings\WasteSettings;
 use Modules\Core\Livewire\Settings\Pages;
 use Modules\Core\Livewire\Settings\ShiftSettings;
 
@@ -73,6 +74,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/data-views', DataViews::class)->middleware('page:settings.data_views')->name('settings.data-views');
 
     Route::get('/settings/service-types', ServiceTypes::class)->middleware('page:settings.service_types')->name('settings.service-types');
+    Route::get('/settings/waste', WasteSettings::class)->middleware('page:settings.waste')->name('settings.waste');
 
     // Shift windows — access granted per page (settings.shifts). Give the
     // Shift Settings page to Admin + an Operations Manager role, etc.

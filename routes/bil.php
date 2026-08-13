@@ -3,8 +3,10 @@
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Modules\Bil\Livewire\FinishedGoods\ConversionOutput;
+use Modules\Bil\Livewire\FinishedGoods\ConversionWaste;
 use Modules\Bil\Livewire\FinishedGoods\FactoryExit;
 use Modules\Bil\Livewire\FinishedGoods\Reports\ConversionOutput as ConversionOutputReport;
+use Modules\Bil\Livewire\FinishedGoods\Reports\ConversionWaste as ConversionWasteReport;
 use Modules\Bil\Livewire\FinishedGoods\Reports\FactoryExit as FactoryExitReport;
 use Modules\Bil\Livewire\FinishedGoods\Reports\FactoryFloorStock as FgFactoryFloorStock;
 use Modules\Bil\Livewire\FinishedGoods\Reports\WarehouseEntrance as WarehouseEntranceReport;
@@ -56,6 +58,8 @@ Route::middleware('auth')
             ->middleware('page:bil.finished_goods.products')->name('products');
         Route::get('/conversion-output', ConversionOutput::class)
             ->middleware('page:bil.finished_goods.conversion_output')->name('conversion-output');
+        Route::get('/conversion-waste', ConversionWaste::class)
+            ->middleware('page:bil.finished_goods.conversion_waste')->name('conversion-waste');
         Route::get('/factory-exit', FactoryExit::class)
             ->middleware('page:bil.finished_goods.factory_exit')->name('factory-exit');
         Route::get('/warehouse-entrance', WarehouseEntrance::class)
@@ -89,12 +93,15 @@ Route::middleware('auth')
                 ->middleware('page:bil.finished_goods.reports.warehouse_entrance')->name('warehouse-entrance');
             Route::get('/factory-floor-stock', FgFactoryFloorStock::class)
                 ->middleware('page:bil.finished_goods.reports.factory_floor_stock')->name('factory-floor-stock');
+            Route::get('/conversion-waste', ConversionWasteReport::class)
+                ->middleware('page:bil.finished_goods.reports.conversion_waste')->name('conversion-waste');
 
             $reports = [
                 'conversion-output' => ConversionOutputReport::class,
                 'factory-exit' => FactoryExitReport::class,
                 'warehouse-entrance' => WarehouseEntranceReport::class,
                 'factory-floor-stock' => FgFactoryFloorStock::class,
+                'conversion-waste' => ConversionWasteReport::class,
             ];
 
             $hydrate = function (string $class) {

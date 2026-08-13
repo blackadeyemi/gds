@@ -8,6 +8,7 @@
     $product = $this->product;
     $place = $this->placement;
     $maxPallets = \Modules\Bil\Livewire\FinishedGoods\ConversionOutput::MAX_PALLETS;
+    $wasteBlock = $this->wasteBlock;
 @endphp
 
 <div>
@@ -112,6 +113,18 @@
                 </div>
             @endif
 
+            {{-- The waste rule, said before the form is filled in rather than
+                 after Generate is pressed. --}}
+            @if ($wasteBlock)
+                <div class="card" style="border-color:var(--danger);margin-bottom:1rem;padding:0.8rem 1.25rem;">
+                    <div style="color:var(--danger);font-weight:600;">Previous run's waste is not confirmed</div>
+                    <div class="text-sm" style="margin-top:0.25rem;">{{ $wasteBlock }}</div>
+                    <a href="{{ route('bil.finished-goods.conversion-waste') }}" class="btn btn-ghost btn-sm" style="margin-top:0.5rem;">
+                        Go to Conversion Waste
+                    </a>
+                </div>
+            @endif
+
             {{-- Stacked and centred: the count and the action are the end of the
                  form, not another pair of side-by-side fields. --}}
             <div style="text-align:center;">
@@ -124,7 +137,7 @@
                 </div>
 
                 <button type="submit" class="btn btn-primary"
-                        @disabled(! $setup || ! $product || ! ($place['code'] ?? null))>
+                        @disabled(! $setup || ! $product || ! ($place['code'] ?? null) || $wasteBlock)>
                     <span wire:loading.remove wire:target="generate">Create pallets &amp; print labels</span>
                     <span wire:loading wire:target="generate">Creating…</span>
                 </button>
