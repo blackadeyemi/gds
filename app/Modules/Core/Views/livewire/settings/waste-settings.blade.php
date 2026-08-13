@@ -15,6 +15,84 @@
 
     <form wire:submit="save">
 
+        {{-- ---------------- The cut-over ---------------- --}}
+        @php
+            $impact = $this->cutoverImpact;
+            $meta = $this->cutoverMeta;
+        @endphp
+        <div class="card" style="margin-bottom:1rem;">
+            <div class="card-head">
+                <div>
+                    <h2 class="card-title">Confirmation cut-over</h2>
+                    <div class="text-sm text-muted">Production before this date never has to be confirmed.</div>
+                </div>
+            </div>
+
+            <div class="card-pad">
+                <div style="display:grid;grid-template-columns:minmax(180px,220px) 1fr;gap:1rem;align-items:start;">
+                    <div class="form-group" style="margin:0;">
+                        <label class="form-label">Waste is confirmed from</label>
+                        <input type="date" class="form-control" wire:model.live="cutover" @disabled(! $mayEdit)>
+                        @error('cutover') <div class="form-error">{{ $message }}</div> @enderror
+                    </div>
+
+                    <div class="text-sm text-muted">
+                        <p style="margin:0 0 .5rem;">
+                            Runs on or after this date appear on Conversion Waste and block the next run
+                            on their line until confirmed. Anything earlier is history — still in the
+                            reports, never a blocker.
+                        </p>
+                        <p style="margin:0;">
+                            @if ($this->cutoverIsOverridden())
+                                Set here, overriding <code>WASTE_CONFIRMATION_START</code>
+                                (<strong>{{ $this->cutoverConfigured() ?: 'unset' }}</strong>) in the environment.
+                                @if ($meta?->updated_by_name)
+                                    Last changed by <strong>{{ $meta->updated_by_name }}</strong>
+                                    on {{ \Illuminate\Support\Carbon::parse($meta->updated_at)->format('d/m/Y H:i') }}.
+                                @endif
+                                @if ($mayEdit)
+                                    <button type="button" class="btn btn-ghost btn-sm" style="margin-left:.4rem;"
+                                            wire:click="revertCutover"
+                                            wire:confirm="Revert to the environment setting ({{ $this->cutoverConfigured() ?: 'unset' }})?">
+                                        Revert to environment
+                                    </button>
+                                @endif
+                            @else
+                                Coming from <code>WASTE_CONFIRMATION_START</code> in the environment.
+                                Changing it here overrides that.
+                            @endif
+                        </p>
+                    </div>
+                </div>
+
+                {{-- Both directions are consequential, so the cost is shown
+                     before it is paid rather than discovered afterwards. --}}
+                @if ($impact)
+                    <div class="card" style="margin-top:0.9rem;padding:0.8rem 1.1rem;border-color:{{ $impact['direction'] === 'later' ? 'var(--danger)' : 'var(--accent,#3b82f6)' }};">
+                        <div style="font-weight:600;">
+                            @if ($impact['direction'] === 'later')
+                                Moving the cut-over <em>later</em> — {{ abs($impact['delta']) }} run(s) would stop needing confirmation
+                            @else
+                                Moving the cut-over <em>earlier</em> — {{ abs($impact['delta']) }} more run(s) would need confirmation
+                            @endif
+                        </div>
+                        <div class="text-sm" style="margin-top:0.3rem;">
+                            Open runs today: <strong>{{ number_format($impact['now']) }}</strong>
+                            (from {{ $impact['current'] }}) →
+                            <strong>{{ number_format($impact['then']) }}</strong> after this change.
+                            @if ($impact['direction'] === 'later')
+                                Those runs disappear from the queue and stop blocking their lines —
+                                <strong>their waste will never be asked for</strong>. This change is
+                                recorded against your name.
+                            @else
+                                Every affected line will block until those runs are confirmed.
+                            @endif
+                        </div>
+                    </div>
+                @endif
+            </div>
+        </div>
+
         {{-- ---------------- Causes ---------------- --}}
         <div class="card" style="margin-bottom:1rem;">
             <div class="card-head">

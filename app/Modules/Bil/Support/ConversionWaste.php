@@ -5,6 +5,7 @@ namespace Modules\Bil\Support;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Bil\Models\ConversionWasteRun;
+use Modules\Core\Support\Settings;
 
 /**
  * The rules behind conversion waste: what a run is, which runs still owe waste,
@@ -32,16 +33,19 @@ class ConversionWaste
     /**
      * Production before this date is history and never blocks. See config/waste.php
      * — without it, 1.2M unconfirmed historic runs would block every line forever.
+     *
+     * Editable in Settings → Waste; the stored override wins, and with none set
+     * the .env value stands (Core\Support\Settings).
      */
     public static function cutover(): string
     {
-        return (string) config('waste.confirmation_start', '2026-08-13');
+        return (string) Settings::get('waste.confirmation_start', '2026-08-13');
     }
 
     /** The cut-over in the legacy `Y/m/d` form `factory_conversion` stores. */
-    protected static function cutoverSlash(): string
+    protected static function cutoverSlash(?string $since = null): string
     {
-        return str_replace('-', '/', self::cutover());
+        return str_replace('-', '/', $since ?: self::cutover());
     }
 
     /* ---------------- Current production date + shift ---------------- */
@@ -90,9 +94,9 @@ class ConversionWaste
      * Every run since the cut-over across all lines, newest first.
      * `$lineIds` limits it to a set of lines (the run picker's filter).
      */
-    public static function recentRuns(?array $lineIds = null, int $limit = 500): array
+    public static function recentRuns(?array $lineIds = null, int $limit = 500, ?string $since = null): array
     {
-        $q = self::runQuery();
+        $q = self::runQuery($since);
 
         if ($lineIds !== null) {
             if ($lineIds === []) {
@@ -112,10 +116,10 @@ class ConversionWaste
      * the cut-over keeps the date range short, so this stays cheap however long
      * factory_conversion grows.
      */
-    protected static function runQuery()
+    protected static function runQuery(?string $since = null)
     {
         return DB::connection('bil')->table('factory_conversion as c')
-            ->where('c.dateofproduction', '>=', self::cutoverSlash())
+            ->where('c.dateofproduction', '>=', self::cutoverSlash($since))
             ->whereNotNull('c.line_id')
             ->whereNotNull('c.productid')
             ->where('c.productid', '>', 0)
@@ -191,11 +195,11 @@ class ConversionWaste
      * The order is the point: the oldest open run is the one holding the line
      * up, so it belongs at the top of the entry screen and in the block message.
      */
-    public static function openRuns(?array $lineIds = null, ?int $limit = null): array
+    public static function openRuns(?array $lineIds = null, ?int $limit = null, ?string $since = null): array
     {
         $limit ??= (int) config('waste.open_run_limit', 100);
 
-        $runs = self::recentRuns($lineIds);
+        $runs = self::recentRuns($lineIds, 500, $since);
         $stored = self::storedFor($runs);
 
         $open = array_values(array_filter(
@@ -316,7 +320,8 @@ class ConversionWaste
         $run->forceFill([
             'confirmed_at' => now(),
             'confirmed_by' => auth()->id(),
-            'confirmed_by_name' => auth()->user()?->name,
+            // `username` is the User model's display field — `name` is null.
+            'confirmed_by_name' => auth()->user()?->username ?? auth()->user()?->name,
             'is_nil' => $isNil,
             'note' => $note ?: $run->note,
         ])->save();

@@ -227,6 +227,24 @@ class ConversionWaste extends Component
         return MachineLine::treeOrder()->get();
     }
 
+    /**
+     * Lines for the searchable filter, with an explicit "All lines" entry.
+     *
+     * The searchable-select has no empty option of its own, so clearing the
+     * filter has to be a choosable value rather than the absence of one.
+     */
+    #[Computed]
+    public function lineOptions(): array
+    {
+        return array_merge(
+            [['value' => '', 'label' => 'All lines']],
+            $this->lines->map(fn ($l) => [
+                'value' => (string) $l->id,
+                'label' => ($l->parent_id ? '— ' : '') . $l->name,
+            ])->all()
+        );
+    }
+
     /** Waste already saved against the selected run. */
     #[Computed]
     public function entries()
@@ -366,7 +384,7 @@ class ConversionWaste extends Component
                     'origin_ref_id' => $ref ? $origin?->refId($ref) : null,
                     'weight_kg' => (float) $row['weight'],
                     'user_id' => auth()->id(),
-                    'username' => auth()->user()?->name,
+                    'username' => auth()->user()?->username ?? auth()->user()?->name,
                 ]);
             }
         });

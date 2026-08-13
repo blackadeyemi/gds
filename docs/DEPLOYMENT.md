@@ -36,7 +36,7 @@ runs can share a line, date and shift and still have an unambiguous order,
 because one's pallets were booked before the other's. No changeover log is
 consulted — production itself says which came first.
 
-### ⚠️ `WASTE_CONFIRMATION_START` — set this per environment
+### ⚠️ The confirmation cut-over — set this per environment
 
 ```
 WASTE_CONFIRMATION_START=2026-08-13
@@ -50,6 +50,23 @@ Production before this date is history: visible in the reports, never a blocker.
 Set it to the day the feature goes live in that environment. The fallback in
 `config/waste.php` is a fixed date rather than `now()`, deliberately — so the
 boundary cannot quietly move every time the app boots.
+
+**It is also editable in Settings → Waste**, which overrides the environment
+value; "Revert to environment" drops the override and puts `.env` back. Overrides
+live in the new `app_settings` table (`Core\Support\Settings`) — a row there
+beats the matching `config` key, so a fresh environment behaves exactly as its
+`.env` says until somebody deliberately changes it.
+
+Editing it is consequential in **both** directions, so the page prices the change
+before it is made and records who made it:
+
+- **later** — open runs drop off the queue and stop blocking. A backlog can be
+  made to disappear by editing a date, which is precisely why the preview says
+  how many and the change is attributed.
+- **earlier** — historic production becomes unconfirmed and every affected line
+  blocks at once.
+
+Restrict `settings.waste:edit` accordingly.
 
 ### New abilities (run `php artisan gds:sync-pages`)
 

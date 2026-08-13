@@ -43,12 +43,17 @@
             <div class="card-pad">
                 <div class="form-group">
                     <label class="form-label">Line</label>
-                    <select class="form-control" wire:model.live="filterLine">
-                        <option value="">All lines</option>
-                        @foreach ($this->lines as $l)
-                            <option value="{{ $l->id }}">{{ $l->parent_id ? '— ' : '' }}{{ $l->name }}</option>
-                        @endforeach
-                    </select>
+                    {{-- Searchable: there are enough lines that scanning a plain
+                         dropdown is slower than typing two letters. Live, because
+                         choosing one refilters the queue. --}}
+                    @include('core::partials.searchable-select', [
+                        'field' => 'filterLine',
+                        'options' => $this->lineOptions,
+                        'valueKey' => 'value',
+                        'labelKey' => 'label',
+                        'placeholder' => 'All lines',
+                        'live' => true,
+                    ])
                 </div>
 
                 <div style="max-height:26rem;overflow:auto;margin:0 -0.4rem;">
@@ -240,22 +245,32 @@
                                                     @elseif (! $needsRef)
                                                         <div class="text-sm text-muted" style="padding:0.5rem 0;">Not classified</div>
                                                     @else
-                                                        <select class="form-control" wire:model="rows.{{ $i }}.origin_ref" @disabled($blocked)>
-                                                            <option value="">— Select —</option>
-                                                            @foreach ($opts as $value => $label)
-                                                                <option value="{{ $value }}">{{ $label }}</option>
-                                                            @endforeach
-                                                        </select>
+                                                        {{-- Searchable: 20 grade types is past the point of scanning
+                                                             a list. The wire:key carries the origin, so switching
+                                                             origin re-initialises the control with its options
+                                                             instead of leaving the previous origin's behind. --}}
+                                                        @include('core::partials.searchable-select', [
+                                                            'field' => "rows.{$i}.origin_ref",
+                                                            'options' => collect($opts)->map(fn ($label, $value) => [
+                                                                'value' => (string) $value, 'label' => $label,
+                                                            ])->values(),
+                                                            'valueKey' => 'value',
+                                                            'labelKey' => 'label',
+                                                            'placeholder' => '— Select —',
+                                                            'disabled' => $blocked,
+                                                            'key' => "ref-{$row['uid']}-{$row['origin_id']}",
+                                                        ])
                                                         @error("rows.{$i}.origin_ref") <div class="form-error">{{ $message }}</div> @enderror
                                                     @endif
                                                 </td>
                                                 <td>
-                                                    <select class="form-control" wire:model="rows.{{ $i }}.cause_id" @disabled($blocked)>
-                                                        <option value="">— Select cause —</option>
-                                                        @foreach ($this->causes as $c)
-                                                            <option value="{{ $c->id }}">{{ $c->name }}</option>
-                                                        @endforeach
-                                                    </select>
+                                                    @include('core::partials.searchable-select', [
+                                                        'field' => "rows.{$i}.cause_id",
+                                                        'options' => $this->causes,
+                                                        'placeholder' => '— Select cause —',
+                                                        'disabled' => $blocked,
+                                                        'key' => "cause-{$row['uid']}",
+                                                    ])
                                                     @error("rows.{$i}.cause_id") <div class="form-error">{{ $message }}</div> @enderror
                                                 </td>
                                                 <td>
