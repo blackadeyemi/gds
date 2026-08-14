@@ -140,6 +140,26 @@ class JumboRollFactoryEntrancePageTest extends TestCase
             ->assertSet('scanError', 'Barcode already scanned.');
     }
 
+    /**
+     * Receiving a reel closes its BPL exit (`bpl_factoryexit.received_at`).
+     *
+     * The Stock page does not show outstanding exits, but this is the record of
+     * which ones are still open — so it has to stay true, or the count is stale
+     * the moment someone reports on it.
+     */
+    public function test_receiving_a_reel_closes_its_bpl_exit(): void
+    {
+        $stillOpen = DB::connection('bil')->table('bpl_factoryexit as x')
+            ->join('factory_entrance_reel as f', function ($j) {
+                $j->on('f.barcode', '=', 'x.barcode')->where('f.is_deleted', 0);
+            })
+            ->whereNull('x.deleted_at')
+            ->whereNull('x.received_at')
+            ->count();
+
+        $this->assertSame(0, $stillOpen, 'reels already received at a BIL gate still have an open BPL exit');
+    }
+
     public function test_the_page_is_registered_and_shift_gated(): void
     {
         $page = collect(config('pages.pages'))->firstWhere('key', 'bil.jumbo_rolls.factory_entrance');

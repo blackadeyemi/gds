@@ -6,6 +6,7 @@ use Modules\Bil\Livewire\FinishedGoods\ConversionOutput;
 use Modules\Bil\Livewire\FinishedGoods\ConversionWaste;
 use Modules\Bil\Livewire\FinishedGoods\StockTransfer as FgStockTransfer;
 use Modules\Bil\Livewire\FinishedGoods\StockTransferReceive;
+use Modules\Bil\Livewire\FinishedGoods\Statistics as FgStatistics;
 use Modules\Bil\Livewire\FinishedGoods\FactoryExit;
 use Modules\Bil\Livewire\FinishedGoods\Reports\ConversionOutput as ConversionOutputReport;
 use Modules\Bil\Livewire\FinishedGoods\Reports\ConversionWaste as ConversionWasteReport;
@@ -68,6 +69,23 @@ Route::middleware('auth')
             ->middleware('page:bil.finished_goods.conversion_output')->name('conversion-output');
         Route::get('/conversion-waste', ConversionWaste::class)
             ->middleware('page:bil.finished_goods.conversion_waste')->name('conversion-waste');
+
+        Route::get('/statistics', FgStatistics::class)
+            ->middleware('page:bil.finished_goods.statistics')->name('statistics');
+        // Direct download of the current statistics section as xlsx/csv/pdf.
+        Route::get('/statistics/export', function () {
+            abort_unless((bool) request()->user()?->canDo('bil.finished_goods.statistics', 'export'), 403);
+
+            $format = strtolower((string) request('format', 'xlsx'));
+            abort_unless(in_array($format, ['xlsx', 'csv', 'pdf'], true), 404);
+
+            $c = new FgStatistics();
+            $c->section = (string) request('section', '');
+            $c->range = (string) request('range', '30d');
+            $c->figures = (string) request('figures', 'rounded');
+
+            return $c->exportResponse($format);
+        })->middleware('page:bil.finished_goods.statistics')->name('statistics.export');
 
         Route::get('/stock-transfer', FgStockTransfer::class)
             ->middleware('page:bil.finished_goods.stock_transfer')->name('stock-transfer');

@@ -277,6 +277,12 @@
                             <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
                         </button>
                         <div class="nav-sub" x-show="finishedGoodsOpen">
+                            @canPage('bil.finished_goods.statistics')
+                            <a href="{{ route('bil.finished-goods.statistics') }}" class="nav-link {{ $is('bil/finished-goods/statistics*') }}" title="Statistics">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/></svg>
+                                <span class="label">Statistics</span>
+                            </a>
+                            @endcanPage
                             @canPage('bil.finished_goods.products')
                             <a href="{{ route('bil.finished-goods.products') }}" class="nav-link {{ $is('bil/finished-goods/products*') }}" title="Products">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7l-8-4-8 4 8 4 8-4zM4 7v10l8 4 8-4V7M12 11v10"/></svg>

@@ -68,6 +68,7 @@ return [
         ['key' => 'bil.machines.reports.conversion_history', 'label' => 'Conversion History', 'module' => 'BIL / Machines Reports', 'route' => 'bil.machines.reports.conversion-history', 'abilities' => $snapshot],
 
         // BIL — Finished Goods
+        ['key' => 'bil.finished_goods.statistics', 'label' => 'Statistics', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.statistics', 'abilities' => $snapshot],
         ['key' => 'bil.finished_goods.products', 'label' => 'Products', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.products', 'abilities' => $crud],
         ['key' => 'bil.finished_goods.conversion_output', 'label' => 'Conversion Output', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.conversion-output', 'abilities' => ['view', 'backdate', 'bypass-shift']],
         // Entry plus the two supervisory acts that close and re-open a run, and

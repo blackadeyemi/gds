@@ -417,6 +417,10 @@ class Consumption extends Component
     /**
      * What is left of a whole reel: its production weight, less everything
      * consumed and everything returned across all of its slices.
+     *
+     * Matched on `reel_barcode` — the stored generated column holding a slice's
+     * parent code — so each rollup is a covering index lookup rather than the
+     * unindexable `barcode LIKE 'parent%'` the legacy code used.
      */
     protected function remainingWeight($conn, string $parent): float
     {
@@ -424,10 +428,10 @@ class Consumption extends Component
             ->where('barcode', $parent)->value('weight');
 
         $used = (float) $conn->table('factory_usage_reel')
-            ->where('barcode', 'like', $parent . '%')->where('is_deleted', 0)->sum('weight');
+            ->where('reel_barcode', $parent)->where('is_deleted', 0)->sum('weight');
 
         $returned = (float) $conn->table('factory_event')
-            ->where('barcode', 'like', $parent . '%')->where('event', 'return')->sum('weight');
+            ->where('reel_barcode', $parent)->where('event', 'return')->sum('weight');
 
         return $weight - ($used + $returned);
     }

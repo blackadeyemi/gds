@@ -5,6 +5,41 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-08-14 — Finished Goods Statistics
+
+```
+php artisan gds:sync-pages    # 1 new page: bil.finished_goods.statistics
+```
+
+The counterpart of the Raw Materials dashboard, on the same `StatisticsPage`
+base. Five sections: **Overview, Production, Warehouse, Waste, Transfers**.
+
+Unlike Raw Materials it spans BOTH connections. Production and factory exit are
+legacy `bil` tables with `Y/m/d` VARCHAR dates, handled by `LegacyStatQueries`
+(bucketing with `LEFT(col, 7|10)`). Warehouse receipts, waste and transfers are
+gds-owned `core` tables with real DATE columns, so they use the
+`coreSeries()`/`coreCount()` helpers on the page — same shape of answer, without
+the string juggling the legacy columns force. The two cannot be joined, so
+product names for `core` rows are resolved in PHP.
+
+Ranges are capped at 12 months, as on Raw Materials: `factory_conversion` is 1.2M
+rows and a bounded range rides the `(dateofproduction, id)` index while an
+unbounded one does not.
+
+Top-products charts group on the indexed `productid` and resolve names afterwards
+— joining `products` across 1.2M rows costs far more than ten lookups.
+
+### Verified against source
+
+Every headline figure is asserted against the table it summarises, not just
+checked for rendering: pallets and bundles against `factory_conversion`, floor
+stock against the Factory Floor Stock report, in-stock against the Warehouse
+Stock page, waste against the waste entries, transfers against the transfer
+lines. Warehouse receipts exclude imported history, so the dashboard agrees with
+the Warehouse Entrance report rather than counting 1.16M backfilled rows.
+
+---
+
 ## 2026-08-13 (e) — BIL Sales: Orders + Customers
 
 New nav group **BIL → Sales**, two pages, and a geography reference set.

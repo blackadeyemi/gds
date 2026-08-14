@@ -219,6 +219,7 @@ class FactoryEntrance extends Component
                         JumboRollFactoryEntrance::create($row + ['barcode' => $item['barcode']]);
                     }
 
+                    $this->closeBplExit($conn, $item['barcode'], $date);
                     $this->addToFloorStock($conn, $item, $username, $now);
                     $entered++;
                 }
@@ -233,6 +234,29 @@ class FactoryEntrance extends Component
         $this->items = [];
         $this->scanError = '';
         session()->flash('ok', $entered . ' reel' . ($entered === 1 ? '' : 's') . ' entered into ' . $gate->factory->name . '.');
+    }
+
+    /**
+     * Close the handshake on the BPL side: mark the reel's factory exit as
+     * received here.
+     *
+     * BPL records a reel leaving; BIL records it arriving; until now nothing
+     * joined the two, so "shipped but never received" could only be found by an
+     * anti-join over 130k exits and no row ever said it was outstanding. This
+     * is what keeps the In Transit position on the Stock page true — without
+     * it, every reel this screen receives would stay in transit forever.
+     *
+     * Best-effort and non-fatal: a reel can legitimately have no exit row (the
+     * gate scan is the record that matters here), and a reel that never left
+     * BPL on paper must still be receivable.
+     */
+    protected function closeBplExit($conn, string $barcode, string $date): void
+    {
+        $conn->table('bpl_factoryexit')
+            ->where('barcode', $barcode)
+            ->whereNull('received_at')
+            ->whereNull('deleted_at')
+            ->update(['received_at' => str_replace('/', '-', $date)]);
     }
 
     /**

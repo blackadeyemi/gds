@@ -22,14 +22,19 @@ use Modules\Bil\Livewire\RawMaterials\Reports\RawMaterialReport;
  *   BIL Factory    on a BIL factory floor, whole or part-used — the legacy page
  *                  (`factory_entrance_reel.status IS NULL` or `'mid'`)
  *
- * Each stage is decided by its OWN table's "has not moved on" flag rather than
- * by absence from the next table down. That matters: ~56k reels made before the
+ * Each place is decided by its OWN table's "has not moved on" flag rather than
+ * by absence from the next table down. That matters: ~54k reels made before the
  * BIL entrance system went live in 2021 have no entrance row at all, and
  * inferring location from absence would report them as stock forever.
  *
- * The gap between the two systems — reels marked shipped out of BPL that no BIL
- * gate has yet scanned in — is deliberately NOT claimed as stock anywhere. No
- * table records that a reel is in transit, so placing it would be a guess.
+ * Reels that left BPL and were never scanned in at a BIL gate are therefore NOT
+ * shown here — no table says where they are, so no place can honestly hold
+ * them. `bpl_factoryexit.received_at` records which exits are still outstanding
+ * (stamped by the Factory Entrance screen), so that population can be reported
+ * on once it is decided what should happen to it.
+ *
+ * Every row carries the days it has been standing where it is, so a stale
+ * position is visible without reading dates.
  *
  * A live snapshot: no date range, and no row editing (corrections belong on the
  * screens that create these rows).
@@ -233,6 +238,9 @@ class Stock extends RawMaterialReport
 
     /* ---------------- Views ---------------- */
 
+    /** Days a reel has been standing where it is — `since` is legacy 'Y/m/d' text. */
+    private const DAYS = "DATEDIFF(CURDATE(), STR_TO_DATE(s.`since`, '%Y/%m/%d'))";
+
     public function views(): array
     {
         $searchable = ['s.barcode', 's.hardrollnumber', 's.productname', 's.gradetype', 's.location'];
@@ -249,12 +257,15 @@ class Stock extends RawMaterialReport
                     ['Where', 'place'],
                     ['Location', 'location'],
                     $this->dateCol('Since', 'since'),
+                    ['Days', 'days'],
                     ['Weight (kg)', 'weight'],
                 ],
                 'searchable' => $searchable,
                 'query' => fn () => $this->base()
-                    ->select('s.*')
-                    ->orderBy('s.place')->orderBy('s.location')->orderByDesc('s.since'),
+                    ->select('s.*')->selectRaw(self::DAYS . ' as days')
+                    // Oldest first: the rows that need someone's attention are the
+                    // ones that have been standing longest, especially in transit.
+                    ->orderBy('s.place')->orderBy('s.location')->orderBy('s.since'),
             ],
             'by_location' => [
                 'label' => 'Summary (by location)',
@@ -264,10 +275,12 @@ class Stock extends RawMaterialReport
                     ['Location', 'location'],
                     ['Reels', 'quantity'],
                     ['Weight (kg)', 'weight'],
+                    ['Oldest (days)', 'oldest'],
                 ],
                 'searchable' => $searchable,
                 'query' => fn () => $this->base()
-                    ->selectRaw('s.place, s.location, COUNT(*) as quantity, ROUND(SUM(s.weight), 2) as weight')
+                    ->selectRaw('s.place, s.location, COUNT(*) as quantity, ROUND(SUM(s.weight), 2) as weight,'
+                        . ' MAX(' . self::DAYS . ') as oldest')
                     ->groupBy('s.place', 's.location')
                     ->orderBy('s.place')->orderBy('s.location'),
             ],
@@ -324,6 +337,7 @@ class Stock extends RawMaterialReport
             ['Where', 'place'],
             ['Location', 'location'],
             $this->dateCol('Since', 'since'),
+            ['Days', 'days'],
             ['Weight (kg)', 'weight'],
         ];
     }
@@ -341,12 +355,12 @@ class Stock extends RawMaterialReport
             return null;
         }
 
-        $q = $this->base()->select('s.*');
+        $q = $this->base()->select('s.*')->selectRaw(self::DAYS . ' as days');
 
         foreach (array_combine($fields, $this->detailKeyParts($key)) as $field => $value) {
             $q->where('s.' . $field, $value);
         }
 
-        return $q->orderByDesc('s.since');
+        return $q->orderBy('s.since');
     }
 }
