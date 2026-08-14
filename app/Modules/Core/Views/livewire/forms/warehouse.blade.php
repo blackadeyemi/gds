@@ -33,6 +33,16 @@
     @error('code') <div class="form-error">{{ $message }}</div> @enderror
 </div>
 <div class="form-group">
+    <label class="form-label">Sales depot code <span style="font-weight:400">(optional)</span></label>
+    <input type="text" class="form-control" wire:model="legacy_sales_code" placeholder="e.g. 01" maxlength="3">
+    <div class="text-muted text-sm" style="margin-top:.25rem;">
+        Set this only on a warehouse sales orders are placed against. It is the code written to
+        the legacy sales tables (<code>01</code>&nbsp;Lagos, <code>02</code>&nbsp;Kano, <code>03</code>&nbsp;Abuja),
+        so the legacy app can still read the order and build its loading barcode. Leave blank otherwise.
+    </div>
+    @error('legacy_sales_code') <div class="form-error">{{ $message }}</div> @enderror
+</div>
+<div class="form-group">
     <label class="form-label">Sort order</label>
     <input type="number" class="form-control" wire:model="sort_order" min="0">
     <div class="text-muted text-sm" style="margin-top:.25rem;">Lower numbers appear first in pickers.</div>

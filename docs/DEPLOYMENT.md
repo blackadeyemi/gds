@@ -5,6 +5,131 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-08-13 (e) — BIL Sales: Orders + Customers
+
+New nav group **BIL → Sales**, two pages, and a geography reference set.
+
+### Order of operations
+
+```bash
+php artisan migrate                       # 4 migrations, see below
+php artisan gds:import-geo --download     # ~154k rows, 1-2 min, needs internet ONCE
+php artisan gds:sync-pages
+php artisan gds:sync-data-views
+```
+
+Then grant the new pages in **Admin → Roles**. Both are new, so only Admin has
+them today:
+
+| Page | Legacy equivalent | Abilities |
+|---|---|---|
+| `bil.sales.orders` | `sales_order.php` (levels 1, 12) | view, delete, **backdate** |
+| `bil.sales.customers` | `sales_customers.php` (levels 1, 12, 70) | view, create, edit, delete, export |
+
+⚠️ **Grant `backdate` to the Sales Order role**, or clerks can only enter
+today's orders. Legacy let any level-12 user date an order freely.
+
+### Migrations
+
+| Migration | What it does | Reversible |
+|---|---|---|
+| `…_add_sales_code_to_warehouses_and_register_depots` | `warehouses.legacy_sales_code`; maps FG → `01` (Lagos), adds Kano (`02`, inactive) and Abuja (`03`) | yes |
+| `…_index_sales_order_customerid` | Index on `bil.sales_order.customerid` | yes |
+| `…_create_geo_reference_tables` | `core.geo_countries` / `geo_states` / `geo_cities` | yes |
+
+**The index is the one to notice.** `sales_order` indexed only `orderid` and
+`dateoforder`. Counting a customer's orders scanned all 97,291 rows per
+customer, so exporting the 1,898-customer list took **150 seconds**; it is now
+517 ms. Legacy gains too — its balance and invoice reports filter on that column.
+Adding it locks the table briefly (~0.8 s here); do it outside order entry.
+
+### Geo import
+
+`gds:import-geo` fills the `geo_*` tables from the
+[Countries States Cities Database](https://github.com/dr5hn/countries-states-cities-database)
+(ODbL v1.0 — attribution is in the README and the migration). Downloads to
+`storage/app/geo/`, which is git-ignored, so **production needs internet for
+this one command** — or copy the three CSVs across and run it without
+`--download`. Idempotent: it upserts on the dataset's ids.
+
+Without it the customer form has no country list and cannot be saved. Check:
+
+```bash
+php artisan tinker --execute="echo Modules\Core\Support\Geography::isLoaded() ? 'ok' : 'NOT IMPORTED';"
+```
+
+The legacy `countries` and `states` tables are untouched — the old app reads
+`countries` via `Bil\Country`.
+
+### Verify
+
+- `/bil/sales/orders` — place an order; it must write `warehousecode` `01`/`03`,
+  not a warehouse id, or legacy loading barcodes break.
+- `/bil/sales/customers` — the Unclassified view is the data-quality worklist.
+- `php artisan test --filter="Sales"` — 14 tests, read-only.
+
+### Rolling back
+
+`migrate:rollback` on all four is safe; the geo tables are dropped and the depot
+rows removed only if they have no gates. Sales orders written by gds stay — they
+are ordinary legacy rows the old app can read.
+
+---
+
+## 2026-08-13 (e) — Stock Transfer (fg_inter_transfer rebuild)
+
+```
+php artisan migrate --force   # 2 tables; imports the 814 legacy rows as history
+php artisan gds:sync-pages    # 3 new pages
+```
+
+### The design decision
+
+The legacy screen asked for a "company from" and a "company to" — and its
+destination list held **a warehouse and a company side by side**: "BIL ABUJA" is
+Belimpex's Abuja Depot, "BHN" is the Belhin company. 812 of the 814 transfers
+went to BIL ABUJA, so the overwhelmingly common case was warehouse-to-warehouse
+*inside* one company, recorded through a field called "company to".
+
+Since `warehouses.company_id` already says which company a warehouse belongs to,
+**there is nothing to distinguish**: pick the destination warehouse and the kind
+of transfer follows. Same company → internal, different → inter-company. `kind`
+is derived once at write time and stored so reports can group on it; the operator
+is never asked to classify anything, and one screen covers both cases.
+
+Destinations are grouped by company in the dropdown, own company first — the
+grouping IS the distinction.
+
+### Stock moves in two steps
+
+Dispatch takes bundles off the source (they are on a truck); receipt puts them on
+the destination. What has left and not arrived is **in transit** and is
+reportable as such, rather than disappearing between two warehouses' figures.
+Both legs go through `FinishedGoodsStock::adjust()`, so a transfer is an ordinary
+movement in the ledger `bil:reconcile-fg-stock` already proves.
+
+A short delivery is recorded on the line as a shortfall, not absorbed. A receipt
+is clamped to what was sent — it cannot create stock. Cancelling a dispatch
+returns the bundles to the source; once received, the way back is another
+transfer, not an undo.
+
+### Imported history
+
+The 814 legacy rows became 304 truckloads (one legacy row is a product LINE, not
+a transfer), with bundles conserved exactly (470,383). They are flagged
+`is_historic`, carry **null warehouses** — the legacy table records only a
+company on each side, so which warehouse a 2023 transfer left from is not
+knowable — and never touch stock. Filter **Source → Imported history** in the
+report to see them.
+
+### To send to another company
+
+Add a warehouse for it (Admin → Warehouses) under that company. Every transfer
+lands in a warehouse so stock stays derivable end to end; a destination with
+nowhere to land would be a disposal, not a transfer.
+
+---
+
 ## 2026-08-13 (d) — The machine maps now track the hierarchy, and gds is strict
 
 A follow-on from `gds:check-machine-maps`. Two problems it exposed:

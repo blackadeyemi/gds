@@ -23,6 +23,9 @@ return [
         ['key' => 'bil.raw_materials.factory_entrance', 'label' => 'BIL Raw Materials Factory Entrance', 'module' => 'BIL', 'windows' => $dayNight],
         ['key' => 'bil.raw_materials.consumption',      'label' => 'BIL Raw Materials Consumption',      'module' => 'BIL', 'windows' => $dayNight],
 
+        ['key' => 'bil.jumbo_rolls.factory_entrance', 'label' => 'BIL Jumbo Rolls Factory Entrance', 'module' => 'BIL', 'windows' => $dayNight],
+        ['key' => 'bil.jumbo_rolls.consumption',      'label' => 'BIL Jumbo Rolls Consumption',      'module' => 'BIL', 'windows' => $dayNight],
+
         /*
         | Conversion. These two do more than gate a page: their windows define
         | what "day" and "night" MEAN for a converting line, which is what the

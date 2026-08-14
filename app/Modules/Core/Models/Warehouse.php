@@ -26,7 +26,8 @@ class Warehouse extends Model
     use SoftDeletes;
 
     protected $connection = 'core';
-    protected $fillable = ['company_id', 'module', 'legacy_location_id', 'name', 'code', 'sort_order', 'is_active'];
+    protected $fillable = ['company_id', 'module', 'legacy_location_id', 'legacy_sales_code',
+        'name', 'code', 'sort_order', 'is_active'];
 
     protected $casts = [
         'company_id' => 'integer',
@@ -67,6 +68,18 @@ class Warehouse extends Model
     public function scopeForModule($query, string $module)
     {
         return $query->where('module', $module);
+    }
+
+    /**
+     * Warehouses the legacy sales tables can name — the sales depots.
+     *
+     * `sales_order.warehousecode` and the load barcode's L/K/A letter are both
+     * derived from `legacy_sales_code`, so a warehouse without one cannot be
+     * the location of an order the legacy app still has to read.
+     */
+    public function scopeSalesDepot($query)
+    {
+        return $query->whereNotNull('legacy_sales_code')->where('legacy_sales_code', '<>', '');
     }
 
     public function scopeActive($query)

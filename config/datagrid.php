@@ -29,6 +29,9 @@ return [
         \Modules\Bil\Livewire\RawMaterials\Products::class,
         \Modules\Bil\Livewire\RawMaterials\Suppliers::class,
 
+        // BIL — Sales
+        \Modules\Bil\Livewire\Sales\Customers::class,
+
         // BIL — Finished Goods
         \Modules\Bil\Livewire\FinishedGoods\Products::class,
         \Modules\Bil\Livewire\FinishedGoods\Stock::class,

@@ -4,15 +4,21 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Modules\Bil\Livewire\FinishedGoods\ConversionOutput;
 use Modules\Bil\Livewire\FinishedGoods\ConversionWaste;
+use Modules\Bil\Livewire\FinishedGoods\StockTransfer as FgStockTransfer;
+use Modules\Bil\Livewire\FinishedGoods\StockTransferReceive;
 use Modules\Bil\Livewire\FinishedGoods\FactoryExit;
 use Modules\Bil\Livewire\FinishedGoods\Reports\ConversionOutput as ConversionOutputReport;
 use Modules\Bil\Livewire\FinishedGoods\Reports\ConversionWaste as ConversionWasteReport;
+use Modules\Bil\Livewire\FinishedGoods\Reports\StockTransfer as StockTransferReport;
 use Modules\Bil\Livewire\FinishedGoods\Reports\FactoryExit as FactoryExitReport;
 use Modules\Bil\Livewire\FinishedGoods\Reports\FactoryFloorStock as FgFactoryFloorStock;
 use Modules\Bil\Livewire\FinishedGoods\Reports\WarehouseEntrance as WarehouseEntranceReport;
 use Modules\Bil\Livewire\FinishedGoods\WarehouseEntrance;
 use Modules\Bil\Livewire\FinishedGoods\Products as FinishedGoodsProducts;
 use Modules\Bil\Livewire\FinishedGoods\Stock as FinishedGoodsStockPage;
+use Modules\Bil\Livewire\JumboRolls\Consumption as JumboRollConsumption;
+use Modules\Bil\Livewire\JumboRolls\FactoryEntrance as JumboRollFactoryEntrance;
+use Modules\Bil\Livewire\JumboRolls\Stock as JumboRollStock;
 use Modules\Bil\Livewire\Machines\Lines as MachineLines;
 use Modules\Bil\Livewire\Machines\Projects as MachineProjects;
 use Modules\Bil\Livewire\Machines\Reports\ConversionHistory;
@@ -40,6 +46,8 @@ use Modules\Bil\Livewire\RawMaterials\SupplierDeliveries;
 use Modules\Bil\Livewire\RawMaterials\Suppliers;
 use Modules\Bil\Livewire\RawMaterials\WarehouseEntry;
 use Modules\Bil\Livewire\RawMaterials\WarehouseExit;
+use Modules\Bil\Livewire\Sales\Customers as SalesCustomers;
+use Modules\Bil\Livewire\Sales\Orders as SalesOrders;
 
 /*
 | BIL module routes — factory, raw materials, sales, store, quality.
@@ -60,6 +68,11 @@ Route::middleware('auth')
             ->middleware('page:bil.finished_goods.conversion_output')->name('conversion-output');
         Route::get('/conversion-waste', ConversionWaste::class)
             ->middleware('page:bil.finished_goods.conversion_waste')->name('conversion-waste');
+
+        Route::get('/stock-transfer', FgStockTransfer::class)
+            ->middleware('page:bil.finished_goods.stock_transfer')->name('stock-transfer');
+        Route::get('/stock-transfer/receive', StockTransferReceive::class)
+            ->middleware('page:bil.finished_goods.stock_transfer_receive')->name('stock-transfer.receive');
         Route::get('/factory-exit', FactoryExit::class)
             ->middleware('page:bil.finished_goods.factory_exit')->name('factory-exit');
         Route::get('/warehouse-entrance', WarehouseEntrance::class)
@@ -95,6 +108,8 @@ Route::middleware('auth')
                 ->middleware('page:bil.finished_goods.reports.factory_floor_stock')->name('factory-floor-stock');
             Route::get('/conversion-waste', ConversionWasteReport::class)
                 ->middleware('page:bil.finished_goods.reports.conversion_waste')->name('conversion-waste');
+            Route::get('/stock-transfer', StockTransferReport::class)
+                ->middleware('page:bil.finished_goods.reports.stock_transfer')->name('stock-transfer');
 
             $reports = [
                 'conversion-output' => ConversionOutputReport::class,
@@ -102,6 +117,7 @@ Route::middleware('auth')
                 'warehouse-entrance' => WarehouseEntranceReport::class,
                 'factory-floor-stock' => FgFactoryFloorStock::class,
                 'conversion-waste' => ConversionWasteReport::class,
+                'stock-transfer' => StockTransferReport::class,
             ];
 
             $hydrate = function (string $class) {
@@ -132,6 +148,21 @@ Route::middleware('auth')
                 return $hydrate($reports[$report])->export($format);
             })->name('download');
         });
+    });
+
+/*
+| Sales — the order-to-delivery chain for finished goods: the customer's order,
+| then loading, delivery and the paperwork that follows. Built on the legacy
+| `sales_*` tables, which the legacy screens still read, so the write contracts
+| in Modules\Bil\Models\SalesOrder are load-bearing.
+*/
+Route::middleware('auth')
+    ->prefix('sales')->name('sales.')
+    ->group(function () {
+        Route::get('/customers', SalesCustomers::class)
+            ->middleware('page:bil.sales.customers')->name('customers');
+        Route::get('/orders', SalesOrders::class)
+            ->middleware('page:bil.sales.orders')->name('orders');
     });
 
 /*
@@ -306,6 +337,61 @@ Route::middleware('auth')
                 ->middleware('page:bil.raw_materials.reports.factory_returns')->name('factory-returns');
             Route::get('/damaged-goods', DamagedGoodsReport::class)
                 ->middleware('page:bil.raw_materials.reports.damaged_goods')->name('damaged-goods');
+        });
+    });
+
+/*
+| Jumbo Rolls — the reels BPL makes for BIL, followed from the factory gate
+| inwards. BPL's own Jumbo Rolls module covers making and selling them; this
+| one covers receiving and using them.
+*/
+Route::middleware('auth')
+    ->prefix('jumbo-rolls')->name('jumbo-rolls.')
+    ->group(function () {
+        Route::get('/factory-entrance', JumboRollFactoryEntrance::class)
+            ->middleware('page:bil.jumbo_rolls.factory_entrance')->name('factory-entrance');
+        Route::get('/consumption', JumboRollConsumption::class)
+            ->middleware('page:bil.jumbo_rolls.consumption')->name('consumption');
+        Route::get('/stock', JumboRollStock::class)
+            ->middleware('page:bil.jumbo_rolls.stock')->name('stock');
+
+        // Print / download for the report-framework pages in this group, on the
+        // same contract as the other modules: slug => [component, page key].
+        Route::prefix('reports')->name('reports.')->group(function () {
+            $reports = [
+                'stock' => [JumboRollStock::class, 'bil.jumbo_rolls.stock'],
+            ];
+
+            $hydrate = function (array $report) {
+                [$class] = $report;
+                $c = new $class();
+                $c->view = (string) request('view', '');
+                $c->search = (string) request('search', '');
+                $c->filters = array_map('strval', (array) request('filters', []));
+
+                return $c;
+            };
+
+            $authorize = function (array $report) {
+                abort_unless((bool) request()->user()?->canDo($report[1], 'export'), 403);
+            };
+
+            Route::get('/{report}/print', function (string $report) use ($reports, $hydrate, $authorize) {
+                abort_unless(isset($reports[$report]), 404);
+                $authorize($reports[$report]);
+
+                return view('core::print.grid', $hydrate($reports[$report])->reportPayload());
+            })->name('print');
+
+            Route::get('/{report}/download', function (string $report) use ($reports, $hydrate, $authorize) {
+                abort_unless(isset($reports[$report]), 404);
+                $authorize($reports[$report]);
+
+                $format = strtolower((string) request('format', 'xlsx'));
+                abort_unless(in_array($format, ['xlsx', 'csv', 'pdf'], true), 404);
+
+                return $hydrate($reports[$report])->export($format);
+            })->name('download');
         });
     });
 

@@ -61,6 +61,15 @@ class FactoryGate extends Model
         return $query->whereIn('direction', [$direction, self::BOTH]);
     }
 
+    /** Gates on factories belonging to one company, matched on companies.code. */
+    public function scopeForCompany($query, string $companyCode)
+    {
+        return $query->whereHas(
+            'factory',
+            fn ($f) => $f->whereHas('company', fn ($c) => $c->where('code', $companyCode))
+        );
+    }
+
     public function scopeOrdered($query)
     {
         return $query->orderBy('sort_order')->orderBy('name');

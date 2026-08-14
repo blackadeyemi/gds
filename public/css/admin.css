@@ -211,6 +211,74 @@
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 
+/* ---- Section heading inside a long form ----
+   Groups a modal's fields into the things the record actually is, so a
+   ten-field form reads as three short ones. */
+.form-section {
+    margin: 1.5rem 0 0.9rem; padding-bottom: 0.4rem;
+    font-size: 0.74rem; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--line);
+}
+.form-section:first-child { margin-top: 0; }
+
+/* ---- Input with a fixed prefix (e.g. a +234 dial code) ----
+   The prefix is a label, not a value: it sits inside the control's frame but
+   the input still owns the whole field. */
+.input-affix { position: relative; display: flex; align-items: stretch; }
+.input-affix-prefix {
+    display: inline-flex; align-items: center; padding: 0 0.6em;
+    font-size: 0.92rem; font-weight: 600; color: var(--muted);
+    background: var(--surface-2); border: 1px solid var(--line); border-right: 0;
+    border-radius: 8px 0 0 8px; white-space: nowrap;
+}
+.input-affix-prefix + .form-control { border-radius: 0 8px 8px 0; }
+
+/* ---- Combobox in a grid cell ----
+   The bare variant drops the .form-group wrapper (no label, no bottom margin)
+   so the control sits flush in a table cell. */
+.combobox-bare { position: relative; }
+.combobox-clear { color: var(--muted); border-top: 1px solid var(--line); border-radius: 0; margin-top: 4px; }
+
+/* Order-line grid (Sales Orders).
+   A row's dropdown must be able to paint over the rows beneath it, so no
+   ancestor here may create a scroll or clipping context — that is why the table
+   is not inside .table-wrap. The product column is capped: left to fill a wide
+   screen it stretches to ~900px, which is far more than any product name needs
+   and pushes the quantity off to the far right. */
+.order-lines { width: 100%; }
+.order-lines td { vertical-align: top; padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.order-lines td.product-cell { max-width: 0; }
+.order-lines td.product-cell .combobox-bare { max-width: 460px; }
+.order-lines .combobox-panel { max-width: 460px; }
+/* The open row has to sit above the ones after it in DOM order. */
+.order-lines tr:focus-within { position: relative; z-index: 5; }
+
+/* ---- Quantity entry ----
+   Numbers typed off a paper order: centred and a size up, so a column of them
+   reads at a glance. Used by the Sales Order line quantities and its
+   "rows to add" box. The spinners are hidden — the value is typed, and the
+   arrows only shrink the room the digits have.
+
+   The box must be the SAME HEIGHT as the product picker beside it, so the
+   larger digits are bought with line-height and padding in absolute rem rather
+   than by letting the font size inflate the control: .form-control is
+   0.92rem text (line-height normal ≈ 1.104rem) with 0.6em padding
+   (≈ 0.552rem), and these values reproduce that box exactly at 1.05rem text. */
+.qty-input {
+    text-align: center;
+    font-size: 1.05rem;
+    line-height: 1.104rem;
+    padding: 0.552rem 0.5rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    max-width: 120px;
+    margin: 0 auto;
+}
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.qty-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
 /* ---- Date entry (flatpickr, DD/MM/YYYY) ---- */
 .datefield-wrap { display: block; }
 .datefield-wrap input.form-control { width: 100%; }

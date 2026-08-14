@@ -24,6 +24,7 @@ class Warehouses extends DataGrid
     public ?string $module = null;
     public string $name = '';
     public ?string $code = null;
+    public ?string $legacy_sales_code = null;
     public int $sort_order = 0;
     public bool $is_active = true;
 
@@ -102,6 +103,11 @@ class Warehouses extends DataGrid
             'module' => ['required', 'in:' . implode(',', array_keys(config('warehouses.modules')))],
             'name' => ['required', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:20', 'unique:warehouses,code' . $ignore],
+            // The legacy sales depot code. Unique, because it is what gds
+            // writes into sales_order.warehousecode — two warehouses sharing
+            // one would make an order's location ambiguous to the legacy app.
+            'legacy_sales_code' => ['nullable', 'string', 'max:3',
+                'unique:warehouses,legacy_sales_code' . $ignore],
             'sort_order' => ['integer', 'min:0'],
             'is_active' => ['boolean'],
         ];
@@ -113,6 +119,7 @@ class Warehouses extends DataGrid
         $this->module = null;
         $this->name = '';
         $this->code = null;
+        $this->legacy_sales_code = null;
         $this->sort_order = 0;
         $this->is_active = true;
     }
@@ -124,6 +131,7 @@ class Warehouses extends DataGrid
         $this->module = $w->module;
         $this->name = $w->name;
         $this->code = $w->code;
+        $this->legacy_sales_code = $w->legacy_sales_code;
         $this->sort_order = (int) $w->sort_order;
         $this->is_active = (bool) $w->is_active;
     }
@@ -151,6 +159,9 @@ class Warehouses extends DataGrid
     public function save(): void
     {
         $this->code = $this->code ? strtoupper(trim($this->code)) : null;
+        $this->legacy_sales_code = ($this->legacy_sales_code !== null && trim($this->legacy_sales_code) !== '')
+            ? trim($this->legacy_sales_code)
+            : null;
         $data = $this->validate();
 
         // Name is unique per company rather than globally — two companies may

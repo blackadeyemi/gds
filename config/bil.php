@@ -13,6 +13,14 @@ return [
     'company_code' => 'BIL',
 
     /*
+    | The BPL customer this company buys its jumbo rolls as — `customer_id` on
+    | bpl_production ("Belimpex Limited"). The reels arriving at a BIL factory
+    | gate are exactly the ones produced against it, so it decides which
+    | barcodes the Jumbo Rolls → Factory Entrance scanner accepts.
+    */
+    'jumbo_roll_customer_id' => env('BIL_JUMBO_ROLL_CUSTOMER_ID', 17),
+
+    /*
     | Where quality-control product photos live. The legacy Quality Control
     | dashboard writes them to <STORAGE_PATH>/QC/Pics (production STORAGE_PATH
     | is E:/), and products.imagepath holds only the bare filename. Point this

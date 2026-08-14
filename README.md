@@ -129,7 +129,17 @@ see `docs/DEPLOYMENT.md`, it must point at the shared folder in production).
 | `gds:sync-data-views` | DataGrid `views()` → admin-editable config |
 | `gds:sync-shift-contexts` | Shift windows from `config/shifts.php` |
 | `gds:migrate-legacy-auth` | Seed roles from legacy user levels |
+| `gds:import-geo` | Country / state / city reference data into `core.geo_*` |
 | `bil:reconcile-warehouse-stock` | Rebuild the stock aggregate from barcodes |
+
+### Reference data: countries, states, cities
+
+Address pickers read `core.geo_countries` / `geo_states` / `geo_cities`, filled
+by `php artisan gds:import-geo --download` (250 countries, 5,308 states,
+152,970 cities). It is idempotent — re-run it to take a newer export. The legacy
+`countries` and `states` tables are left alone; the old app still reads them.
+
+> Data by [Countries States Cities Database](https://github.com/dr5hn/countries-states-cities-database) — ODbL v1.0.
 
 ### Tests
 

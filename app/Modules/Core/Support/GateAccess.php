@@ -49,14 +49,23 @@ class GateAccess
         );
     }
 
-    /** Factory gates for a direction ('in' = goods arriving, 'out' = leaving). */
-    public static function factoryGates(?User $user, string $direction): Collection
+    /**
+     * Factory gates for a direction ('in' = goods arriving, 'out' = leaving).
+     *
+     * `$companyCode` narrows them to one company's factories (companies.code),
+     * for a screen that only ever moves goods within one company — jumbo rolls
+     * arrive at Belimpex factories, never at the Belpapyrus paper machines that
+     * made them.
+     */
+    public static function factoryGates(?User $user, string $direction, ?string $companyCode = null): Collection
     {
-        return self::scope(
-            FactoryGate::query()->with('factory')->usable()->direction($direction)->ordered(),
-            $user,
-            'factory_gate_user'
-        );
+        $query = FactoryGate::query()->with('factory')->usable()->direction($direction)->ordered();
+
+        if ($companyCode !== null) {
+            $query->forCompany($companyCode);
+        }
+
+        return self::scope($query, $user, 'factory_gate_user');
     }
 
     /* ---------------- Which pages use which gates ---------------- */

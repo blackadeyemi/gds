@@ -72,6 +72,8 @@ return [
         ['key' => 'bil.finished_goods.conversion_output', 'label' => 'Conversion Output', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.conversion-output', 'abilities' => ['view', 'backdate', 'bypass-shift']],
         // Entry plus the two supervisory acts that close and re-open a run, and
         // the bypass that lets production continue when a run cannot be closed.
+        ['key' => 'bil.finished_goods.stock_transfer', 'label' => 'Stock Transfer', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.stock-transfer', 'abilities' => ['view', 'backdate']],
+        ['key' => 'bil.finished_goods.stock_transfer_receive', 'label' => 'Receive Transfer', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.stock-transfer.receive', 'abilities' => ['view', 'approve', 'cancel']],
         ['key' => 'bil.finished_goods.conversion_waste', 'label' => 'Conversion Waste', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.conversion-waste', 'abilities' => ['view', 'confirm', 'reopen', 'bypass-waste-lock', 'bypass-shift']],
         ['key' => 'bil.finished_goods.factory_exit', 'label' => 'Factory Exit', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.factory-exit', 'abilities' => $entry, 'gates' => 'factory'],
         // Stock lines are created by movement and never deleted, so no create
@@ -80,6 +82,7 @@ return [
         // Pallets made but not yet sent on — read-only, since it is a view
         // over conversion output rather than a table of its own.
         ['key' => 'bil.finished_goods.reports.factory_floor_stock', 'label' => 'Factory Floor Stock', 'module' => 'BIL / Finished Goods Reports', 'route' => 'bil.finished-goods.reports.factory-floor-stock', 'abilities' => ['view', 'export']],
+        ['key' => 'bil.finished_goods.reports.stock_transfer', 'label' => 'Stock Transfer', 'module' => 'BIL / Finished Goods Reports', 'route' => 'bil.finished-goods.reports.stock-transfer', 'abilities' => $snapshot],
         ['key' => 'bil.finished_goods.reports.conversion_waste', 'label' => 'Conversion Waste', 'module' => 'BIL / Finished Goods Reports', 'route' => 'bil.finished-goods.reports.conversion-waste', 'abilities' => $snapshot],
         ['key' => 'bil.finished_goods.warehouse_entrance', 'label' => 'Warehouse Entrance', 'module' => 'BIL / Finished Goods', 'route' => 'bil.finished-goods.warehouse-entrance', 'abilities' => $entry, 'gates' => 'warehouse'],
 
@@ -91,6 +94,13 @@ return [
         // Deleting a receipt also takes its bundles back out of the warehouse
         // stock, so `delete` here is a stock permission, not a tidy-up one.
         ['key' => 'bil.finished_goods.reports.warehouse_entrance', 'label' => 'Warehouse Entrance', 'module' => 'BIL / Finished Goods Reports', 'route' => 'bil.finished-goods.reports.warehouse-entrance', 'abilities' => ['view', 'delete', 'export']],
+
+        // BIL — Sales. An order is placed, edited and withdrawn on the one
+        // screen, so there is no separate `create`: `view` is placing an order
+        // and editing one, and `delete` is the withdrawal — which is refused
+        // outright once anything has been loaded against the order.
+        ['key' => 'bil.sales.customers', 'label' => 'Customers', 'module' => 'BIL / Sales', 'route' => 'bil.sales.customers', 'abilities' => $crud],
+        ['key' => 'bil.sales.orders', 'label' => 'Orders', 'module' => 'BIL / Sales', 'route' => 'bil.sales.orders', 'abilities' => ['view', 'delete', 'backdate']],
 
         // BIL — Raw Materials
         ['key' => 'bil.raw_materials.statistics',          'label' => 'Statistics',          'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.statistics',          'abilities' => $snapshot],
@@ -116,6 +126,13 @@ return [
         ['key' => 'bil.raw_materials.reports.factory_returns',     'label' => 'Factory Returns',     'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.factory-returns',     'abilities' => $report],
         ['key' => 'bil.raw_materials.reports.damaged_goods',       'label' => 'Damaged Goods',       'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.damaged-goods',       'abilities' => $report],
 
+        // BIL — Jumbo Rolls (the reels BPL makes for BIL, from the gate inwards)
+        ['key' => 'bil.jumbo_rolls.factory_entrance', 'label' => 'Factory Entrance', 'module' => 'BIL / Jumbo Rolls', 'route' => 'bil.jumbo-rolls.factory-entrance', 'abilities' => ['view', 'backdate', 'bypass-shift'], 'gates' => 'factory'],
+        // Consumption picks a machine, not a gate, so no gate checklist.
+        ['key' => 'bil.jumbo_rolls.consumption',      'label' => 'Consumption',      'module' => 'BIL / Jumbo Rolls', 'route' => 'bil.jumbo-rolls.consumption',      'abilities' => ['view', 'backdate', 'bypass-shift']],
+        // A live snapshot derived from the movement tables — nothing to edit here.
+        ['key' => 'bil.jumbo_rolls.stock',           'label' => 'Stock',            'module' => 'BIL / Jumbo Rolls', 'route' => 'bil.jumbo-rolls.stock',           'abilities' => $snapshot],
+
         // BPL — Jumbo Rolls
         ['key' => 'bpl.jumbo_rolls.grades',            'label' => 'Grades',              'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.grades',            'abilities' => $crud],
         ['key' => 'bpl.jumbo_rolls.products.hardroll', 'label' => 'Products (Hardroll)', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.products.hardroll', 'abilities' => $crud],
@@ -135,6 +152,7 @@ return [
         'backdate' => 'Backdate',
         'approve' => 'Approve',
         'bypass-shift' => 'Bypass shift',
+        'cancel' => 'Cancel',
         'confirm' => 'Confirm',
         'reopen' => 'Re-open',
         'bypass-waste-lock' => 'Bypass waste lock',

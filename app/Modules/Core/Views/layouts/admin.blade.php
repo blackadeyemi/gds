@@ -1,4 +1,13 @@
 @php
+    // Cache-buster for the hand-maintained stylesheets: the file's own mtime,
+    // so editing one invalidates it and nothing else. Falls back to the app
+    // version if the file is missing rather than emitting "?v=".
+    $cssVersion = function (string $file) {
+        static $seen = [];
+
+        return $seen[$file] ??= (is_file($p = public_path("css/$file")) ? filemtime($p) : '1');
+    };
+
     // Breadcrumb from the current path (e.g. admin/roles -> "Admin / Roles")
     $segments = collect(explode('/', trim(request()->path(), '/')))->filter();
     $crumb = $segments->isEmpty() ? collect(['Dashboard']) : $segments->map(fn ($s) => \Illuminate\Support\Str::headline($s));
@@ -9,7 +18,9 @@
     $onBil = request()->is('bil/*');
     $onRawMaterials = request()->is('bil/raw-materials/*');
     $onRmReports = request()->is('bil/raw-materials/reports/*');
+    $onBilJumboRolls = request()->is('bil/jumbo-rolls/*');
     $onFinishedGoods = request()->is('bil/finished-goods/*');
+    $onSales = request()->is('bil/sales/*');
     $onMachines = request()->is('bil/machines/*');
     $onFgReports = request()->is('bil/finished-goods/reports/*');
     $onMachineReports = request()->is('bil/machines/reports/*');
@@ -59,8 +70,13 @@
             document.addEventListener('livewire:navigated', applyAppearance);
         })();
     </script>
-    <link rel="stylesheet" href="{{ asset('css/app.css') }}" />
-    <link rel="stylesheet" href="{{ asset('css/admin.css') }}" />
+    {{-- Stamped with the file's own mtime. There is no build step, so a CSS
+         change would otherwise sit behind the browser cache until every user
+         happened to hard-refresh — and "reload with Ctrl+F5" is not a deploy
+         step anyone should have to remember. flatpickr's is vendor and never
+         changes, so it is left plain and stays cached. --}}
+    <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ $cssVersion('app.css') }}" />
+    <link rel="stylesheet" href="{{ asset('css/admin.css') }}?v={{ $cssVersion('admin.css') }}" />
     <link rel="stylesheet" href="{{ asset('css/flatpickr.min.css') }}" />
     @livewireStyles
 </head>
@@ -74,8 +90,10 @@
         bilOpen: {{ $onBil ? 'true' : 'false' }},
         rawMaterialsOpen: {{ $onRawMaterials ? 'true' : 'false' }},
         rmReportsOpen: {{ $onRmReports ? 'true' : 'false' }},
+        bilJumboRollsOpen: {{ $onBilJumboRolls ? 'true' : 'false' }},
         finishedGoodsOpen: {{ $onFinishedGoods ? 'true' : 'false' }},
         fgReportsOpen: {{ $onFgReports ? 'true' : 'false' }},
+        salesOpen: {{ $onSales ? 'true' : 'false' }},
         machinesOpen: {{ $onMachines ? 'true' : 'false' }},
         machineReportsOpen: {{ $onMachineReports ? 'true' : 'false' }},
         bplOpen: {{ $onBpl ? 'true' : 'false' }},
@@ -85,7 +103,7 @@
             if (window.innerWidth <= 900) { this.mobileOpen = !this.mobileOpen; return; }
             this.collapsed = !this.collapsed;
             localStorage.setItem('gds_sidebar_collapsed', JSON.stringify(this.collapsed));
-            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; this.finishedGoodsOpen = false; this.fgReportsOpen = false; this.machinesOpen = false; this.machineReportsOpen = false; this.bplOpen = false; this.jumboRollsOpen = false; this.bplSalesOpen = false; }
+            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; this.bilJumboRollsOpen = false; this.finishedGoodsOpen = false; this.fgReportsOpen = false; this.salesOpen = false; this.machinesOpen = false; this.machineReportsOpen = false; this.bplOpen = false; this.jumboRollsOpen = false; this.bplSalesOpen = false; }
         },
         openGroup(group) {
             if (this.collapsed) {
@@ -221,6 +239,36 @@
                     </div>
                     @endcanPrefix
 
+                    @canPrefix('bil.jumbo_rolls.')
+                    <div class="nav-group" :class="{ open: bilJumboRollsOpen }">
+                        <button type="button" class="nav-link" :class="{ active: {{ $onBilJumboRolls ? 'true' : 'false' }} && collapsed }" @click="openGroup('bilJumboRollsOpen')" title="Jumbo Rolls">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><ellipse cx="12" cy="6" rx="2.2" ry="1"/><path d="M5 6v8a7 3 0 0 0 14 0V6"/><path d="M9.5 15.5v4l1.25-1 1.25 1 1.25-1 1.25 1v-4"/></svg>
+                            <span class="label">Jumbo Rolls</span>
+                            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                        </button>
+                        <div class="nav-sub" x-show="bilJumboRollsOpen">
+                            @canPage('bil.jumbo_rolls.factory_entrance')
+                            <a href="{{ route('bil.jumbo-rolls.factory-entrance') }}" class="nav-link {{ $is('bil/jumbo-rolls/factory-entrance*') }}" title="Factory Entrance">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M4 21V10l8-6 8 6v11M9 21v-6h6v6"/></svg>
+                                <span class="label">Factory Entrance</span>
+                            </a>
+                            @endcanPage
+                            @canPage('bil.jumbo_rolls.consumption')
+                            <a href="{{ route('bil.jumbo-rolls.consumption') }}" class="nav-link {{ $is('bil/jumbo-rolls/consumption*') }}" title="Consumption">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12M6 2v6l4 4-4 4v6M18 2v6l-4 4 4 4v6M6 22h12"/></svg>
+                                <span class="label">Consumption</span>
+                            </a>
+                            @endcanPage
+                            @canPage('bil.jumbo_rolls.stock')
+                            <a href="{{ route('bil.jumbo-rolls.stock') }}" class="nav-link {{ $is('bil/jumbo-rolls/stock*') }}" title="Stock">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V9l7-5 7 5v12"/><path d="M9 21v-5h6v5M9 12h6"/></svg>
+                                <span class="label">Stock</span>
+                            </a>
+                            @endcanPage
+                        </div>
+                    </div>
+                    @endcanPrefix
+
                     @canPrefix('bil.finished_goods.')
                     <div class="nav-group" :class="{ open: finishedGoodsOpen }">
                         <button type="button" class="nav-link" :class="{ active: {{ $onFinishedGoods ? 'true' : 'false' }} && collapsed }" @click="openGroup('finishedGoodsOpen')" title="Finished Goods">
@@ -245,6 +293,18 @@
                             <a href="{{ route('bil.finished-goods.conversion-waste') }}" class="nav-link {{ $is('bil/finished-goods/conversion-waste*') }}" title="Conversion Waste">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
                                 <span class="label">Conversion Waste</span>
+                            </a>
+                            @endcanPage
+                            @canPage('bil.finished_goods.stock_transfer')
+                            <a href="{{ route('bil.finished-goods.stock-transfer') }}" class="nav-link {{ $is('bil/finished-goods/stock-transfer') }}" title="Stock Transfer">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h13l-3-3M21 16H8l3 3"/></svg>
+                                <span class="label">Stock Transfer</span>
+                            </a>
+                            @endcanPage
+                            @canPage('bil.finished_goods.stock_transfer_receive')
+                            <a href="{{ route('bil.finished-goods.stock-transfer.receive') }}" class="nav-link {{ $is('bil/finished-goods/stock-transfer/receive*') }}" title="Receive Transfer">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7"/><path d="M12 3v12m0 0l-4-4m4 4l4-4"/></svg>
+                                <span class="label">Receive Transfer</span>
                             </a>
                             @endcanPage
                             @canPage('bil.finished_goods.factory_exit')
@@ -283,6 +343,11 @@
                                         <span class="label">Conversion Waste</span>
                                     </a>
                                     @endcanPage
+                                    @canPage('bil.finished_goods.reports.stock_transfer')
+                                    <a href="{{ route('bil.finished-goods.reports.stock-transfer') }}" class="nav-link {{ $is('bil/finished-goods/reports/stock-transfer*') }}" title="Stock Transfer">
+                                        <span class="label">Stock Transfer</span>
+                                    </a>
+                                    @endcanPage
                                     @canPage('bil.finished_goods.reports.factory_exit')
                                     <a href="{{ route('bil.finished-goods.reports.factory-exit') }}" class="nav-link {{ $is('bil/finished-goods/reports/factory-exit*') }}" title="Factory Exit">
                                         <span class="label">Factory Exit</span>
@@ -301,6 +366,30 @@
                                 </div>
                             </div>
                             @endcanPrefix
+                        </div>
+                    </div>
+                    @endcanPrefix
+
+                    @canPrefix('bil.sales.')
+                    <div class="nav-group" :class="{ open: salesOpen }">
+                        <button type="button" class="nav-link" :class="{ active: {{ $onSales ? 'true' : 'false' }} && collapsed }" @click="openGroup('salesOpen')" title="Sales">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg>
+                            <span class="label">Sales</span>
+                            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                        </button>
+                        <div class="nav-sub" x-show="salesOpen">
+                            @canPage('bil.sales.customers')
+                            <a href="{{ route('bil.sales.customers') }}" class="nav-link {{ $is('bil/sales/customers*') }}" title="Customers">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                <span class="label">Customers</span>
+                            </a>
+                            @endcanPage
+                            @canPage('bil.sales.orders')
+                            <a href="{{ route('bil.sales.orders') }}" class="nav-link {{ $is('bil/sales/orders*') }}" title="Orders">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>
+                                <span class="label">Orders</span>
+                            </a>
+                            @endcanPage
                         </div>
                     </div>
                     @endcanPrefix
