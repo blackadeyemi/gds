@@ -114,7 +114,7 @@ class Stock extends DataGrid
                 ],
                 'query' => fn () => FgWarehouseStock::query()
                     ->from('finished_goods_warehouse_stock as s')
-                    ->leftJoin('warehouses as w', 's.warehouse_id', '=', 'w.id')
+                    ->leftJoin('core.warehouses as w', 's.warehouse_id', '=', 'w.id')
                     ->selectRaw("COALESCE(w.name, '—') as warehouse_name,
                                  COUNT(*) as products, SUM(s.bundles) as bundles")
                     ->groupBy('warehouse_name'),
@@ -149,7 +149,7 @@ class Stock extends DataGrid
      */
     public function openMovements(int $id): void
     {
-        $row = DB::connection('core')->table('finished_goods_warehouse_stock')->find($id);
+        $row = DB::connection('bil')->table('finished_goods_warehouse_stock')->find($id);
         if (! $row) {
             return;
         }
@@ -215,7 +215,7 @@ class Stock extends DataGrid
         // Eloquent rather than the query builder: the grid blade calls
         // `$row->getKey()` for row actions, which a stdClass has not got.
         return FgWarehouseStock::query()->from('finished_goods_warehouse_stock as s')
-            ->leftJoin('warehouses as w', 's.warehouse_id', '=', 'w.id')
+            ->leftJoin('core.warehouses as w', 's.warehouse_id', '=', 'w.id')
             ->select('s.id', 's.warehouse_id', 's.productid', 's.productname', 's.productcode',
                 's.bundles', 's.orders_90d', 's.ordered_qty_90d', 's.orders_counted_at',
                 's.updated_at', 'w.name as warehouse_name');
@@ -225,7 +225,7 @@ class Stock extends DataGrid
     #[Computed]
     public function ordersCountedAt(): ?string
     {
-        $at = DB::connection('core')->table('finished_goods_warehouse_stock')->max('orders_counted_at');
+        $at = DB::connection('bil')->table('finished_goods_warehouse_stock')->max('orders_counted_at');
 
         return $at ? \Illuminate\Support\Carbon::parse($at)->diffForHumans() : null;
     }
@@ -263,7 +263,7 @@ class Stock extends DataGrid
 
     protected function fillForm(int $id): void
     {
-        $row = DB::connection('core')->table('finished_goods_warehouse_stock')->find($id);
+        $row = DB::connection('bil')->table('finished_goods_warehouse_stock')->find($id);
         if (! $row) {
             return;
         }

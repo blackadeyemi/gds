@@ -32,6 +32,8 @@ class BackfillFinishedGoodsReceipts extends Command
     {
         $core = DB::connection('core');
         $bil = DB::connection('bil');
+        $bil = DB::connection('bil');
+        $bil = DB::connection('bil');
 
         // Legacy gate name -> [gate id, warehouse id]. Only gates attached to a
         // warehouse can take receipts; the rest are reported and skipped.
@@ -77,7 +79,7 @@ class BackfillFinishedGoodsReceipts extends Command
             return self::FAILURE;
         }
 
-        $already = (int) $core->table('finished_goods_warehouse_receipts')->whereNotNull('legacy_id')->count();
+        $already = (int) $bil->table('finished_goods_warehouse_receipts')->whereNotNull('legacy_id')->count();
         $importable = $bil->table('store_entrance')->whereIn('entrancelocation', array_keys($rows))->count();
 
         $this->newLine();
@@ -102,15 +104,15 @@ class BackfillFinishedGoodsReceipts extends Command
         $bil->table('store_entrance')
             ->whereIn('entrancelocation', array_keys($rows))
             ->orderBy('id')
-            ->chunkById($chunk, function ($batch) use ($core, $rows, &$imported, &$skipped, $bar) {
-                $existing = $core->table('finished_goods_warehouse_receipts')
+            ->chunkById($chunk, function ($batch) use ($bil, $rows, &$imported, &$skipped, $bar) {
+                $existing = $bil->table('finished_goods_warehouse_receipts')
                     ->whereIn('legacy_id', $batch->pluck('id'))
                     ->pluck('legacy_id')->flip();
 
                 // A barcode already present as a LIVE receipt must not be
                 // duplicated — `barcode` is unique, and the live row is the
                 // authoritative one.
-                $liveBarcodes = $core->table('finished_goods_warehouse_receipts')
+                $liveBarcodes = $bil->table('finished_goods_warehouse_receipts')
                     ->whereIn('barcode', $batch->pluck('barcode'))
                     ->pluck('barcode')->flip();
 
@@ -140,7 +142,7 @@ class BackfillFinishedGoodsReceipts extends Command
                 }
 
                 if ($insert !== []) {
-                    $core->table('finished_goods_warehouse_receipts')->insert($insert);
+                    $bil->table('finished_goods_warehouse_receipts')->insert($insert);
                     $imported += count($insert);
                 }
 

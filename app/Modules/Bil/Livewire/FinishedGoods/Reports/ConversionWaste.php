@@ -98,10 +98,10 @@ class ConversionWaste extends RawMaterialReport
     {
         $f = $this->filters;
 
-        $q = DB::connection('core')->table('conversion_waste_entries as e')
+        $q = DB::connection('bil')->table('conversion_waste_entries as e')
             ->join('conversion_waste_runs as r', 'e.run_id', '=', 'r.id')
-            ->leftJoin('waste_causes as c', 'e.cause_id', '=', 'c.id')
-            ->leftJoin('waste_origins as o', 'e.origin_id', '=', 'o.id');
+            ->leftJoin('core.waste_causes as c', 'e.cause_id', '=', 'c.id')
+            ->leftJoin('core.waste_origins as o', 'e.origin_id', '=', 'o.id');
 
         return $this->applyDate($q, 'r.production_date')
             ->when($f['line'] ?? '', fn ($q, $v) => $q->where('r.line_id', $v))
@@ -126,7 +126,7 @@ class ConversionWaste extends RawMaterialReport
     {
         $f = $this->filters;
 
-        $q = DB::connection('core')->table('conversion_waste_runs as r');
+        $q = DB::connection('bil')->table('conversion_waste_runs as r');
 
         return $this->applyDate($q, 'r.production_date')
             ->when($f['line'] ?? '', fn ($q, $v) => $q->where('r.line_id', $v))
@@ -260,7 +260,7 @@ class ConversionWaste extends RawMaterialReport
                     // no entries still appears — which is the whole point of
                     // this view.
                     ->leftJoinSub(
-                        DB::connection('core')->table('conversion_waste_entries')
+                        DB::connection('bil')->table('conversion_waste_entries')
                             ->groupBy('run_id')
                             ->selectRaw('run_id, COUNT(*) as entries, SUM(weight_kg) as weight_kg'),
                         'agg',

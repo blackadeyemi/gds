@@ -205,7 +205,7 @@ class WarehouseEntrance extends Component
         $saved = 0;
         $skipped = [];
 
-        DB::connection('core')->transaction(function () use ($entrance, $fallbackDate, $user, $username, &$saved, &$skipped) {
+        DB::connection('bil')->transaction(function () use ($entrance, $fallbackDate, $user, $username, &$saved, &$skipped) {
             foreach ($this->items as $item) {
                 $barcode = $item['barcode'];
 

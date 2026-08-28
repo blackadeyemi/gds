@@ -352,27 +352,27 @@ class WasteSettings extends Component
      */
     public function causeUsage(): array
     {
-        return DB::connection('core')->table('conversion_waste_entries')
+        return DB::connection('bil')->table('conversion_waste_entries')
             ->groupBy('cause_id')->selectRaw('cause_id, COUNT(*) n')
             ->pluck('n', 'cause_id')->all();
     }
 
     public function originUsage(): array
     {
-        return DB::connection('core')->table('conversion_waste_entries')
+        return DB::connection('bil')->table('conversion_waste_entries')
             ->groupBy('origin_id')->selectRaw('origin_id, COUNT(*) n')
             ->pluck('n', 'origin_id')->all();
     }
 
     private function causeUseCount(int $id): int
     {
-        return (int) DB::connection('core')->table('conversion_waste_entries')
+        return (int) DB::connection('bil')->table('conversion_waste_entries')
             ->where('cause_id', $id)->count();
     }
 
     private function originUseCount(int $id): int
     {
-        return (int) DB::connection('core')->table('conversion_waste_entries')
+        return (int) DB::connection('bil')->table('conversion_waste_entries')
             ->where('origin_id', $id)->count();
     }
 

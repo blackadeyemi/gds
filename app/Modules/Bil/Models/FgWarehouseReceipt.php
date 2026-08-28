@@ -25,7 +25,7 @@ use Modules\Core\Models\WarehouseGate;
  */
 class FgWarehouseReceipt extends Model
 {
-    protected $connection = 'core';
+    protected $connection = 'bil';
     protected $table = 'finished_goods_warehouse_receipts';
 
     protected $guarded = [];

@@ -196,7 +196,7 @@ class FactoryExit extends Component
                 }
 
                 $received = $conn->table('store_entrance')->where('barcode', $barcode)->exists()
-                    || DB::connection('core')->table('finished_goods_warehouse_receipts')
+                    || DB::connection('bil')->table('finished_goods_warehouse_receipts')
                         ->where('barcode', $barcode)->exists();
 
                 FactoryExitModel::create([

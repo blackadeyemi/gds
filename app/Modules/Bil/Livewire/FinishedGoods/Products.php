@@ -247,14 +247,14 @@ class Products extends DataGrid
     protected function historyOffPage(int $productid): array
     {
         $bil = DB::connection('bil');
-        $core = DB::connection('core');
+        $bil = DB::connection('bil');
         $name = FinishedGoodsProduct::where('productid', $productid)->value('productname');
 
         $checks = [
             'conversion output' => fn () => $bil->table('factory_conversion')->where('productid', $productid)->exists(),
             'factory exits' => fn () => $bil->table('factory_exit')->where('productid', $productid)->exists(),
-            'warehouse receipts' => fn () => $core->table('finished_goods_warehouse_receipts')->where('productid', $productid)->exists(),
-            'stock on hand' => fn () => $core->table('finished_goods_warehouse_stock')->where('productid', $productid)->where('bundles', '<>', 0)->exists(),
+            'warehouse receipts' => fn () => $bil->table('finished_goods_warehouse_receipts')->where('productid', $productid)->exists(),
+            'stock on hand' => fn () => $bil->table('finished_goods_warehouse_stock')->where('productid', $productid)->where('bundles', '<>', 0)->exists(),
             'sales orders' => fn () => $bil->table('sales_order_details')->where('productid', $productid)->exists(),
             'set up on a line' => fn () => $name && $bil->table('conversion_setup')->where('productname', $name)->exists(),
         ];
@@ -1011,16 +1011,16 @@ class Products extends DataGrid
             $this->historyCache = [];
             if ($ids !== []) {
                 $bil = DB::connection('bil');
-                $core = DB::connection('core');
+                $bil = DB::connection('bil');
 
                 $sources = [
                     'conversion output' => $bil->table('factory_conversion')
                         ->whereIn('productid', $ids)->distinct()->pluck('productid'),
                     'factory exits' => $bil->table('factory_exit')
                         ->whereIn('productid', $ids)->distinct()->pluck('productid'),
-                    'warehouse receipts' => $core->table('finished_goods_warehouse_receipts')
+                    'warehouse receipts' => $bil->table('finished_goods_warehouse_receipts')
                         ->whereIn('productid', $ids)->distinct()->pluck('productid'),
-                    'stock on hand' => $core->table('finished_goods_warehouse_stock')
+                    'stock on hand' => $bil->table('finished_goods_warehouse_stock')
                         ->whereIn('productid', $ids)->where('bundles', '<>', 0)
                         ->distinct()->pluck('productid'),
                     'sales orders' => $bil->table('sales_order_details')

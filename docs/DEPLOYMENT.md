@@ -5,6 +5,75 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-08-28 — Six tables move out of `core` into `bil`
+
+`2026_08_28_150000_move_bil_tables_out_of_core`. **Run with the app quiet** —
+each table takes a brief exclusive lock.
+
+`core` is meant to hold the platform and the structure shared across companies.
+These six were none of that: every model reading them is `Modules\Bil\Models\*`,
+every service `Bil\Support\*`, every page `Bil\Livewire\*`, and every row is
+Belimpex's.
+
+| Table | Rows |
+|---|---|
+| `finished_goods_warehouse_receipts` | 1,165,543 |
+| `finished_goods_warehouse_stock` | 167 |
+| `finished_goods_stock_adjustments` | 166 |
+| `raw_materials_warehouse_stock` | 117 |
+| `conversion_waste_runs` / `_entries` | 1 / 3 |
+
+`RENAME TABLE` moves a table between schemas on one server as a metadata
+operation, so the 323 MB receipts table moves in well under a second — this is
+**not** a copy, and `down()` moves them straight back.
+
+**`stock_transfers` / `stock_transfer_lines` deliberately stay in `core`.** A
+transfer runs warehouse-to-warehouse and can cross companies (one already goes
+BIL → Belhin), so neither module owns it.
+
+### Three things to know
+
+**1. Transfers now write across two schemas.** The header and lines are core,
+the stock they move is bil, and two connections cannot share one transaction.
+All three write paths in `Bil\Support\StockTransfers` now nest a bil transaction
+inside the core one, so anything that throws rolls back both. The only uncovered
+case is the outer COMMIT itself failing after the inner has committed — a
+deadlock at commit time. Moving `stock_transfers` into bil later would collapse
+this back to a single transaction.
+
+**2. Two cross-schema foreign keys were dropped** — `conversion_waste_entries`
+→ `core.waste_causes` / `core.waste_origins`. InnoDB would allow them, but `bil`
+and `bpl` declare no foreign keys at all, and `conversion_waste_runs` already
+points at `core.factories` as a plain indexed column. Both indexes stay, so
+lookups are unaffected; what is gone is the delete-time guard, which the Waste
+Settings screen already enforces in application code.
+
+**3. Joins onto tables still in core are now schema-qualified** —
+`core.warehouses`, `core.warehouse_gates`, `core.waste_causes`,
+`core.waste_origins`. Cross-schema joins work fine on one MySQL server; the
+codebase already did this for `core.service_types`.
+
+Two migration comments claimed "MySQL cannot join two connections in one
+statement" and used it to justify denormalising `productname`/`productcode` onto
+`finished_goods_warehouse_stock` and `product_code`/`product_name` onto
+`stock_transfer_lines`. The claim is wrong — Laravel connections cannot be
+joined, MySQL schemas on one server can — and the comments are corrected. The
+columns stay: on the transfer LINE they are a historic record of what was sent,
+which a rename must not rewrite; on the STOCK row they are a sort/search cache
+that `bil:reconcile-fg-stock` refreshes, and now that stock and products share a
+schema that one could be dropped for a join if it ever drifts.
+
+### Verify
+
+`php scripts/verify_core_move.php --snapshot` **before**, then the migration,
+then the same script: table locations, row counts and aggregates, the foreign
+keys, cross-schema reads, ten pages, all five FG Statistics sections, and that
+the stock ledger still reconciles against its receipts. Passed locally,
+including a rollback and re-apply. `bil:reconcile-fg-stock` and
+`bil:reconcile-rm-stock` both report no drift afterwards.
+
+---
+
 ## 2026-08-14 — Finished Goods Statistics
 
 ```

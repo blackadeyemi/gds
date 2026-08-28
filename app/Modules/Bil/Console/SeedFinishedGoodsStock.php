@@ -153,10 +153,10 @@ class SeedFinishedGoodsStock extends Command
     /** received − loaded + unloaded + returned, all-time. */
     private function computedTotals(): array
     {
-        $core = DB::connection('core');
+        $bil = DB::connection('bil');
         $bil = DB::connection('bil');
 
-        $received = $core->table('finished_goods_warehouse_receipts')
+        $received = $bil->table('finished_goods_warehouse_receipts')
             ->groupBy('productid')->selectRaw('productid, SUM(bundles) as b')
             ->pluck('b', 'productid');
 

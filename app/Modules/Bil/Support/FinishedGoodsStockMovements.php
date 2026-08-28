@@ -89,8 +89,8 @@ class FinishedGoodsStockMovements
     /** Pallets received through a gate — the barcode, its bundles and the date. */
     public static function receipts(int $warehouseId, int $productid, int $days = self::DEFAULT_WINDOW): array
     {
-        return DB::connection('core')->table('finished_goods_warehouse_receipts as r')
-            ->leftJoin('warehouse_gates as g', 'r.entrance_id', '=', 'g.id')
+        return DB::connection('bil')->table('finished_goods_warehouse_receipts as r')
+            ->leftJoin('core.warehouse_gates as g', 'r.entrance_id', '=', 'g.id')
             ->where('r.warehouse_id', $warehouseId)
             ->where('r.productid', $productid)
             ->where('r.date_of_entrance', '>=', self::sinceIso($days))
@@ -104,7 +104,7 @@ class FinishedGoodsStockMovements
     /** Manual corrections, with who made them and why. */
     public static function adjustments(int $warehouseId, int $productid, int $days = self::DEFAULT_WINDOW): array
     {
-        return DB::connection('core')->table('finished_goods_stock_adjustments')
+        return DB::connection('bil')->table('finished_goods_stock_adjustments')
             ->where('warehouse_id', $warehouseId)
             ->where('productid', $productid)
             ->where('created_at', '>=', now()->subDays($days))

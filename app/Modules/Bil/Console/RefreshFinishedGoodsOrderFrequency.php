@@ -63,9 +63,9 @@ class RefreshFinishedGoodsOrderFrequency extends Command
         // Every stock row is stamped, including the ones with no orders — a
         // zero that was checked is information; a zero that was never counted
         // is not.
-        foreach (DB::connection('core')->table('finished_goods_warehouse_stock')->get(['id', 'productid']) as $row) {
+        foreach (DB::connection('bil')->table('finished_goods_warehouse_stock')->get(['id', 'productid']) as $row) {
             $c = $counts[(int) $row->productid] ?? ['orders' => 0, 'qty' => 0];
-            DB::connection('core')->table('finished_goods_warehouse_stock')
+            DB::connection('bil')->table('finished_goods_warehouse_stock')
                 ->where('id', $row->id)
                 ->update([
                     'orders_90d' => $c['orders'],

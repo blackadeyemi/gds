@@ -17,7 +17,7 @@ use Modules\Core\Models\WasteOrigin;
  */
 class ConversionWasteEntry extends Model
 {
-    protected $connection = 'core';
+    protected $connection = 'bil';
     protected $table = 'conversion_waste_entries';
 
     protected $fillable = [

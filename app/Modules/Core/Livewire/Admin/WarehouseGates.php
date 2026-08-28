@@ -128,7 +128,7 @@ class WarehouseGates extends DataGrid
      */
     public function deleteGuard($row): ?string
     {
-        $used = DB::connection('core')->table('finished_goods_warehouse_receipts')
+        $used = DB::connection('bil')->table('finished_goods_warehouse_receipts')
                 ->where('entrance_id', $row->id)->limit(1)->count()
             + DB::connection('bil')->table('rawmaterials_warehouse_entry')
                 ->where('gate_id', $row->id)->limit(1)->count()

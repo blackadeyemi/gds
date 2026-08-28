@@ -105,13 +105,25 @@ class StockTransfers
      * source but recorded no lines would be unrecoverable, because there would
      * be nothing left to say what had gone.
      */
+    /*
+     * A transfer writes to BOTH schemas: the header and its lines are `core`
+     * (a transfer can cross companies, so neither module owns it) while the
+     * stock it moves is `bil`. Two connections cannot share one transaction, so
+     * each of the three below runs a bil transaction nested inside a core one —
+     * anything that throws, a failed stock adjustment included, rolls back both.
+     * The one uncovered case is the outer COMMIT failing after the inner has
+     * committed, which means a deadlock at commit time and is vanishingly rare.
+     *
+     * Moving stock_transfers into `bil` would collapse this back to a single
+     * transaction. It stays in core because of the cross-company case.
+     */
     public static function dispatch(array $header, array $lines): StockTransfer
     {
         $user = auth()->user();
         $from = Warehouse::find($header['from_warehouse_id']);
         $to = Warehouse::find($header['to_warehouse_id']);
 
-        return DB::connection('core')->transaction(function () use ($header, $lines, $user, $from, $to) {
+        return DB::connection('core')->transaction(fn () => DB::connection('bil')->transaction(function () use ($header, $lines, $user, $from, $to) {
             $transfer = StockTransfer::create([
                 'module' => $header['module'] ?? self::MODULE,
                 'transfer_number' => $header['transfer_number'] ?? null,
@@ -159,7 +171,7 @@ class StockTransfers
             }
 
             return $transfer;
-        });
+        }));
     }
 
     /* ---------------- Receive ---------------- */
@@ -180,7 +192,7 @@ class StockTransfers
 
         $user = auth()->user();
 
-        DB::connection('core')->transaction(function () use ($transfer, $received, $note, $user) {
+        DB::connection('core')->transaction(fn () => DB::connection('bil')->transaction(function () use ($transfer, $received, $note, $user) {
             foreach ($transfer->lines as $line) {
                 $qty = array_key_exists($line->id, $received)
                     ? max(0, (int) $received[$line->id])
@@ -208,7 +220,7 @@ class StockTransfers
                 'received_at' => now(),
                 'note' => $note ?: $transfer->note,
             ])->save();
-        });
+        }));
     }
 
     /** Sign off a received transfer — the legacy `approved` status. */
@@ -239,7 +251,7 @@ class StockTransfers
             return;
         }
 
-        DB::connection('core')->transaction(function () use ($transfer, $reason) {
+        DB::connection('core')->transaction(fn () => DB::connection('bil')->transaction(function () use ($transfer, $reason) {
             foreach ($transfer->lines as $line) {
                 FinishedGoodsStock::adjust(
                     (int) $transfer->from_warehouse_id, (int) $line->productid, $line->bundles,
@@ -251,7 +263,7 @@ class StockTransfers
                 'status' => StockTransfer::CANCELLED,
                 'note' => $reason ?: $transfer->note,
             ])->save();
-        });
+        }));
     }
 
     /* ---------------- Reads ---------------- */

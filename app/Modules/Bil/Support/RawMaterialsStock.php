@@ -51,7 +51,7 @@ class RawMaterialsStock
 
         // Race-safe: the unique key on (warehouse_id, productid) turns a
         // concurrent double-insert into an increment, and `x + ?` is atomic.
-        DB::connection('core')->insert(
+        DB::connection('bil')->insert(
             'INSERT INTO `raw_materials_warehouse_stock`
                  (`warehouse_id`, `productid`, `quantity`, `weight`, `created_at`, `updated_at`)
              VALUES (?, ?, ?, ?, ?, ?)
@@ -128,7 +128,7 @@ class RawMaterialsStock
     /** What the totals currently say, in the same shape as expected(). */
     public static function actual(?int $warehouseId = null): array
     {
-        return DB::connection('core')->table('raw_materials_warehouse_stock')
+        return DB::connection('bil')->table('raw_materials_warehouse_stock')
             ->when($warehouseId, fn ($q, $id) => $q->where('warehouse_id', $id))
             ->get(['warehouse_id', 'productid', 'quantity', 'weight'])
             ->mapWithKeys(fn ($r) => [$r->warehouse_id . ':' . $r->productid => [

@@ -162,7 +162,7 @@ class StockTransfer extends Component
             return [];
         }
 
-        return DB::connection('core')->table('finished_goods_warehouse_stock')
+        return DB::connection('bil')->table('finished_goods_warehouse_stock')
             ->where('warehouse_id', $this->from_warehouse_id)
             ->pluck('bundles', 'productid')->all();
     }

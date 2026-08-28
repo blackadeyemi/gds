@@ -272,7 +272,7 @@ class FactoryExit extends RawMaterialReport
                 $hits = array_flip(array_merge(
                     DB::connection('bil')->table('store_entrance')
                         ->whereIn('barcode', $page)->distinct()->pluck('barcode')->all(),
-                    DB::connection('core')->table('finished_goods_warehouse_receipts')
+                    DB::connection('bil')->table('finished_goods_warehouse_receipts')
                         ->whereIn('barcode', $page)->distinct()->pluck('barcode')->all()
                 ));
                 foreach ($page as $code) {
@@ -287,7 +287,7 @@ class FactoryExit extends RawMaterialReport
 
         return $this->receivedCache[$barcode] = DB::connection('bil')->table('store_entrance')
             ->where('barcode', $barcode)->exists()
-            || DB::connection('core')->table('finished_goods_warehouse_receipts')
+            || DB::connection('bil')->table('finished_goods_warehouse_receipts')
                 ->where('barcode', $barcode)->exists();
     }
 

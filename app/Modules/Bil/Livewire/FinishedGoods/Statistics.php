@@ -13,15 +13,14 @@ use Modules\Core\Livewire\StatisticsPage;
  * Finished Goods → Statistics. The counterpart of the Raw Materials dashboard,
  * on the same StatisticsPage base.
  *
- * It spans BOTH connections, which Raw Materials does not have to. Production
- * and factory exit are legacy `bil` tables with `Y/m/d` VARCHAR dates — handled
- * by LegacyStatQueries, which buckets with LEFT(col, 7|10). Warehouse receipts,
- * waste and transfers are gds-owned `core` tables with real DATE columns, so
- * they get the coreSeries()/coreCount() helpers below: the same shape of answer,
- * without the string juggling the legacy columns force.
+ * It spans two date IDIOMS, not two schemas. Production and factory exit are
+ * legacy `bil` tables with `Y/m/d` VARCHAR dates — handled by LegacyStatQueries,
+ * which buckets with LEFT(col, 7|10). Warehouse receipts and waste are gds-owned
+ * tables with real DATE columns, so they get the dateSeries()/dateCount()
+ * helpers below: the same shape of answer without the string juggling.
  *
- * The two cannot be joined in one statement, so anything spanning them (a
- * product name against a core row, say) is resolved in PHP.
+ * Those helpers take a connection because stock transfers still live in `core`
+ * (a transfer can cross companies); everything else here is `bil`.
  *
  * Ranges are capped at 12 months for the same reason Raw Materials caps them:
  * `factory_conversion` is 1.2M rows and unbounded aggregation over nine years
@@ -115,12 +114,12 @@ class Statistics extends StatisticsPage
      * filled — but it can use DATE_FORMAT rather than LEFT(), because the column
      * is an actual date.
      */
-    protected function coreSeries(string $table, string $dateCol, string $agg = 'COUNT(*)', ?callable $where = null): array
+    protected function dateSeries(string $table, string $dateCol, string $agg = 'COUNT(*)', ?callable $where = null, string $conn = 'bil'): array
     {
         $monthly = $this->isMonthly();
         $fmt = $monthly ? '%Y-%m' : '%Y-%m-%d';
 
-        $q = $this->core()->table($table)
+        $q = DB::connection($conn)->table($table)
             ->selectRaw("DATE_FORMAT(`{$dateCol}`, '{$fmt}') as bucket, {$agg} as val");
 
         [$from, $to] = $this->coreBounds();
@@ -151,19 +150,19 @@ class Statistics extends StatisticsPage
         return ['labels' => $labels, 'data' => $data];
     }
 
-    protected function coreCount(string $table, string $dateCol, ?callable $where = null): int
+    protected function dateCount(string $table, string $dateCol, ?callable $where = null, string $conn = 'bil'): int
     {
-        return (int) $this->coreScoped($table, $dateCol, $where)->count();
+        return (int) $this->dateScoped($table, $dateCol, $where, $conn)->count();
     }
 
-    protected function coreSum(string $table, string $dateCol, string $col, ?callable $where = null): float
+    protected function dateSum(string $table, string $dateCol, string $col, ?callable $where = null, string $conn = 'bil'): float
     {
-        return (float) $this->coreScoped($table, $dateCol, $where)->sum($col);
+        return (float) $this->dateScoped($table, $dateCol, $where, $conn)->sum($col);
     }
 
-    protected function coreScoped(string $table, string $dateCol, ?callable $where = null)
+    protected function dateScoped(string $table, string $dateCol, ?callable $where = null, string $conn = 'bil')
     {
-        $q = $this->core()->table($table);
+        $q = DB::connection($conn)->table($table);
         [$from, $to] = $this->coreBounds();
 
         if ($from) {
@@ -199,24 +198,24 @@ class Statistics extends StatisticsPage
         $bundles = $this->sumOver('factory_conversion', 'dateofproduction', '/', 'bundles');
         $exited = $this->countOver('factory_exit', 'dateofexit', '/');
 
-        $received = $this->coreCount('finished_goods_warehouse_receipts', 'date_of_entrance',
+        $received = $this->dateCount('finished_goods_warehouse_receipts', 'date_of_entrance',
             fn ($q) => $q->where('is_historic', false));
 
         // Snapshots — "right now", not "over the range".
         $onFloor = (int) $this->db()->table('factory_conversion')->whereNull('status')->count();
-        $inStock = (float) $this->core()->table('finished_goods_warehouse_stock')->sum('bundles');
+        $inStock = (float) $this->db()->table('finished_goods_warehouse_stock')->sum('bundles');
 
-        $wasteKg = (float) $this->core()->table('conversion_waste_entries as e')
+        $wasteKg = (float) $this->db()->table('conversion_waste_entries as e')
             ->join('conversion_waste_runs as r', 'e.run_id', '=', 'r.id')
             ->when($this->coreBounds()[0], fn ($q) => $q->whereBetween('r.production_date', $this->coreBounds()))
             ->sum('e.weight_kg');
 
-        $openRuns = (int) $this->core()->table('conversion_waste_runs')->whereNull('confirmed_at')->count();
+        $openRuns = (int) $this->db()->table('conversion_waste_runs')->whereNull('confirmed_at')->count();
 
         // The flow, end to end: made → left the factory → booked into a store.
         $made = $this->series('factory_conversion', 'dateofproduction', '/', 'SUM(bundles)');
         $out = $this->series('factory_exit', 'dateofexit', '/', 'SUM(bundles)');
-        $in = $this->coreSeries('finished_goods_warehouse_receipts', 'date_of_entrance', 'SUM(bundles)',
+        $in = $this->dateSeries('finished_goods_warehouse_receipts', 'date_of_entrance', 'SUM(bundles)',
             fn ($q) => $q->where('is_historic', false));
 
         $byLine = $this->db()->table('factory_conversion')
@@ -321,36 +320,36 @@ class Statistics extends StatisticsPage
     {
         $live = fn ($q) => $q->where('is_historic', false);
 
-        $receipts = $this->coreCount('finished_goods_warehouse_receipts', 'date_of_entrance', $live);
-        $bundlesIn = $this->coreSum('finished_goods_warehouse_receipts', 'date_of_entrance', 'bundles', $live);
+        $receipts = $this->dateCount('finished_goods_warehouse_receipts', 'date_of_entrance', $live);
+        $bundlesIn = $this->dateSum('finished_goods_warehouse_receipts', 'date_of_entrance', 'bundles', $live);
 
-        $stockRows = $this->core()->table('finished_goods_warehouse_stock')->where('bundles', '>', 0);
+        $stockRows = $this->db()->table('finished_goods_warehouse_stock')->where('bundles', '>', 0);
         $inStock = (float) (clone $stockRows)->sum('bundles');
         $distinct = (int) (clone $stockRows)->distinct()->count('productid');
 
-        $in = $this->coreSeries('finished_goods_warehouse_receipts', 'date_of_entrance', 'SUM(bundles)', $live);
+        $in = $this->dateSeries('finished_goods_warehouse_receipts', 'date_of_entrance', 'SUM(bundles)', $live);
 
-        $byWarehouse = $this->core()->table('finished_goods_warehouse_stock as s')
-            ->leftJoin('warehouses as w', 's.warehouse_id', '=', 'w.id')
+        $byWarehouse = $this->db()->table('finished_goods_warehouse_stock as s')
+            ->leftJoin('core.warehouses as w', 's.warehouse_id', '=', 'w.id')
             ->where('s.bundles', '>', 0)
             ->selectRaw("COALESCE(w.name,'Unassigned') as name, SUM(s.bundles) as val")
             ->groupBy('name')->orderByDesc('val')->get();
 
         // productname is denormalised onto the stock row, so no cross-connection
         // lookup is needed here.
-        $topStock = $this->core()->table('finished_goods_warehouse_stock')
+        $topStock = $this->db()->table('finished_goods_warehouse_stock')
             ->where('bundles', '>', 0)
             ->selectRaw("COALESCE(productname, CONCAT('#', productid)) as name, SUM(bundles) as val")
             ->groupBy('name')->orderByDesc('val')->limit(10)->get();
 
-        $byGate = $this->core()->table('finished_goods_warehouse_receipts as r')
-            ->leftJoin('warehouse_gates as g', 'r.entrance_id', '=', 'g.id')
+        $byGate = $this->db()->table('finished_goods_warehouse_receipts as r')
+            ->leftJoin('core.warehouse_gates as g', 'r.entrance_id', '=', 'g.id')
             ->where('r.is_historic', false)
             ->when($this->coreBounds()[0], fn ($q) => $q->whereBetween('r.date_of_entrance', $this->coreBounds()))
             ->selectRaw("COALESCE(g.name,'Unknown') as name, SUM(r.bundles) as val")
             ->groupBy('name')->orderByDesc('val')->limit(8)->get();
 
-        $ordered = (int) $this->core()->table('finished_goods_warehouse_stock')
+        $ordered = (int) $this->db()->table('finished_goods_warehouse_stock')
             ->where('orders_90d', '>', 0)->count();
 
         return [
@@ -389,13 +388,13 @@ class Statistics extends StatisticsPage
     {
         [$from, $to] = $this->coreBounds();
 
-        $entries = fn () => $this->core()->table('conversion_waste_entries as e')
+        $entries = fn () => $this->db()->table('conversion_waste_entries as e')
             ->join('conversion_waste_runs as r', 'e.run_id', '=', 'r.id')
             ->when($from, fn ($q) => $q->whereBetween('r.production_date', [$from, $to]));
 
         $totalKg = (float) $entries()->sum('e.weight_kg');
 
-        $runs = fn () => $this->core()->table('conversion_waste_runs')
+        $runs = fn () => $this->db()->table('conversion_waste_runs')
             ->when($from, fn ($q) => $q->whereBetween('production_date', [$from, $to]));
 
         $confirmed = (int) (clone $runs())->whereNotNull('confirmed_at')->count();
@@ -403,18 +402,18 @@ class Statistics extends StatisticsPage
         $nil = (int) (clone $runs())->where('is_nil', true)->count();
         $perRun = $confirmed > 0 ? $totalKg / $confirmed : 0;
 
-        $daily = $this->coreSeries('conversion_waste_runs', 'production_date', 'COUNT(*)');
+        $daily = $this->dateSeries('conversion_waste_runs', 'production_date', 'COUNT(*)');
         // Weight has to come through the join, so it is built separately and
         // aligned to the same labels.
         $weightSeries = $this->wasteWeightSeries();
 
         $byCause = $entries()
-            ->leftJoin('waste_causes as c', 'e.cause_id', '=', 'c.id')
+            ->leftJoin('core.waste_causes as c', 'e.cause_id', '=', 'c.id')
             ->selectRaw("COALESCE(c.name,'—') as name, SUM(e.weight_kg) as val")
             ->groupBy('name')->orderByDesc('val')->limit(10)->get();
 
         $byOrigin = $entries()
-            ->leftJoin('waste_origins as o', 'e.origin_id', '=', 'o.id')
+            ->leftJoin('core.waste_origins as o', 'e.origin_id', '=', 'o.id')
             ->selectRaw("COALESCE(o.label,'—') as name, SUM(e.weight_kg) as val")
             ->groupBy('name')->orderByDesc('val')->get();
 
@@ -472,7 +471,7 @@ class Statistics extends StatisticsPage
         $fmt = $monthly ? '%Y-%m' : '%Y-%m-%d';
         [$from, $to] = $this->coreBounds();
 
-        $vals = $this->core()->table('conversion_waste_entries as e')
+        $vals = $this->db()->table('conversion_waste_entries as e')
             ->join('conversion_waste_runs as r', 'e.run_id', '=', 'r.id')
             ->when($from, fn ($q) => $q->whereBetween('r.production_date', [$from, $to]))
             ->selectRaw("DATE_FORMAT(r.production_date, '{$fmt}') as bucket, SUM(e.weight_kg) as val")
@@ -523,8 +522,8 @@ class Statistics extends StatisticsPage
             ->where('t.is_historic', false)
             ->sum('l.bundles');
 
-        $daily = $this->coreSeries('stock_transfers', 'date_of_transfer', 'COUNT(*)',
-            fn ($q) => $q->where('module', 'finished-goods'));
+        $daily = $this->dateSeries('stock_transfers', 'date_of_transfer', 'COUNT(*)',
+            fn ($q) => $q->where('module', 'finished-goods'), 'core');
 
         $byKind = $transfers()
             ->selectRaw('kind as name, COUNT(*) as val')

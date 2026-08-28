@@ -22,7 +22,7 @@ use Modules\Core\Models\Warehouse;
  */
 class FgWarehouseStock extends Model
 {
-    protected $connection = 'core';
+    protected $connection = 'bil';
     protected $table = 'finished_goods_warehouse_stock';
 
     protected $guarded = [];

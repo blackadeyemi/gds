@@ -114,7 +114,7 @@ class WarehouseEntrance extends RawMaterialReport
     {
         $f = $this->filters;
 
-        $q = DB::connection('core')->table('finished_goods_warehouse_receipts as r');
+        $q = DB::connection('bil')->table('finished_goods_warehouse_receipts as r');
 
         return $this->applyDate($q, 'r.date_of_entrance')
             ->when($f['warehouse'] ?? '', fn ($q, $v) => $q->where('r.warehouse_id', $v))
@@ -136,9 +136,9 @@ class WarehouseEntrance extends RawMaterialReport
     {
         $f = $this->filters;
 
-        $q = DB::connection('core')->table('finished_goods_warehouse_receipts as r')
-            ->leftJoin('warehouse_gates as e', 'r.entrance_id', '=', 'e.id')
-            ->leftJoin('warehouses as w', 'r.warehouse_id', '=', 'w.id');
+        $q = DB::connection('bil')->table('finished_goods_warehouse_receipts as r')
+            ->leftJoin('core.warehouse_gates as e', 'r.entrance_id', '=', 'e.id')
+            ->leftJoin('core.warehouses as w', 'r.warehouse_id', '=', 'w.id');
 
         return $this->applyDate($q, 'r.date_of_entrance')
             ->when($f['warehouse'] ?? '', fn ($q, $v) => $q->where('r.warehouse_id', $v))
@@ -275,7 +275,7 @@ class WarehouseEntrance extends RawMaterialReport
             return;
         }
 
-        DB::connection('core')->transaction(function () use ($receipt) {
+        DB::connection('bil')->transaction(function () use ($receipt) {
             // Imported history never counted toward stock, so removing it must
             // not take bundles out either.
             if (! $receipt->is_historic) {

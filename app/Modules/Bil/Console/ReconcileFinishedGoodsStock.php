@@ -58,9 +58,9 @@ class ReconcileFinishedGoodsStock extends Command
             return self::FAILURE;
         }
 
-        DB::connection('core')->transaction(function () use ($drift, $products) {
+        DB::connection('bil')->transaction(function () use ($drift, $products) {
             foreach ($drift as $d) {
-                DB::connection('core')->table('finished_goods_warehouse_stock')->updateOrInsert(
+                DB::connection('bil')->table('finished_goods_warehouse_stock')->updateOrInsert(
                     ['warehouse_id' => $d['warehouse_id'], 'productid' => $d['productid']],
                     [
                         'bundles' => $d['expected'],

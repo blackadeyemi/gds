@@ -388,7 +388,7 @@ class ConversionWaste extends Component
         $model = Waste::findOrCreateRun($run);
         $originsById = $this->origins->keyBy('id');
 
-        DB::connection('core')->transaction(function () use ($filled, $model, $originsById) {
+        DB::connection('bil')->transaction(function () use ($filled, $model, $originsById) {
             foreach ($filled as $row) {
                 $origin = $originsById[(int) $row['origin_id']] ?? null;
                 $ref = $origin?->needsRef() ? ($row['origin_ref'] ?: null) : null;

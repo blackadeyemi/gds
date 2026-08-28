@@ -58,9 +58,9 @@ class ReconcileRawMaterialsStock extends Command
             return self::FAILURE;
         }
 
-        DB::connection('core')->transaction(function () use ($drift) {
+        DB::connection('bil')->transaction(function () use ($drift) {
             foreach ($drift as $d) {
-                DB::connection('core')->table('raw_materials_warehouse_stock')->updateOrInsert(
+                DB::connection('bil')->table('raw_materials_warehouse_stock')->updateOrInsert(
                     ['warehouse_id' => $d['warehouse_id'], 'productid' => $d['productid']],
                     [
                         'quantity' => $d['expected_quantity'],

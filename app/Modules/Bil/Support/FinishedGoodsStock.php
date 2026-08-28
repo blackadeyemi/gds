@@ -76,14 +76,15 @@ class FinishedGoodsStock
         }
 
         // Denormalised so the Stock grid can sort and search on it — products
-        // are on another connection and cannot be joined. See the migration.
+        // Denormalised onto the stock row for sorting and searching; see the
+        // migration that added them.
         $product = DB::connection('bil')->table('products')
             ->where('productid', $productid)->first(['productname', 'productcode']);
 
         // Race-safe: the unique key on (warehouse_id, productid) turns a
         // concurrent double-insert into an increment, and `bundles + ?` is
         // atomic, so no read-modify-write and no lock is needed.
-        DB::connection('core')->insert(
+        DB::connection('bil')->insert(
             'INSERT INTO `finished_goods_warehouse_stock`
                  (`warehouse_id`, `productid`, `productname`, `productcode`, `bundles`, `created_at`, `updated_at`)
              VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -116,8 +117,8 @@ class FinishedGoodsStock
 
         $user = auth()->user();
 
-        DB::connection('core')->transaction(function () use ($warehouseId, $productid, $bundles, $reason, $user) {
-            DB::connection('core')->table('finished_goods_stock_adjustments')->insert([
+        DB::connection('bil')->transaction(function () use ($warehouseId, $productid, $bundles, $reason, $user) {
+            DB::connection('bil')->table('finished_goods_stock_adjustments')->insert([
                 'warehouse_id' => $warehouseId,
                 'productid' => $productid,
                 'bundles' => $bundles,
@@ -135,7 +136,7 @@ class FinishedGoodsStock
     /** Set a product's stock to an absolute figure, recorded as the delta. */
     public static function setTo(int $warehouseId, int $productid, int $target, ?string $reason = null): void
     {
-        $current = (int) DB::connection('core')->table('finished_goods_warehouse_stock')
+        $current = (int) DB::connection('bil')->table('finished_goods_warehouse_stock')
             ->where('warehouse_id', $warehouseId)->where('productid', $productid)
             ->value('bundles');
 
@@ -151,7 +152,7 @@ class FinishedGoodsStock
      */
     public static function expected(?int $warehouseId = null): array
     {
-        $core = DB::connection('core');
+        $bil = DB::connection('bil');
         $out = [];
 
         $add = function (string $key, int $bundles) use (&$out) {
@@ -159,7 +160,7 @@ class FinishedGoodsStock
         };
 
         // 1. Live receipts.
-        $core->table('finished_goods_warehouse_receipts')
+        $bil->table('finished_goods_warehouse_receipts')
             ->where('is_historic', false)
             ->when($warehouseId, fn ($q, $id) => $q->where('warehouse_id', $id))
             ->groupBy('warehouse_id', 'productid')
@@ -168,7 +169,7 @@ class FinishedGoodsStock
             ->each(fn ($r) => $add($r->warehouse_id . ':' . $r->productid, (int) $r->bundles));
 
         // 2. Manual corrections.
-        $core->table('finished_goods_stock_adjustments')
+        $bil->table('finished_goods_stock_adjustments')
             ->when($warehouseId, fn ($q, $id) => $q->where('warehouse_id', $id))
             ->groupBy('warehouse_id', 'productid')
             ->selectRaw('warehouse_id, productid, SUM(bundles) as bundles')
@@ -239,7 +240,7 @@ class FinishedGoodsStock
     /** What the totals currently say, in the same shape as expected(). */
     public static function actual(?int $warehouseId = null): array
     {
-        return DB::connection('core')->table('finished_goods_warehouse_stock')
+        return DB::connection('bil')->table('finished_goods_warehouse_stock')
             ->when($warehouseId, fn ($q, $id) => $q->where('warehouse_id', $id))
             ->get(['warehouse_id', 'productid', 'bundles'])
             ->mapWithKeys(fn ($r) => [$r->warehouse_id . ':' . $r->productid => (int) $r->bundles])

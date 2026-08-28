@@ -26,7 +26,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class ConversionWasteRun extends Model
 {
-    protected $connection = 'core';
+    protected $connection = 'bil';
     protected $table = 'conversion_waste_runs';
 
     protected $fillable = [
