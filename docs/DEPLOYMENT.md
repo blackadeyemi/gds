@@ -5,6 +5,60 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-08-28 — Three dead tables dropped from `core`
+
+`2026_08_28_170000_drop_dead_inter_transfer_tables`, plus a legacy-side change.
+Sub-second. **Deploy the two together** — the migration drops tables the legacy
+routes still pointed at.
+
+| Dropped | Rows | Why |
+|---|---|---|
+| `local_governments` | 774 | Referenced by no php, js or yaml in either codebase. Superseded by `geo_states` / `geo_cities`. |
+| `rawmaterial_inter_transfer` | 28 | Last written 2023-10-18 |
+| `rawmaterials_inter_received` | 11 | Last written 2023-10-18 |
+
+The two raw-material tables belonged to a feature whose **screens no longer
+exist**: no PHP page loads `js/bpl/rm_inter_transfer/form.js` or
+`rm_inter_received/form.js`, and neither is in `main_nav.php`. Only three API
+routes still pointed at it, so the legacy change removes them from
+`app/private/routes/api.yaml` and leaves `barcodeDetails` / `save` / `received`
+on `Bpl\RawmaterialInterTransfer` as throwing stubs — a forgotten caller now
+fails loudly instead of writing to a table that is gone. **The finished-goods
+routes on that same controller are live and untouched.**
+
+The compatibility views in `bil` and `bpl` go with the tables.
+
+### What deliberately stays
+
+`transfer_company_from` (1 row) and `transfer_company_to` (2 rows) look just as
+dead and are **not**: `report_fg_inter_transfer.php` reads both directly and is
+in the nav, and the live `fg_transfer/getcompany` endpoint reads `to_company`
+for the finished-goods transfer and receive screens. `fg_inter_transfer` /
+`fg_inter_received` also stay — GDS has replaced them with `stock_transfers`,
+but their legacy screens are still served, so **both apps can record a transfer
+today and the two will diverge.** Retiring those screens is the follow-up.
+
+`countries` / `currencies` / `states` stay too: the legacy app reads them, even
+though GDS now uses `geo_countries` / `geo_states` / `geo_cities`.
+
+### Rollback
+
+`down()` rebuilds the three tables and their views from the DDL recorded in the
+migration, but **cannot bring the rows back**. They are in
+`db_backups/pre-drop-dead-core-tables_*.sql`, dumped with
+`--default-character-set=binary` before the drop.
+
+### Verify
+
+`php scripts/verify_dead_table_drop.php` — the three are gone from all three
+schemas, the seven look-alikes are intact and readable through their views, a
+recursive search of both codebases finds no remaining reference, and the retired
+routes are unrouted while the finished-goods ones survive. Passed locally,
+including a rollback and re-apply. `core` is now 44 objects, down from 53 when
+this audit started.
+
+---
+
 ## 2026-08-28 — `finished_goods_warehouse_stock` drops its product name/code
 
 `2026_08_28_160000_drop_denormalised_product_from_fg_stock`. Sub-second, no data
