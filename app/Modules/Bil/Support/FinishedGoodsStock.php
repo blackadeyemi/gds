@@ -75,26 +75,22 @@ class FinishedGoodsStock
             return;
         }
 
-        // Denormalised so the Stock grid can sort and search on it — products
-        // Denormalised onto the stock row for sorting and searching; see the
-        // migration that added them.
-        $product = DB::connection('bil')->table('products')
-            ->where('productid', $productid)->first(['productname', 'productcode']);
-
         // Race-safe: the unique key on (warehouse_id, productid) turns a
         // concurrent double-insert into an increment, and `bundles + ?` is
         // atomic, so no read-modify-write and no lock is needed.
+        //
+        // The product's name and code are NOT stored here. They were, back when
+        // stock was on `core` and the master on `bil`; both are on `bil` now, so
+        // the pages that sort and search by product join `products` instead of
+        // keeping a copy that has to be refreshed on every movement.
         DB::connection('bil')->insert(
             'INSERT INTO `finished_goods_warehouse_stock`
-                 (`warehouse_id`, `productid`, `productname`, `productcode`, `bundles`, `created_at`, `updated_at`)
-             VALUES (?, ?, ?, ?, ?, ?, ?)
+                 (`warehouse_id`, `productid`, `bundles`, `created_at`, `updated_at`)
+             VALUES (?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                  `bundles` = `bundles` + ?,
-                 `productname` = VALUES(`productname`),
-                 `productcode` = VALUES(`productcode`),
                  `updated_at` = ?',
-            [$warehouseId, $productid, $product->productname ?? null, $product->productcode ?? null,
-                $bundles, now(), now(), $bundles, now()]
+            [$warehouseId, $productid, $bundles, now(), now(), $bundles, now()]
         );
     }
 

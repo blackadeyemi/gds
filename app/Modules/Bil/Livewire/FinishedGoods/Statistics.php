@@ -335,11 +335,10 @@ class Statistics extends StatisticsPage
             ->selectRaw("COALESCE(w.name,'Unassigned') as name, SUM(s.bundles) as val")
             ->groupBy('name')->orderByDesc('val')->get();
 
-        // productname is denormalised onto the stock row, so no cross-connection
-        // lookup is needed here.
-        $topStock = $this->db()->table('finished_goods_warehouse_stock')
-            ->where('bundles', '>', 0)
-            ->selectRaw("COALESCE(productname, CONCAT('#', productid)) as name, SUM(bundles) as val")
+        $topStock = $this->db()->table('finished_goods_warehouse_stock as s')
+            ->leftJoin('products as p', 'p.productid', '=', 's.productid')
+            ->where('s.bundles', '>', 0)
+            ->selectRaw("COALESCE(p.productname, CONCAT('#', s.productid)) as name, SUM(s.bundles) as val")
             ->groupBy('name')->orderByDesc('val')->limit(10)->get();
 
         $byGate = $this->db()->table('finished_goods_warehouse_receipts as r')

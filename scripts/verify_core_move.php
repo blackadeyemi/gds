@@ -125,10 +125,12 @@ $check('waste entries join core.waste_causes', $waste > 0, "$waste entries named
 
 // The claim the two migrations were built on — that the product master "cannot
 // be joined" — was never true, and after the move it is not even cross-schema.
+// 2026_08_28_160000 then dropped the denormalised copy in favour of this join,
+// so the Stock grid depends on it resolving.
 $joined = DB::connection('bil')->table('finished_goods_warehouse_stock as s')
     ->leftJoin('products as p', 'p.productid', '=', 's.productid')
-    ->whereColumn('s.productname', 'p.productname')->count();
-$check('stock joins bil.products in one statement', $joined > 0, "$joined rows agree with the master");
+    ->whereNotNull('p.productname')->count();
+$check('stock joins bil.products in one statement', $joined > 0, "$joined rows resolve a product name");
 
 echo "== 5. the pages that read them still render ==\n";
 $admin = User::query()->with('roles')->get()->first(fn ($u) => $u->roles->contains('legacy_level', 1));

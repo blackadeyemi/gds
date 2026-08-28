@@ -5,6 +5,51 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-08-28 — `finished_goods_warehouse_stock` drops its product name/code
+
+`2026_08_28_160000_drop_denormalised_product_from_fg_stock`. Sub-second, no data
+loss — the two columns were a cache of `bil.products`, and the Stock grid now
+joins the master instead.
+
+They were added by 2026_08_12_150000 so the grid could sort and search by
+product, on the grounds that *"stock lives on `core` and products on `bil`, and
+MySQL cannot join two connections in one statement"*. The first half stopped
+being true when the table moved into `bil`; the second half was never true —
+Laravel **connections** cannot be joined, MySQL **schemas** on one server can.
+
+What changed:
+
+- `Stock::base()` joins `products` and selects `p.productname` / `p.productcode`
+  under the same names, so the columns, sorting and searching are unchanged from
+  the user's side — the sort just happens against the master now.
+- `FinishedGoodsStock::apply()` no longer looks the product up on every movement
+  or writes the two columns, and `bil:reconcile-fg-stock` no longer refreshes
+  them. Both got shorter.
+- `openMovements()` and the FG Statistics top-products chart read through the
+  join.
+
+`down()` re-adds the columns **and refills them from `products`**, so a rollback
+does not leave the old code showing every row as unnamed.
+
+**`stock_transfer_lines.product_code` / `product_name` stay, and are not the
+same case.** They are in active use — displayed, searchable, sortable, and
+GROUP BY'd in the Stock Transfer report's summary view, and read by the receive
+screen and the transfers chart — but that is not why they stay. A transfer line
+records what was **sent**; if a product is renamed next year the line must still
+read as it did on the day, the way an invoice line keeps its price. A stock row
+is current state and should follow the master. Same for
+`conversion_waste_runs.product_name` / `line_name`.
+
+### Verify
+
+The Stock grid renders 167 rows with names and codes from the join; sorting by
+either matches MySQL's own ordering; search hits and misses behave; the
+movements modal still names its product; `apply()` still moves stock; the top-
+products chart still names products. One stock row has no matching product
+master and shows unnamed — it did before this change too, for the same reason.
+
+---
+
 ## 2026-08-28 — Six tables move out of `core` into `bil`
 
 `2026_08_28_150000_move_bil_tables_out_of_core`. **Run with the app quiet** —

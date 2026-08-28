@@ -96,12 +96,11 @@ class Stock extends DataGrid
                         ? e(\Illuminate\Support\Carbon::parse($r->updated_at)->format('d M Y H:i'))
                         : '—'],
                 ],
-                // Every column sorts, including the product — which is only
-                // possible because the name is denormalised onto the row;
-                // products live on `bil` and cannot be joined from `core`.
+                // Every column sorts, including the product: `products` is
+                // joined, so the sort happens in SQL before the page is taken.
                 'sortable' => ['productcode', 'productname', 'warehouse_name', 'bundles',
                     'orders_90d', 'ordered_qty_90d', 'updated_at'],
-                'searchable' => ['s.productname', 's.productcode', 'w.name'],
+                'searchable' => ['p.productname', 'p.productcode', 'w.name'],
                 'query' => fn () => $this->base(),
             ],
             'by_warehouse' => [
@@ -156,7 +155,8 @@ class Stock extends DataGrid
 
         $this->detailWarehouseId = (int) $row->warehouse_id;
         $this->detailProductId = (int) $row->productid;
-        $this->productLabel = (string) ($row->productname ?? '—');
+        $this->productLabel = (string) (DB::connection('bil')->table('products')
+            ->where('productid', $row->productid)->value('productname') ?? '—');
         $this->warehouseLabel = (string) (Warehouse::find($row->warehouse_id)?->name ?? '—');
         $this->currentBundles = (int) $row->bundles;
         $this->movementTab = 'incoming';
@@ -216,7 +216,8 @@ class Stock extends DataGrid
         // `$row->getKey()` for row actions, which a stdClass has not got.
         return FgWarehouseStock::query()->from('finished_goods_warehouse_stock as s')
             ->leftJoin('core.warehouses as w', 's.warehouse_id', '=', 'w.id')
-            ->select('s.id', 's.warehouse_id', 's.productid', 's.productname', 's.productcode',
+            ->leftJoin('products as p', 'p.productid', '=', 's.productid')
+            ->select('s.id', 's.warehouse_id', 's.productid', 'p.productname', 'p.productcode',
                 's.bundles', 's.orders_90d', 's.ordered_qty_90d', 's.orders_counted_at',
                 's.updated_at', 'w.name as warehouse_name');
     }

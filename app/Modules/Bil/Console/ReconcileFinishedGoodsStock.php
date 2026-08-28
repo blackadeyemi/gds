@@ -64,10 +64,6 @@ class ReconcileFinishedGoodsStock extends Command
                     ['warehouse_id' => $d['warehouse_id'], 'productid' => $d['productid']],
                     [
                         'bundles' => $d['expected'],
-                        // Refresh the denormalised copy the Stock grid sorts on.
-                        'productname' => $products[$d['productid']] ?? null,
-                        'productcode' => DB::connection('bil')->table('products')
-                            ->where('productid', $d['productid'])->value('productcode'),
                         'updated_at' => now(),
                         'created_at' => now(),
                     ]
