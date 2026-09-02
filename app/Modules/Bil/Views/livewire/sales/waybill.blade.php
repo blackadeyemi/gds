@@ -163,7 +163,7 @@
                                 <div class="form-group">
                                     <label class="form-label">Receipt number</label>
                                     <input type="number" class="form-control" style="text-align:right;"
-                                           wire:model="receiptnumber" placeholder="optional"
+                                           wire:model="receiptnumber"
                                            @disabled($waybill ? ! $this->canModify() : ! $this->canCreate())>
                                     @error('receiptnumber') <div class="form-error">{{ $message }}</div> @enderror
                                 </div>
