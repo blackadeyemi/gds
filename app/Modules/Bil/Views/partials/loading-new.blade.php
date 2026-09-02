@@ -35,6 +35,26 @@
             @endif
         </div>
 
+        {{-- The date the truck is loaded ON. Part of the load's identity: the
+             load number restarts daily and the barcode carries the date, so a
+             load keyed the next morning belongs to the day it happened. Only a
+             user with the backdate ability may move it — everyone else sees
+             today, fixed, and saveNew() re-checks rather than trusting it. --}}
+        <div class="form-group" style="max-width:240px;">
+            <label class="form-label">Date of loading</label>
+            @if ($this->canBackdate())
+                @include('bil::partials.date-field', ['model' => 'loadDateIso', 'live' => true])
+                @if ($loadDateIso !== now()->format('Y-m-d'))
+                    <div class="text-sm" style="color:#b45309;margin-top:.25rem;">
+                        Backdated — this load will be numbered in
+                        {{ \Illuminate\Support\Carbon::parse($loadDateIso)->format('d M Y') }}’s sequence.
+                    </div>
+                @endif
+            @else
+                <input type="text" class="form-control" value="{{ now()->format('Y/m/d') }}" disabled>
+            @endif
+        </div>
+
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0.75rem;">
             <div class="form-group">
                 <label class="form-label">Transporter</label>
@@ -82,7 +102,8 @@
             <div class="card" style="background:var(--surface-2);padding:.7rem 1rem;margin-top:.9rem;">
                 <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
                     <div class="text-sm">
-                        Times this truck has loaded today:
+                        Times this truck has loaded on
+                        {{ \Illuminate\Support\Carbon::parse($this->loadDateSlash())->format('d M Y') }}:
                         <strong>{{ number_format($this->truckLoadCount) }}</strong>
                     </div>
 
@@ -98,7 +119,7 @@
                     @elseif ($joining)
                         Will be <strong>added to load #{{ $joining }}</strong> — same customer, truck and crew.
                     @else
-                        Will start a <strong>new load</strong>; nothing today matches this customer, truck and crew.
+                        Will start a <strong>new load</strong>; nothing on that date matches this customer, truck and crew.
                     @endif
                 </div>
             </div>

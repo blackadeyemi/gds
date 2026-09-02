@@ -84,6 +84,21 @@ class Loading extends Component
     public string $orderid = '';
 
     /**
+     * The date the truck is being loaded ON, which is not always today.
+     *
+     * A load raised the morning after a night shift, or keyed once the office
+     * catches up, belongs to the day it happened: `dateofloading` is part of the
+     * load's identity — the load number restarts daily and the barcode carries
+     * the date — so getting it wrong puts the load on the wrong day's sheet and
+     * gives it a number from the wrong sequence.
+     *
+     * Only a user with the `backdate` ability may move it; for everyone else it
+     * is fixed to today, and saveNew() re-checks that rather than trusting the
+     * field.
+     */
+    public string $loadDateIso = '';
+
+    /**
      * The legacy "NEW LOAD NUMBER" checkbox.
      *
      * Several sales orders for one customer share a load number when the truck
@@ -116,6 +131,7 @@ class Loading extends Component
     public function mount(): void
     {
         $this->dateIso = now()->format('Y-m-d');
+        $this->loadDateIso = now()->format('Y-m-d');
 
         // Someone who cannot create a load has nothing to see in that mode, so
         // they start on the queue with nothing selected instead.
@@ -144,6 +160,26 @@ class Loading extends Component
     public function canReturn(): bool
     {
         return $this->mayDo('return');
+    }
+
+    public function canBackdate(): bool
+    {
+        return $this->mayDo('backdate');
+    }
+
+    /**
+     * The date a new load will be written against, as the legacy `Y/m/d`.
+     *
+     * Falls back to today whenever the user may not backdate or the field is
+     * unusable, so nothing downstream has to cope with an empty date.
+     */
+    public function loadDateSlash(): string
+    {
+        if (! $this->canBackdate() || $this->loadDateIso === '') {
+            return now()->format('Y/m/d');
+        }
+
+        return str_replace('-', '/', $this->loadDateIso);
     }
 
     /* ---------------- Cagerooms the user may load from ---------------- */
@@ -334,7 +370,7 @@ class Loading extends Component
     #[Computed]
     public function truckLoadCount(): int
     {
-        return SalesLoadings::truckLoadCount($this->trucknumber, now()->format('Y/m/d'));
+        return SalesLoadings::truckLoadCount($this->trucknumber, $this->loadDateSlash());
     }
 
     /**
@@ -351,7 +387,7 @@ class Loading extends Component
 
         $order = $this->order;
 
-        return SalesLoadings::joinableLoadNumber(now()->format('Y/m/d'), [
+        return SalesLoadings::joinableLoadNumber($this->loadDateSlash(), [
             'trucknumber' => strtoupper(str_replace(' ', '', $this->trucknumber)),
             'loader' => strtoupper(trim($this->loader)),
             'truckdriver' => strtoupper(trim($this->truckdriver)),
@@ -389,6 +425,7 @@ class Loading extends Component
         $this->orderid = '';
         $this->toLoad = [];
         $this->newLoadNumber = false;
+        $this->loadDateIso = now()->format('Y-m-d');
         $this->reset(['transporterid', 'cageroomcode', 'loader', 'trucknumber', 'truckdriver']);
         $this->resetLineEditors();
     }
@@ -431,6 +468,11 @@ class Loading extends Component
     {
         $this->shown = SalesLoadings::QUEUE_LIMIT;
         unset($this->page, $this->openLoads, $this->openLoadCount);
+    }
+
+    public function updatedLoadDateIso(): void
+    {
+        unset($this->truckLoadCount, $this->joiningLoad);
     }
 
     public function updatedOrderid(): void
@@ -510,7 +552,7 @@ class Loading extends Component
             'trucknumber' => strtoupper(str_replace(' ', '', $this->trucknumber)),
             'truckdriver' => strtoupper(trim($this->truckdriver)),
             'warehousecode' => $order->warehousecode,
-        ], $lines, now()->format('Y/m/d'),
+        ], $lines, $this->loadDateSlash(),
             $order->customerid ? (int) $order->customerid : null,
             $this->newLoadNumber);
 
