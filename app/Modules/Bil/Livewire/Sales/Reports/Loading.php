@@ -47,7 +47,8 @@ class Loading extends SalesReport
         return $this->commonFilterDefs() + [
             'foc' => $this->focFilterDef(),
             'cageroom' => ['label' => 'Cageroom', 'options' => $o['cagerooms']],
-            'transporter' => ['label' => 'Transporter', 'options' => $o['transporters']],
+            'transporter' => ['label' => 'Transporter', 'options' => $o['transporters'],
+                'width' => self::NAME_FILTER_WIDTH],
             'delivered' => ['label' => 'Delivery', 'options' => [
                 'yes' => 'Confirmed delivered', 'no' => 'Not yet confirmed',
             ]],

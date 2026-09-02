@@ -28,7 +28,7 @@
             @endif
 
             @foreach ($this->filterDefs() as $name => $def)
-                @include('bil::partials.report-select', ['name' => $name, 'label' => $def['label'], 'options' => $def['options']])
+                @include('bil::partials.report-select', ['name' => $name, 'label' => $def['label'], 'options' => $def['options'], 'width' => $def['width'] ?? null])
             @endforeach
 
             <div class="flex items-center gap-2 ml-auto" style="flex-wrap:wrap;">

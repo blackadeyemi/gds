@@ -100,6 +100,14 @@ abstract class SalesReport extends RawMaterialReport
     }
 
     /**
+     * How wide a filter holding a NAME has to be. The default 170px suits a
+     * depot or a status and truncates everything here: 95% of customer names
+     * reach 36 characters and 95% of product names 40, against a field that
+     * shows about 20.
+     */
+    protected const NAME_FILTER_WIDTH = 300;
+
+    /**
      * The three filters every one of these reports carries, in the order the
      * legacy search modal had them: depot, customer, product.
      */
@@ -109,8 +117,10 @@ abstract class SalesReport extends RawMaterialReport
 
         return [
             'warehouse' => ['label' => 'Depot', 'options' => $o['warehouses']],
-            'customer' => ['label' => 'Customer', 'options' => $o['customers']],
-            'product' => ['label' => 'Product', 'options' => $o['products']],
+            'customer' => ['label' => 'Customer', 'options' => $o['customers'],
+                'width' => self::NAME_FILTER_WIDTH],
+            'product' => ['label' => 'Product', 'options' => $o['products'],
+                'width' => self::NAME_FILTER_WIDTH],
         ];
     }
 

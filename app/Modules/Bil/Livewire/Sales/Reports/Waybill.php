@@ -45,8 +45,10 @@ class Waybill extends SalesReport
 
         return [
             'warehouse' => ['label' => 'Depot', 'options' => $o['warehouses']],
-            'customer' => ['label' => 'Customer', 'options' => $o['customers']],
-            'transporter' => ['label' => 'Transporter', 'options' => $o['transporters']],
+            'customer' => ['label' => 'Customer', 'options' => $o['customers'],
+                'width' => self::NAME_FILTER_WIDTH],
+            'transporter' => ['label' => 'Transporter', 'options' => $o['transporters'],
+                'width' => self::NAME_FILTER_WIDTH],
             'receipt' => ['label' => 'Receipt', 'options' => [
                 'yes' => 'Receipt number recorded', 'no' => 'No receipt number',
             ]],

@@ -3,7 +3,15 @@
     the given options (a few hundred rows), with an "All" entry that clears the
     filter. Writes the chosen value to `filters.<name>` via $wire (live).
 
-    Params: $name (filter key), $label, $options ([value => label]).
+    Params: $name (filter key), $label, $options ([value => label]), and an
+    optional $width in px.
+
+    $width exists because the default 170px is right for a status or a depot and
+    wrong for a name. A customer at the 95th percentile is 36 characters
+    ("LAGOS AIRPORT HOTEL CARAT 24 BUSINESS HOTEL AND SUITES" is 51) and a
+    product 40, so those two get 300px and everything else stays as it was. The
+    dropdown panel is pinned to the input's edges, so widening the field widens
+    the list with it.
 
     The key carries a hash of the OPTIONS, not just the filter name. Alpine
     snapshots `items` when x-data is evaluated, which happens once per element;
@@ -12,7 +20,8 @@
     the original one. Changing the key forces a replacement and a fresh snapshot.
     Filters whose options never change hash the same and are untouched.
 --}}
-<div class="form-group" style="margin:0;min-width:170px;"
+@php($fieldWidth = (int) ($width ?? 170))
+<div class="form-group" style="margin:0;min-width:{{ $fieldWidth }}px;"
      wire:key="rfilter-{{ $name }}-{{ substr(md5(json_encode($options)), 0, 8) }}"
      x-data="{
         open: false,
@@ -39,7 +48,7 @@
      @click.outside="restore()" @keydown.escape="restore()">
     <label class="form-label text-sm">{{ $label }}</label>
     <div class="combobox">
-        <input type="text" class="form-control" style="min-width:150px;"
+        <input type="text" class="form-control" style="min-width:{{ max(150, $fieldWidth - 20) }}px;"
                :value="open ? query : label"
                @input="query = $event.target.value; open = true"
                @focus="open = true" @click="open = true"
