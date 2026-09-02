@@ -54,6 +54,15 @@ class Returns extends Component
     /* ---- queue ---- */
     public string $search = '';
 
+    /**
+     * How many returns the queue is showing. "Show more" adds another page.
+     *
+     * Kept as state rather than a page number because the list is newest-first
+     * and grows at the top: paging by offset would shuffle rows under the
+     * operator as returns are recorded.
+     */
+    public int $shown = SalesReturns::QUEUE_LIMIT;
+
     /* ---- New Return: the header ---- */
     public string $customerid = '';
     public string $dateIso = '';
@@ -122,22 +131,43 @@ class Returns extends Component
 
     /* ---------------- The queue ---------------- */
 
+    /**
+     * One page of the queue, plus whether there is another.
+     *
+     * Asks for one MORE than it shows: if that extra row comes back there is
+     * something beyond this page, and it costs nothing to find out. A separate
+     * count would have to repeat the search to be right about it.
+     */
+    #[Computed]
+    public function page(): array
+    {
+        $rows = SalesReturns::recent($this->search ?: null, $this->shown + 1);
+
+        return ['rows' => array_slice($rows, 0, $this->shown), 'more' => count($rows) > $this->shown];
+    }
+
     #[Computed]
     public function returns(): array
     {
-        return SalesReturns::recent($this->search ?: null);
+        return $this->page['rows'];
     }
 
-    /** All returns ever recorded — what the queue's 15 is a slice of. */
+    public function hasMore(): bool
+    {
+        return $this->page['more'];
+    }
+
+    /** All returns ever recorded — what the queue's page is a slice of. */
     #[Computed]
     public function returnCount(): int
     {
         return SalesReturns::totalCount();
     }
 
-    public function queueLimit(): int
+    public function showMore(): void
     {
-        return SalesReturns::QUEUE_LIMIT;
+        $this->shown += SalesReturns::QUEUE_LIMIT;
+        unset($this->page, $this->returns);
     }
 
     #[Computed]
@@ -346,7 +376,11 @@ class Returns extends Component
 
     public function updatedSearch(): void
     {
-        unset($this->returns);
+        // A new search starts at the first page — carrying a deep page over
+        // means typing a term and seeing a scrollbar of results you did not ask
+        // to expand.
+        $this->shown = SalesReturns::QUEUE_LIMIT;
+        unset($this->page, $this->returns);
     }
 
     public function updatedCustomerid(): void
@@ -513,7 +547,7 @@ class Returns extends Component
         $number = (int) $result['number'];
         $this->basket = [];
         $this->resetEntry();
-        unset($this->returns);
+        unset($this->page, $this->returns);
         session()->flash('ok', $result['message']);
         $this->openReturn(str_replace('-', '/', $this->dateIso), $number);
     }
@@ -549,7 +583,7 @@ class Returns extends Component
         }
 
         $this->resetLineEditors();
-        unset($this->lines, $this->selected, $this->returns);
+        unset($this->lines, $this->selected, $this->page, $this->returns);
         session()->flash('ok', $result['message']);
     }
 
@@ -568,7 +602,7 @@ class Returns extends Component
             ? SalesReturns::lines($this->dateofreturn, $this->returnnumber)
             : [];
 
-        unset($this->lines, $this->selected, $this->returns);
+        unset($this->lines, $this->selected, $this->page, $this->returns);
 
         if ($remaining === []) {
             $this->dateofreturn = '';

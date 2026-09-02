@@ -44,40 +44,61 @@ class SalesLoadings
 
     /* ---------------- The open queue ---------------- */
 
+    /** How many loads the queue shows before "Show more". */
+    public const QUEUE_LIMIT = 15;
+
     /**
      * Loads still open, newest first, as one row per LOAD (not per line).
      *
      * `status IS NULL` is the whole definition of open, and it is the only state
      * in which a load can be corrected or returned against.
+     *
+     * 🐛 SEARCHING BY CUSTOMER USED TO FIND NOTHING. The customer lives on the
+     * order, which is resolved after the query rather than joined (see the
+     * collation note on loadQuery()), so it was matched in PHP — but the SQL
+     * had ALREADY narrowed to rows matching barcode, truck, driver or loader.
+     * A row that matched only the customer never survived to be tested. The
+     * whole search is therefore done in one place, in PHP, over the open set:
+     * that set is ~73 loads and the grouped read is 9ms, so there is nothing to
+     * save by pre-filtering it.
+     *
+     * A SEARCH IS NOT LIMITED, only its results are — a limit applied before
+     * the filter would silently hide matches that exist. `$limit` is the page
+     * size the queue asks for; ask for one more than you intend to show and a
+     * full page tells you there is another.
      */
-    public static function openLoads(?string $search = null, ?array $cageroomCodes = null, int $limit = 200): array
+    public static function openLoads(?string $search = null, ?array $cageroomCodes = null, ?int $limit = null): array
     {
+        $limit ??= self::QUEUE_LIMIT;
+
         $loads = self::loadQuery()
             ->whereNull('l.status')
             ->when($cageroomCodes !== null, fn ($q) => $q->whereIn('l.cageroomcode', $cageroomCodes ?: ['~none~']))
-            ->when($search, fn ($q, $s) => $q->where(function ($w) use ($s) {
-                $term = '%' . $s . '%';
-                $w->where('l.barcode', 'like', $term)
-                  ->orWhere('l.trucknumber', 'like', $term)
-                  ->orWhere('l.truckdriver', 'like', $term)
-                  ->orWhere('l.loader', 'like', $term);
-            }))
             ->orderByDesc(DB::raw('MAX(l.id)'))
-            ->limit($limit)->get()->all();
+            ->when(! $search, fn ($q) => $q->limit($limit))
+            ->get()->all();
 
         $loads = self::decorate($loads);
 
-        // Customer lives on the order, which is resolved after the query rather
-        // than joined, so a search on it is applied here.
         if ($search) {
             $needle = mb_strtolower($search);
             $loads = array_values(array_filter($loads, fn ($l) => str_contains(mb_strtolower(
                 $l->barcode . ' ' . $l->trucknumber . ' ' . $l->truckdriver . ' '
                 . $l->loader . ' ' . ($l->customername ?? '')
             ), $needle)));
+            $loads = array_slice($loads, 0, $limit);
         }
 
         return $loads;
+    }
+
+    /** How many loads are open in total — what the queue's page is a slice of. */
+    public static function openLoadCount(?array $cageroomCodes = null): int
+    {
+        return (int) DB::connection('bil')->table('sales_loading')
+            ->whereNull('status')
+            ->when($cageroomCodes !== null, fn ($q) => $q->whereIn('cageroomcode', $cageroomCodes ?: ['~none~']))
+            ->distinct()->count('barcode');
     }
 
     /** Loads on a date — how a closed one is reached, read-only, to reprint. */

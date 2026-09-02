@@ -55,6 +55,13 @@ class Delivery extends Component
 
     /* ---- queue filters ---- */
     public string $search = '';
+
+    /**
+     * How many waiting loads the queue is showing. "Show more" adds a page.
+     * A count, not a page number — the list is newest-first and grows at the
+     * top, so an offset would shuffle rows under the operator.
+     */
+    public int $shown = SalesLoadings::QUEUE_LIMIT;
     public string $dateIso = '';
     public bool $showDelivered = false;
 
@@ -121,11 +128,48 @@ class Delivery extends Component
 
     /* ---------------- The queue ---------------- */
 
+    /**
+     * One page of the queue, plus whether there is another.
+     *
+     * Asks for one MORE row than it shows: if that extra comes back there is
+     * something beyond this page, and it costs nothing to find out. A separate
+     * count would have to repeat the search to be right about it.
+     */
+    #[Computed]
+    public function page(): array
+    {
+        $rows = SalesDeliveries::pendingLoads(
+            $this->search ?: null,
+            $this->allowedCageroomCodes(),
+            $this->shown + 1
+        );
+
+        return ['rows' => array_slice($rows, 0, $this->shown), 'more' => count($rows) > $this->shown];
+    }
+
     /** Loads still on the floor — the legacy's "barcodes not delivered". */
     #[Computed]
     public function pendingLoads(): array
     {
-        return SalesDeliveries::pendingLoads($this->search ?: null, $this->allowedCageroomCodes());
+        return $this->page['rows'];
+    }
+
+    public function hasMore(): bool
+    {
+        return $this->page['more'];
+    }
+
+    /** How many are waiting in total — what the page is a slice of. */
+    #[Computed]
+    public function pendingCount(): int
+    {
+        return SalesDeliveries::pendingLoadCount($this->allowedCageroomCodes());
+    }
+
+    public function showMore(): void
+    {
+        $this->shown += SalesLoadings::QUEUE_LIMIT;
+        unset($this->page, $this->pendingLoads);
     }
 
     /**
@@ -280,7 +324,9 @@ class Delivery extends Component
 
     public function updatedSearch(): void
     {
-        unset($this->pendingLoads);
+        // A new search starts at the first page.
+        $this->shown = SalesLoadings::QUEUE_LIMIT;
+        unset($this->page, $this->pendingLoads);
     }
 
     public function updatedDateIso(): void
@@ -303,7 +349,7 @@ class Delivery extends Component
 
         $result = SalesDeliveries::confirm($this->barcode);
 
-        unset($this->load, $this->delivery, $this->lines, $this->pendingLoads, $this->deliveredLoads);
+        unset($this->load, $this->delivery, $this->lines, $this->page, $this->pendingLoads, $this->pendingCount, $this->deliveredLoads);
 
         if (! $result['ok']) {
             session()->flash('err', $result['message']);
@@ -329,7 +375,7 @@ class Delivery extends Component
 
         $this->confirmingUndo = false;
         $this->deliveryId = null;
-        unset($this->load, $this->delivery, $this->lines, $this->pendingLoads, $this->deliveredLoads);
+        unset($this->load, $this->delivery, $this->lines, $this->page, $this->pendingLoads, $this->pendingCount, $this->deliveredLoads);
 
         session()->flash($result['ok'] ? 'ok' : 'err', $result['message']);
     }

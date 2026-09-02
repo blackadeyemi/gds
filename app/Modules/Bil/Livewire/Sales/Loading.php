@@ -60,6 +60,15 @@ class Loading extends Component
 
     /* ---- queue filters ---- */
     public string $search = '';
+
+    /**
+     * How many open loads the queue is showing. "Show more" adds another page.
+     *
+     * Kept as a count rather than a page number because the list is newest-first
+     * and grows at the top: paging by offset would shuffle rows under the
+     * operator as loads are created.
+     */
+    public int $shown = SalesLoadings::QUEUE_LIMIT;
     public string $filterCageroom = '';
     public string $dateIso = '';
     public bool $showByDate = false;
@@ -165,13 +174,47 @@ class Loading extends Component
 
     /* ---------------- The queue ---------------- */
 
+    /**
+     * One page of the queue, plus whether there is another.
+     *
+     * Asks for one MORE row than it shows: if that extra comes back there is
+     * something beyond this page, and it costs nothing to find out. A separate
+     * count would have to repeat the search to be right about it.
+     */
+    #[Computed]
+    public function page(): array
+    {
+        $rows = SalesLoadings::openLoads(
+            $this->search ?: null,
+            $this->allowedCageroomCodes(),
+            $this->shown + 1
+        );
+
+        return ['rows' => array_slice($rows, 0, $this->shown), 'more' => count($rows) > $this->shown];
+    }
+
     #[Computed]
     public function openLoads(): array
     {
-        return SalesLoadings::openLoads(
-            $this->search ?: null,
-            $this->allowedCageroomCodes()
-        );
+        return $this->page['rows'];
+    }
+
+    public function hasMore(): bool
+    {
+        return $this->page['more'];
+    }
+
+    /** How many are open in total — what the page is a slice of. */
+    #[Computed]
+    public function openLoadCount(): int
+    {
+        return SalesLoadings::openLoadCount($this->allowedCageroomCodes());
+    }
+
+    public function showMore(): void
+    {
+        $this->shown += SalesLoadings::QUEUE_LIMIT;
+        unset($this->page, $this->openLoads);
     }
 
     /** Loads on a chosen date — how a closed one is reached, to reprint. */
@@ -379,12 +422,15 @@ class Loading extends Component
 
     public function updatedSearch(): void
     {
-        unset($this->openLoads);
+        // A new search starts at the first page.
+        $this->shown = SalesLoadings::QUEUE_LIMIT;
+        unset($this->page, $this->openLoads);
     }
 
     public function updatedFilterCageroom(): void
     {
-        unset($this->openLoads);
+        $this->shown = SalesLoadings::QUEUE_LIMIT;
+        unset($this->page, $this->openLoads, $this->openLoadCount);
     }
 
     public function updatedOrderid(): void
@@ -468,7 +514,7 @@ class Loading extends Component
             $order->customerid ? (int) $order->customerid : null,
             $this->newLoadNumber);
 
-        unset($this->openLoads);
+        unset($this->page, $this->openLoads);
         session()->flash('ok', 'Load ' . $barcode . ' created with ' . count($lines) . ' line(s).');
         $this->openLoad($barcode);
     }
@@ -497,7 +543,7 @@ class Loading extends Component
             'truckdriver' => strtoupper(trim($this->truckdriver)),
         ]);
 
-        unset($this->load, $this->openLoads);
+        unset($this->load, $this->page, $this->openLoads);
         session()->flash('ok', 'Truck and crew updated for the whole load.');
     }
 
@@ -530,7 +576,7 @@ class Loading extends Component
 
         SalesLoadings::correctLine($this->editingLine, $qty);
         $this->resetLineEditors();
-        unset($this->lines, $this->load, $this->openLoads);
+        unset($this->lines, $this->load, $this->page, $this->openLoads);
         session()->flash('ok', 'Line corrected. Any return recorded against it has been cleared.');
     }
 
@@ -542,7 +588,7 @@ class Loading extends Component
 
         SalesLoadings::removeLine($this->confirmingRemove);
         $this->resetLineEditors();
-        unset($this->lines, $this->load, $this->openLoads);
+        unset($this->lines, $this->load, $this->page, $this->openLoads);
         session()->flash('ok', 'Line removed from the load.');
     }
 
@@ -580,7 +626,7 @@ class Loading extends Component
         }
 
         $this->resetLineEditors();
-        unset($this->lines, $this->load, $this->openLoads);
+        unset($this->lines, $this->load, $this->page, $this->openLoads);
         session()->flash('ok', 'Return recorded — the goods are back off the truck.');
     }
 
@@ -591,7 +637,7 @@ class Loading extends Component
         }
 
         SalesLoadings::undoReturns($id);
-        unset($this->lines, $this->load, $this->openLoads);
+        unset($this->lines, $this->load, $this->page, $this->openLoads);
         session()->flash('ok', 'Return undone — the goods are back on the truck.');
     }
 

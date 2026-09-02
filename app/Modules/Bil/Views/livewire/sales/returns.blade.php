@@ -42,9 +42,9 @@
                          as "this is everything there has ever been". --}}
                     <div class="text-sm text-muted">
                         @if ($search !== '')
-                            {{ count($this->returns) }} match{{ count($this->returns) === 1 ? '' : 'es' }}
+                            {{ count($this->returns) }}{{ $this->hasMore() ? '+' : '' }} match{{ count($this->returns) === 1 ? '' : 'es' }}
                         @else
-                            {{ count($this->returns) }} most recent of {{ number_format($this->returnCount) }}
+                            showing {{ count($this->returns) }} of {{ number_format($this->returnCount) }}
                         @endif
                     </div>
                 </div>
@@ -91,6 +91,13 @@
                             @endif
                         </div>
                     @endforelse
+
+                    @if ($this->hasMore())
+                        <button type="button" class="btn btn-ghost btn-sm"
+                                style="width:100%;margin-top:.4rem;" wire:click="showMore">
+                            Show more
+                        </button>
+                    @endif
                 </div>
             </div>
         </div>

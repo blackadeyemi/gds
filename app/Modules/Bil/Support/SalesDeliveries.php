@@ -51,9 +51,15 @@ class SalesDeliveries
      * fetched through SalesLoadings so the two screens can never disagree about
      * what "open" means.
      */
-    public static function pendingLoads(?string $search = null, ?array $cageroomCodes = null, int $limit = 200): array
+    public static function pendingLoads(?string $search = null, ?array $cageroomCodes = null, ?int $limit = null): array
     {
         return SalesLoadings::openLoads($search, $cageroomCodes, $limit);
+    }
+
+    /** How many are waiting in total — what the queue's page is a slice of. */
+    public static function pendingLoadCount(?array $cageroomCodes = null): int
+    {
+        return SalesLoadings::openLoadCount($cageroomCodes);
     }
 
     /* ---------------- Numbering and barcodes ---------------- */

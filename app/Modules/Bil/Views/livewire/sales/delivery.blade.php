@@ -94,7 +94,13 @@
             <div class="card-head">
                 <div>
                     <h2 class="card-title">Awaiting delivery</h2>
-                    <div class="text-sm text-muted">{{ count($this->pendingLoads) }} still on the floor</div>
+                    <div class="text-sm text-muted">
+                        @if ($search !== '')
+                            {{ count($this->pendingLoads) }}{{ $this->hasMore() ? '+' : '' }} match{{ count($this->pendingLoads) === 1 ? '' : 'es' }}
+                        @else
+                            showing {{ count($this->pendingLoads) }} of {{ number_format($this->pendingCount) }} still on the floor
+                        @endif
+                    </div>
                 </div>
             </div>
 
@@ -134,6 +140,13 @@
                             @endif
                         </div>
                     @endforelse
+
+                    @if ($this->hasMore())
+                        <button type="button" class="btn btn-ghost btn-sm"
+                                style="width:100%;margin-top:.4rem;" wire:click="showMore">
+                            Show more
+                        </button>
+                    @endif
                 </div>
 
                 {{-- A delivery already made is reached here, to reprint or undo. --}}
