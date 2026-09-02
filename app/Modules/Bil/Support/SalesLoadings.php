@@ -253,8 +253,17 @@ class SalesLoadings
      * date. Reproduces sales_loading_request.php, because the legacy app and its
      * reports still read what this writes.
      */
-    public static function loadNumberFor(string $dateSlash, array $header, ?int $customerId): int
+    public static function loadNumberFor(string $dateSlash, array $header, ?int $customerId, bool $forceNew = false): int
     {
+        // The legacy "NEW LOAD NUMBER" checkbox. Ticked, the reuse lookup is
+        // skipped entirely and the truck starts a second load for the same
+        // customer — the one case the matching rule cannot infer, because
+        // nothing in the data distinguishes "another order for this truck" from
+        // "this truck is going out again".
+        if ($forceNew) {
+            return self::nextLoadNumber($dateSlash);
+        }
+
         $existing = DB::connection('bil')->table('sales_loading as l')
             ->leftJoin('sales_order_details as d', 'l.sod_id', '=', 'd.id')
             ->leftJoin('sales_order as o', 'd.orderid', '=', 'o.orderid')
@@ -270,8 +279,52 @@ class SalesLoadings
             return (int) $existing;
         }
 
+        return self::nextLoadNumber($dateSlash);
+    }
+
+    /** The next load number for a day. Numbers restart daily. */
+    public static function nextLoadNumber(string $dateSlash): int
+    {
         return (int) DB::connection('bil')->table('sales_loading')
             ->where('dateofloading', $dateSlash)->max('loadnumber') + 1;
+    }
+
+    /**
+     * The load number this truck WOULD join, or null if it would start a new
+     * one. Shown before saving so the operator can see what is about to happen
+     * and tick "new load number" if it is wrong.
+     */
+    public static function joinableLoadNumber(string $dateSlash, array $header, ?int $customerId): ?int
+    {
+        $n = DB::connection('bil')->table('sales_loading as l')
+            ->leftJoin('sales_order_details as d', 'l.sod_id', '=', 'd.id')
+            ->leftJoin('sales_order as o', 'd.orderid', '=', 'o.orderid')
+            ->where('l.dateofloading', $dateSlash)
+            ->where('l.trucknumber', $header['trucknumber'] ?? '')
+            ->where('l.loader', $header['loader'] ?? '')
+            ->where('l.truckdriver', $header['truckdriver'] ?? '')
+            ->when($customerId, fn ($q) => $q->where('o.customerid', $customerId))
+            ->orderByDesc('l.id')
+            ->value('l.loadnumber');
+
+        return $n ? (int) $n : null;
+    }
+
+    /**
+     * How many separate loads this truck has already taken out today — the
+     * legacy's "NUMBER OF TIMES TRUCK HAS LOADED". It is the context the
+     * operator judges the checkbox by.
+     */
+    public static function truckLoadCount(string $truckNumber, string $dateSlash): int
+    {
+        if (trim($truckNumber) === '') {
+            return 0;
+        }
+
+        return (int) DB::connection('bil')->table('sales_loading')
+            ->where('trucknumber', $truckNumber)
+            ->where('dateofloading', $dateSlash)
+            ->distinct()->count('barcode');
     }
 
     /** `{yy}-{mm}-{dd}-{letter}{code}L-{nnn}` — the legacy format, exactly. */
@@ -291,13 +344,13 @@ class SalesLoadings
      * One transaction: a load whose header saved but whose lines did not would
      * be a barcode with nothing on it, and its load number already spent.
      */
-    public static function create(array $header, array $lines, string $dateSlash, ?int $customerId): string
+    public static function create(array $header, array $lines, string $dateSlash, ?int $customerId, bool $forceNew = false): string
     {
         $user = auth()->user();
         $username = (string) ($user?->username ?? $user?->name ?? 'gds');
 
-        return DB::connection('bil')->transaction(function () use ($header, $lines, $dateSlash, $customerId, $username) {
-            $loadNumber = self::loadNumberFor($dateSlash, $header, $customerId);
+        return DB::connection('bil')->transaction(function () use ($header, $lines, $dateSlash, $customerId, $username, $forceNew) {
+            $loadNumber = self::loadNumberFor($dateSlash, $header, $customerId, $forceNew);
             $barcode = self::barcodeFor($dateSlash, (string) ($header['warehousecode'] ?? '1'), $loadNumber);
             $now = time();
 

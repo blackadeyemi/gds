@@ -77,7 +77,7 @@
 </head>
 <body>
     <div class="toolbar">
-        <button type="button" onclick="window.print()">Print {{ count($loads) }} load(s)</button>
+        <button type="button" onclick="window.print()">Print {{ count($loads) }} load(s) again</button>
     </div>
 
     @foreach ($loads as $i => $load)
@@ -174,6 +174,15 @@
             codes.forEach(function (code, i) {
                 $('#bc' + i).barcode(String(code), 'code93', { fontSize: 14 });
             });
+
+            // The print dialog opens by itself, as the legacy sheet did — the
+            // sheet is opened in order to print it. AFTER the barcodes are
+            // drawn, or they would print as empty boxes.
+            //
+            // Deliberately no window.close() on afterprint: it also fires when
+            // the dialog is cancelled, and closing the tab on someone who only
+            // wanted to check the sheet is worse than leaving it open.
+            window.print();
         });
     </script>
 </body>

@@ -58,20 +58,51 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Truck number</label>
-                <input type="text" class="form-control" list="trucklist" wire:model="trucknumber" placeholder="e.g. KJA479YE">
+                <input type="text" class="form-control" list="trucklist" wire:model.live.debounce.400ms="trucknumber" placeholder="e.g. KJA479YE">
                 @error('trucknumber') <div class="form-error">{{ $message }}</div> @enderror
             </div>
             <div class="form-group">
                 <label class="form-label">Driver</label>
-                <input type="text" class="form-control" list="driverlist" wire:model="truckdriver">
+                <input type="text" class="form-control" list="driverlist" wire:model.live.debounce.400ms="truckdriver">
                 @error('truckdriver') <div class="form-error">{{ $message }}</div> @enderror
             </div>
             <div class="form-group">
                 <label class="form-label">Loader</label>
-                <input type="text" class="form-control" wire:model="loader">
+                <input type="text" class="form-control" wire:model.live.debounce.400ms="loader">
                 @error('loader') <div class="form-error">{{ $message }}</div> @enderror
             </div>
         </div>
+
+        {{-- Several orders for one customer share a load number when the truck
+             and crew match — that is how a truck takes more than one order out.
+             What the data cannot tell you is when the SAME truck and customer
+             are going out a SECOND time, so it is asked, as the legacy did. --}}
+        @if ($trucknumber !== '')
+            @php $joining = $this->joiningLoad; @endphp
+            <div class="card" style="background:var(--surface-2);padding:.7rem 1rem;margin-top:.9rem;">
+                <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
+                    <div class="text-sm">
+                        Times this truck has loaded today:
+                        <strong>{{ number_format($this->truckLoadCount) }}</strong>
+                    </div>
+
+                    <label class="flex items-center gap-2" style="cursor:pointer;margin-left:auto;font-size:.9rem;">
+                        <input type="checkbox" wire:model.live="newLoadNumber">
+                        <span><strong>New load number</strong> — this truck is going out again</span>
+                    </label>
+                </div>
+
+                <div class="text-sm text-muted" style="margin-top:.45rem;">
+                    @if ($newLoadNumber)
+                        Will start a <strong>new load</strong>, separate from anything this truck has already taken.
+                    @elseif ($joining)
+                        Will be <strong>added to load #{{ $joining }}</strong> — same customer, truck and crew.
+                    @else
+                        Will start a <strong>new load</strong>; nothing today matches this customer, truck and crew.
+                    @endif
+                </div>
+            </div>
+        @endif
     </div>
 </div>
 

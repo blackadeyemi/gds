@@ -73,6 +73,16 @@ class Loading extends Component
 
     /* ---- New Loading ---- */
     public string $orderid = '';
+
+    /**
+     * The legacy "NEW LOAD NUMBER" checkbox.
+     *
+     * Several sales orders for one customer share a load number when the truck
+     * and crew match — that is how a truck takes more than one order out. What
+     * the data cannot tell you is when the SAME truck and customer are going
+     * out a second time, so this says it explicitly.
+     */
+    public bool $newLoadNumber = false;
     /** sod_id => quantity to load. */
     public array $toLoad = [];
 
@@ -275,6 +285,36 @@ class Loading extends Component
         return $this->orderid === '' ? null : SalesLoadings::order($this->orderid);
     }
 
+    /* ---------------- What this load will join ---------------- */
+
+    /** Loads this truck has already taken out today. */
+    #[Computed]
+    public function truckLoadCount(): int
+    {
+        return SalesLoadings::truckLoadCount($this->trucknumber, now()->format('Y/m/d'));
+    }
+
+    /**
+     * The load number this would join, or null if it would start a new one.
+     * Recomputed as the truck and crew are typed, so what is about to happen is
+     * on screen before Create is pressed rather than discovered afterwards.
+     */
+    #[Computed]
+    public function joiningLoad(): ?int
+    {
+        if ($this->newLoadNumber || $this->trucknumber === '' || $this->loader === '' || $this->truckdriver === '') {
+            return null;
+        }
+
+        $order = $this->order;
+
+        return SalesLoadings::joinableLoadNumber(now()->format('Y/m/d'), [
+            'trucknumber' => strtoupper(str_replace(' ', '', $this->trucknumber)),
+            'loader' => strtoupper(trim($this->loader)),
+            'truckdriver' => strtoupper(trim($this->truckdriver)),
+        ], $order && $order->customerid ? (int) $order->customerid : null);
+    }
+
     /* ---------------- Navigation ---------------- */
 
     public function openLoad(string $barcode): void
@@ -305,6 +345,7 @@ class Loading extends Component
         $this->barcode = '';
         $this->orderid = '';
         $this->toLoad = [];
+        $this->newLoadNumber = false;
         $this->reset(['transporterid', 'cageroomcode', 'loader', 'trucknumber', 'truckdriver']);
         $this->resetLineEditors();
     }
@@ -423,7 +464,9 @@ class Loading extends Component
             'trucknumber' => strtoupper(str_replace(' ', '', $this->trucknumber)),
             'truckdriver' => strtoupper(trim($this->truckdriver)),
             'warehousecode' => $order->warehousecode,
-        ], $lines, now()->format('Y/m/d'), $order->customerid ? (int) $order->customerid : null);
+        ], $lines, now()->format('Y/m/d'),
+            $order->customerid ? (int) $order->customerid : null,
+            $this->newLoadNumber);
 
         unset($this->openLoads);
         session()->flash('ok', 'Load ' . $barcode . ' created with ' . count($lines) . ' line(s).');
