@@ -88,6 +88,17 @@ return [
         // the only thing that re-opens its delivery for undo.
         ['key' => 'bil.sales.waybill', 'label' => 'Waybill', 'module' => 'BIL / Sales', 'route' => 'bil.sales.waybill', 'abilities' => ['view', 'create', 'modify', 'delete']],
 
+        // BIL — Sales Reports. Read-outs, so $snapshot: a wrong loading is
+        // corrected on the Loading screen, which keeps the stock and the
+        // delivery it feeds straight; a report that deleted one would not.
+        // Gated one report at a time because they are not equally sensitive —
+        // Waybill carries what haulage cost, which is not a depot's business.
+        ['key' => 'bil.sales.reports.orders',   'label' => 'Orders',   'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.orders',   'abilities' => $snapshot],
+        ['key' => 'bil.sales.reports.loading',  'label' => 'Loading',  'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.loading',  'abilities' => $snapshot],
+        ['key' => 'bil.sales.reports.delivery', 'label' => 'Delivery', 'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.delivery', 'abilities' => $snapshot],
+        ['key' => 'bil.sales.reports.returns',  'label' => 'Returns',  'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.returns',  'abilities' => $snapshot],
+        ['key' => 'bil.sales.reports.waybill',  'label' => 'Waybill',  'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.waybill',  'abilities' => $snapshot],
+
         // BIL — Raw Materials
         ['key' => 'bil.raw_materials.statistics',          'label' => 'Statistics',          'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.statistics',          'abilities' => $snapshot],
         ['key' => 'bil.raw_materials.products',            'label' => 'Products',            'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.products',            'abilities' => $crud],

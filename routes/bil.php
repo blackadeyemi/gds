@@ -58,6 +58,11 @@ use Modules\Bil\Livewire\Sales\Returns as SalesReturnsPage;
 use Modules\Bil\Livewire\Sales\Waybill as SalesWaybillPage;
 use Modules\Bil\Livewire\Sales\Loading as SalesLoadingPage;
 use Modules\Bil\Livewire\Sales\Orders as SalesOrders;
+use Modules\Bil\Livewire\Sales\Reports\Delivery as SalesDeliveryReport;
+use Modules\Bil\Livewire\Sales\Reports\Loading as SalesLoadingReport;
+use Modules\Bil\Livewire\Sales\Reports\Orders as SalesOrdersReport;
+use Modules\Bil\Livewire\Sales\Reports\Returns as SalesReturnsReport;
+use Modules\Bil\Livewire\Sales\Reports\Waybill as SalesWaybillReport;
 use Modules\Bil\Livewire\Sales\Transporters as SalesTransporters;
 
 /*
@@ -283,6 +288,73 @@ Route::middleware('auth')
         })->middleware('page:bil.sales.waybill')->name('waybill.print');
         Route::get('/transporters', SalesTransporters::class)
             ->middleware('page:bil.sales.transporters')->name('transporters');
+
+        /*
+        | Sales reports. Same contract as every other module's report group:
+        | one gated page per report, then a shared print/download pair that
+        | rebuilds the component from the query string so an export runs
+        | outside Livewire. Each carries `detail*` too, because all five lead
+        | with a summary whose rows expand — those exports are of the open
+        | group, not of the report.
+        */
+        Route::prefix('reports')->name('reports.')->group(function () {
+            Route::get('/orders', SalesOrdersReport::class)
+                ->middleware('page:bil.sales.reports.orders')->name('orders');
+            Route::get('/loading', SalesLoadingReport::class)
+                ->middleware('page:bil.sales.reports.loading')->name('loading');
+            Route::get('/delivery', SalesDeliveryReport::class)
+                ->middleware('page:bil.sales.reports.delivery')->name('delivery');
+            Route::get('/returns', SalesReturnsReport::class)
+                ->middleware('page:bil.sales.reports.returns')->name('returns');
+            Route::get('/waybill', SalesWaybillReport::class)
+                ->middleware('page:bil.sales.reports.waybill')->name('waybill');
+
+            $reports = [
+                'orders' => SalesOrdersReport::class,
+                'loading' => SalesLoadingReport::class,
+                'delivery' => SalesDeliveryReport::class,
+                'returns' => SalesReturnsReport::class,
+                'waybill' => SalesWaybillReport::class,
+            ];
+
+            $hydrate = function (string $class) {
+                $c = new $class();
+                $c->view = (string) request('view', '');
+                $c->search = (string) request('search', '');
+                $c->dateFrom = (string) request('dateFrom', now()->format('Y-m-d'));
+                $c->dateTo = (string) request('dateTo', now()->format('Y-m-d'));
+                $c->filters = array_map('strval', (array) request('filters', []));
+                // A drill-down export: same filters, but the open group's records.
+                $c->detailMode = (bool) request('detail', false);
+                $c->detailKey = request('detailKey') !== null ? (string) request('detailKey') : null;
+                $c->detailSearch = (string) request('detailSearch', '');
+
+                return $c;
+            };
+
+            $authorize = function (string $report) {
+                abort_unless((bool) request()->user()?->canDo(
+                    'bil.sales.reports.' . str_replace('-', '_', $report), 'export'
+                ), 403);
+            };
+
+            Route::get('/{report}/print', function (string $report) use ($reports, $hydrate, $authorize) {
+                abort_unless(isset($reports[$report]), 404);
+                $authorize($report);
+
+                return view('core::print.grid', $hydrate($reports[$report])->reportPayload());
+            })->name('print');
+
+            Route::get('/{report}/download', function (string $report) use ($reports, $hydrate, $authorize) {
+                abort_unless(isset($reports[$report]), 404);
+                $authorize($report);
+
+                $format = strtolower((string) request('format', 'xlsx'));
+                abort_unless(in_array($format, ['xlsx', 'csv', 'pdf'], true), 404);
+
+                return $hydrate($reports[$report])->export($format);
+            })->name('download');
+        });
     });
 
 /*

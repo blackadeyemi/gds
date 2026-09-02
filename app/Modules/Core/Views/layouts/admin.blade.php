@@ -22,6 +22,7 @@
     $onBilJrReports = request()->is('bil/jumbo-rolls/reports/*');
     $onFinishedGoods = request()->is('bil/finished-goods/*');
     $onSales = request()->is('bil/sales/*');
+    $onSalesReports = request()->is('bil/sales/reports/*');
     $onMachines = request()->is('bil/machines/*');
     $onFgReports = request()->is('bil/finished-goods/reports/*');
     $onMachineReports = request()->is('bil/machines/reports/*');
@@ -96,6 +97,7 @@
         finishedGoodsOpen: {{ $onFinishedGoods ? 'true' : 'false' }},
         fgReportsOpen: {{ $onFgReports ? 'true' : 'false' }},
         salesOpen: {{ $onSales ? 'true' : 'false' }},
+        salesReportsOpen: {{ $onSalesReports ? 'true' : 'false' }},
         machinesOpen: {{ $onMachines ? 'true' : 'false' }},
         machineReportsOpen: {{ $onMachineReports ? 'true' : 'false' }},
         bplOpen: {{ $onBpl ? 'true' : 'false' }},
@@ -105,7 +107,7 @@
             if (window.innerWidth <= 900) { this.mobileOpen = !this.mobileOpen; return; }
             this.collapsed = !this.collapsed;
             localStorage.setItem('gds_sidebar_collapsed', JSON.stringify(this.collapsed));
-            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; this.bilJumboRollsOpen = false; this.bilJrReportsOpen = false; this.finishedGoodsOpen = false; this.fgReportsOpen = false; this.salesOpen = false; this.machinesOpen = false; this.machineReportsOpen = false; this.bplOpen = false; this.jumboRollsOpen = false; this.bplSalesOpen = false; }
+            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; this.bilJumboRollsOpen = false; this.bilJrReportsOpen = false; this.finishedGoodsOpen = false; this.fgReportsOpen = false; this.salesOpen = false; this.salesReportsOpen = false; this.machinesOpen = false; this.machineReportsOpen = false; this.bplOpen = false; this.jumboRollsOpen = false; this.bplSalesOpen = false; }
         },
         openGroup(group) {
             if (this.collapsed) {
@@ -455,6 +457,42 @@
                                 <span class="label">Waybill</span>
                             </a>
                             @endcanPage
+                            @canPrefix('bil.sales.reports.')
+                            <div class="nav-group" :class="{ open: salesReportsOpen }">
+                                <button type="button" class="nav-link" :class="{ active: {{ $onSalesReports ? 'true' : 'false' }} && collapsed }" @click="openGroup('salesReportsOpen')" title="Reports">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
+                                    <span class="label">Reports</span>
+                                    <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                                </button>
+                                <div class="nav-sub" x-show="salesReportsOpen">
+                                    @canPage('bil.sales.reports.orders')
+                                    <a href="{{ route('bil.sales.reports.orders') }}" class="nav-link {{ $is('bil/sales/reports/orders*') }}" title="Orders">
+                                        <span class="label">Orders</span>
+                                    </a>
+                                    @endcanPage
+                                    @canPage('bil.sales.reports.loading')
+                                    <a href="{{ route('bil.sales.reports.loading') }}" class="nav-link {{ $is('bil/sales/reports/loading*') }}" title="Loading">
+                                        <span class="label">Loading</span>
+                                    </a>
+                                    @endcanPage
+                                    @canPage('bil.sales.reports.delivery')
+                                    <a href="{{ route('bil.sales.reports.delivery') }}" class="nav-link {{ $is('bil/sales/reports/delivery*') }}" title="Delivery">
+                                        <span class="label">Delivery</span>
+                                    </a>
+                                    @endcanPage
+                                    @canPage('bil.sales.reports.returns')
+                                    <a href="{{ route('bil.sales.reports.returns') }}" class="nav-link {{ $is('bil/sales/reports/returns*') }}" title="Returns">
+                                        <span class="label">Returns</span>
+                                    </a>
+                                    @endcanPage
+                                    @canPage('bil.sales.reports.waybill')
+                                    <a href="{{ route('bil.sales.reports.waybill') }}" class="nav-link {{ $is('bil/sales/reports/waybill*') }}" title="Waybill">
+                                        <span class="label">Waybill</span>
+                                    </a>
+                                    @endcanPage
+                                </div>
+                            </div>
+                            @endcanPrefix
                         </div>
                     </div>
                     @endcanPrefix
