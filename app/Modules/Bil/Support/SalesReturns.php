@@ -45,15 +45,27 @@ class SalesReturns
 
     /* ---------------- The queue ---------------- */
 
+    /** How many returns the queue shows. Returns run ~11 a month. */
+    public const QUEUE_LIMIT = 15;
+
     /**
      * Returns already recorded, newest first — one row per RETURN, not per line.
      *
      * A return is (customer, date, return number): the number is shared by
      * every line the customer sent back that day, which is what the printout
      * prints and what the legacy grouped on.
+     *
+     * A SEARCH IS NOT LIMITED, only its results are. Searching just the rows
+     * already on screen would find nothing you could not already see, and
+     * searching a window would silently miss anything older than it — a search
+     * that quietly returns nothing is worse than a slow one. The whole table is
+     * 1,137 returns and the grouped read is 52ms, paid only when something is
+     * typed; the plain queue reads 15 rows and never runs it.
      */
-    public static function recent(?string $search = null, int $limit = 100): array
+    public static function recent(?string $search = null, ?int $limit = null): array
     {
+        $limit ??= self::QUEUE_LIMIT;
+
         $rows = DB::connection('bil')->table('sales_return as r')
             ->join('sales_order_details as d', 'r.sod_id', '=', 'd.id')
             ->groupBy('r.dateofreturn', 'r.returnnumber')
@@ -63,7 +75,7 @@ class SalesReturns
                          SUM(r.quantityrejected) as rejected,
                          MAX(r.id) as last_id, MAX(r.username) as username')
             ->orderByDesc('r.dateofreturn')->orderByDesc('r.returnnumber')
-            ->limit($limit)->get()->all();
+            ->when(! $search, fn ($q) => $q->limit($limit))->get()->all();
 
         $rows = self::decorate($rows);
 
@@ -71,10 +83,27 @@ class SalesReturns
             $needle = mb_strtolower($search);
             $rows = array_values(array_filter($rows, fn ($r) => str_contains(mb_strtolower(
                 $r->dateofreturn . ' ' . $r->returnnumber . ' ' . ($r->customername ?? '')
+                . ' ' . implode(' ', $r->orders)
             ), $needle)));
+            $rows = array_slice($rows, 0, $limit);
         }
 
         return $rows;
+    }
+
+    /**
+     * How many returns exist in total — so the queue can say what it is not
+     * showing.
+     *
+     * Counted through the SAME join the list uses, or the header would promise
+     * one more than the list can ever reach: one return in the history points
+     * at an order line the legacy order screen deleted out from under it.
+     */
+    public static function totalCount(): int
+    {
+        return (int) DB::connection('bil')->table('sales_return as r')
+            ->join('sales_order_details as d', 'r.sod_id', '=', 'd.id')
+            ->selectRaw('COUNT(DISTINCT r.dateofreturn, r.returnnumber) as n')->value('n');
     }
 
     /** Every return on a date — the Print Outs list. */

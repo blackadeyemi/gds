@@ -128,6 +128,18 @@ class Returns extends Component
         return SalesReturns::recent($this->search ?: null);
     }
 
+    /** All returns ever recorded — what the queue's 15 is a slice of. */
+    #[Computed]
+    public function returnCount(): int
+    {
+        return SalesReturns::totalCount();
+    }
+
+    public function queueLimit(): int
+    {
+        return SalesReturns::QUEUE_LIMIT;
+    }
+
     #[Computed]
     public function selected(): ?object
     {

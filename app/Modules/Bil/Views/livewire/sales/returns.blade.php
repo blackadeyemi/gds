@@ -38,7 +38,15 @@
             <div class="card-head">
                 <div>
                     <h2 class="card-title">Recent returns</h2>
-                    <div class="text-sm text-muted">{{ count($this->returns) }} listed</div>
+                    {{-- Say what the list is a slice of, or a short list reads
+                         as "this is everything there has ever been". --}}
+                    <div class="text-sm text-muted">
+                        @if ($search !== '')
+                            {{ count($this->returns) }} match{{ count($this->returns) === 1 ? '' : 'es' }}
+                        @else
+                            {{ count($this->returns) }} most recent of {{ number_format($this->returnCount) }}
+                        @endif
+                    </div>
                 </div>
             </div>
 
@@ -56,7 +64,7 @@
                            wire:model.live.debounce.400ms="search">
                 </div>
 
-                <div style="max-height:42rem;overflow:auto;margin:0 -0.4rem;">
+                <div style="max-height:36rem;overflow:auto;margin:0 -0.4rem;">
                     @forelse ($this->returns as $r)
                         <button type="button" wire:key="r-{{ $r->dateofreturn }}-{{ $r->returnnumber }}"
                                 wire:click="openReturn('{{ $r->dateofreturn }}', {{ $r->returnnumber }})"
