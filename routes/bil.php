@@ -53,6 +53,7 @@ use Modules\Bil\Livewire\RawMaterials\Suppliers;
 use Modules\Bil\Livewire\RawMaterials\WarehouseEntry;
 use Modules\Bil\Livewire\RawMaterials\WarehouseExit;
 use Modules\Bil\Livewire\Sales\Customers as SalesCustomers;
+use Modules\Bil\Livewire\Sales\Delivery as SalesDeliveryPage;
 use Modules\Bil\Livewire\Sales\Loading as SalesLoadingPage;
 use Modules\Bil\Livewire\Sales\Orders as SalesOrders;
 use Modules\Bil\Livewire\Sales\Transporters as SalesTransporters;
@@ -212,6 +213,30 @@ Route::middleware('auth')
 
             return view('bil::print.loading', ['loads' => $loads]);
         })->middleware('page:bil.sales.loading')->name('loading.print');
+        Route::get('/delivery', SalesDeliveryPage::class)
+            ->middleware('page:bil.sales.delivery')->name('delivery');
+
+        /*
+        | The delivery note. Takes a comma-separated list of DELIVERY barcodes,
+        | for the same reason the loading print-out does: the office prints a
+        | day's notes in a run, and the legacy screen made that a browser tab
+        | each.
+        */
+        Route::get('/delivery/print', function () {
+            $barcodes = array_values(array_filter(array_map(
+                'trim', explode(',', (string) request('deliveries', ''))
+            )));
+
+            abort_if($barcodes === [], 404);
+            // A runaway list would build an unprintable document and a very
+            // large query; a day is never near this.
+            abort_if(count($barcodes) > 100, 422, 'Too many deliveries in one print run.');
+
+            $deliveries = \Modules\Bil\Support\SalesDeliveries::printouts($barcodes);
+            abort_if($deliveries === [], 404);
+
+            return view('bil::print.sales-delivery', ['deliveries' => $deliveries]);
+        })->middleware('page:bil.sales.delivery')->name('delivery.print');
         Route::get('/transporters', SalesTransporters::class)
             ->middleware('page:bil.sales.transporters')->name('transporters');
     });

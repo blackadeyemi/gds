@@ -437,6 +437,12 @@
                                 <span class="label">Loading</span>
                             </a>
                             @endcanPage
+                            @canPage('bil.sales.delivery')
+                            <a href="{{ route('bil.sales.delivery') }}" class="nav-link {{ $is('bil/sales/delivery*') }}" title="Delivery">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h13v13H3z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="7.5" cy="19.5" r="2"/><circle cx="18.5" cy="19.5" r="2"/><path d="m7 9 2.5 2.5L14 7"/></svg>
+                                <span class="label">Delivery</span>
+                            </a>
+                            @endcanPage
                         </div>
                     </div>
                     @endcanPrefix

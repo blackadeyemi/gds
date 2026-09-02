@@ -104,6 +104,7 @@ return [
         ['key' => 'bil.sales.transporters', 'label' => 'Transporters', 'module' => 'BIL / Sales', 'route' => 'bil.sales.transporters', 'abilities' => $crud],
         ['key' => 'bil.sales.orders', 'label' => 'Orders', 'module' => 'BIL / Sales', 'route' => 'bil.sales.orders', 'abilities' => ['view', 'delete', 'backdate']],
         ['key' => 'bil.sales.loading', 'label' => 'Loading', 'module' => 'BIL / Sales', 'route' => 'bil.sales.loading', 'abilities' => ['view', 'create', 'modify', 'return'], 'gates' => 'warehouse'],
+        ['key' => 'bil.sales.delivery', 'label' => 'Delivery', 'module' => 'BIL / Sales', 'route' => 'bil.sales.delivery', 'abilities' => ['view', 'confirm', 'delete'], 'gates' => 'warehouse'],
 
         // BIL — Raw Materials
         ['key' => 'bil.raw_materials.statistics',          'label' => 'Statistics',          'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.statistics',          'abilities' => $snapshot],
