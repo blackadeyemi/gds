@@ -8,9 +8,43 @@
         <div class="card" style="border-color:var(--success);color:var(--success);margin-bottom:1rem;padding:0.7rem 1.25rem;">{{ session('ok') }}</div>
     @endif
 
+    {{--
+        Sticky headers, in two layers: the ability columns, and the module the
+        rows below belong to. Seventy-five pages over thirteen modules is a lot
+        of scrolling, and without them you lose both which column a checkbox is
+        in and which module you are in.
+
+        It needs its OWN scroller. `.table-wrap` sets `overflow-x:auto`, which
+        makes `overflow-y` compute to `auto` as well — so a sticky cell inside
+        it sticks to that box rather than the page, and since the box has no
+        height it never scrolls and sticky does nothing. Giving the scroller a
+        height makes it the thing that scrolls, and the header sticks to it.
+
+        The thead has an explicit height so the module row's offset is exact —
+        derived from padding it would drift by a pixel and show a sliver of the
+        scrolled rows between the two layers.
+    --}}
+    <style>
+        .pages-scroll { overflow: auto; max-height: calc(100vh - 19rem); }
+        .pages-scroll table.data thead th {
+            position: sticky; top: 0; z-index: 3;
+            height: 42px; padding-top: 0; padding-bottom: 0;
+            background: var(--surface);
+        }
+        .pages-scroll tr.module-row td {
+            position: sticky; top: 42px; z-index: 2;
+            background: var(--hover, #f6f7f9);
+            font-weight: 700; font-size: 0.7rem; text-transform: uppercase;
+            letter-spacing: .05em; color: var(--muted);
+        }
+        /* Both layers are opaque, so a border rather than a shadow is enough to
+           part them from the rows sliding underneath. */
+        .pages-scroll table.data thead th { border-bottom: 1px solid var(--line); }
+    </style>
+
     <form wire:submit="save">
         <div class="card">
-            <div class="table-wrap">
+            <div class="pages-scroll">
                 <table class="data" style="width:100%;">
                     <thead>
                         <tr>
@@ -23,8 +57,8 @@
                     </thead>
                     <tbody>
                         @forelse ($groups as $module => $pages)
-                            <tr>
-                                <td colspan="{{ count($columns) + 2 }}" style="background:var(--hover,#f6f7f9);font-weight:700;font-size:0.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">{{ $module }}</td>
+                            <tr class="module-row">
+                                <td colspan="{{ count($columns) + 2 }}">{{ $module }}</td>
                             </tr>
                             @foreach ($pages as $page)
                                 <tr wire:key="page-{{ $page->id }}">

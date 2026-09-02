@@ -33,28 +33,6 @@ $snapshot = ['view', 'export'];
 
 return [
     'pages' => [
-        // Admin
-        ['key' => 'admin.users',       'label' => 'Users',       'module' => 'Admin', 'route' => 'admin.users',       'abilities' => $crud],
-        ['key' => 'admin.roles',       'label' => 'Roles',       'module' => 'Admin', 'route' => 'admin.roles',       'abilities' => $crud],
-        ['key' => 'admin.departments', 'label' => 'Departments', 'module' => 'Admin', 'route' => 'admin.departments', 'abilities' => $crud],
-        ['key' => 'admin.companies',   'label' => 'Companies',   'module' => 'Admin', 'route' => 'admin.companies',   'abilities' => $crud],
-        ['key' => 'admin.factories',   'label' => 'Factories',   'module' => 'Admin', 'route' => 'admin.factories',   'abilities' => $crud],
-        // Warehouses and gates: the storage side of the same structure.
-        ['key' => 'admin.warehouses',  'label' => 'Warehouses',  'module' => 'Admin', 'route' => 'admin.warehouses',  'abilities' => $crud],
-        ['key' => 'admin.warehouse_gates', 'label' => 'Warehouse Gates', 'module' => 'Admin', 'route' => 'admin.warehouse_gates', 'abilities' => $crud],
-        ['key' => 'admin.factory_gates', 'label' => 'Factory Gates', 'module' => 'Admin', 'route' => 'admin.factory_gates', 'abilities' => $crud],
-        ['key' => 'admin.divisions',   'label' => 'Divisions',   'module' => 'Admin', 'route' => 'admin.divisions',   'abilities' => $crud],
-        ['key' => 'admin.staff',       'label' => 'Staff',       'module' => 'Admin', 'route' => 'admin.staff',       'abilities' => $crud],
-
-        // Settings
-        ['key' => 'settings.pages',      'label' => 'Pages',          'module' => 'Settings', 'route' => 'settings.pages',      'abilities' => $access],
-        ['key' => 'settings.data_views', 'label' => 'Data Views',     'module' => 'Settings', 'route' => 'settings.data-views', 'abilities' => $access],
-        ['key' => 'settings.shifts',     'label' => 'Shift Settings', 'module' => 'Settings', 'route' => 'settings.shifts',     'abilities' => $access],
-        ['key' => 'settings.service_types', 'label' => 'Service Types', 'module' => 'Settings', 'route' => 'settings.service-types', 'abilities' => $crud],
-        // One page holding two lists (causes + origins), edited inline — so
-        // 'edit' is the whole write ability; there is no separate create/delete.
-        ['key' => 'settings.waste',      'label' => 'Waste Settings', 'module' => 'Settings', 'route' => 'settings.waste',      'abilities' => ['view', 'edit']],
-
         // BIL — Machines (Company > Factory > Line > Project)
         ['key' => 'bil.machines.statistics', 'label' => 'Statistics', 'module' => 'BIL / Machines', 'route' => 'bil.machines.statistics', 'abilities' => $snapshot],
         ['key' => 'bil.machines.lines',    'label' => 'Lines',    'module' => 'BIL / Machines', 'route' => 'bil.machines.lines',    'abilities' => $crud],
@@ -155,6 +133,38 @@ return [
 
         // BPL — Jumbo Rolls / Sales
         ['key' => 'bpl.jumbo_rolls.sales.customers', 'label' => 'Customers', 'module' => 'BPL / Jumbo Rolls / Sales', 'route' => 'bpl.jumbo-rolls.sales.customers', 'abilities' => $crud],
+
+        /*
+        | Admin and Settings LAST, deliberately.
+        |
+        | `sort_order` is this array's index, and both the Pages screen and
+        | the Role matrix group by it — so this order is the order those
+        | screens read in. Structure and configuration are set up once and
+        | rarely touched again, while the BIL and BPL pages are what a role
+        | is actually built out of, so the day-to-day work comes first and
+        | these sit at the bottom.
+        */
+        // Admin
+        ['key' => 'admin.users',       'label' => 'Users',       'module' => 'Admin', 'route' => 'admin.users',       'abilities' => $crud],
+        ['key' => 'admin.roles',       'label' => 'Roles',       'module' => 'Admin', 'route' => 'admin.roles',       'abilities' => $crud],
+        ['key' => 'admin.departments', 'label' => 'Departments', 'module' => 'Admin', 'route' => 'admin.departments', 'abilities' => $crud],
+        ['key' => 'admin.companies',   'label' => 'Companies',   'module' => 'Admin', 'route' => 'admin.companies',   'abilities' => $crud],
+        ['key' => 'admin.factories',   'label' => 'Factories',   'module' => 'Admin', 'route' => 'admin.factories',   'abilities' => $crud],
+        // Warehouses and gates: the storage side of the same structure.
+        ['key' => 'admin.warehouses',  'label' => 'Warehouses',  'module' => 'Admin', 'route' => 'admin.warehouses',  'abilities' => $crud],
+        ['key' => 'admin.warehouse_gates', 'label' => 'Warehouse Gates', 'module' => 'Admin', 'route' => 'admin.warehouse_gates', 'abilities' => $crud],
+        ['key' => 'admin.factory_gates', 'label' => 'Factory Gates', 'module' => 'Admin', 'route' => 'admin.factory_gates', 'abilities' => $crud],
+        ['key' => 'admin.divisions',   'label' => 'Divisions',   'module' => 'Admin', 'route' => 'admin.divisions',   'abilities' => $crud],
+        ['key' => 'admin.staff',       'label' => 'Staff',       'module' => 'Admin', 'route' => 'admin.staff',       'abilities' => $crud],
+
+        // Settings
+        ['key' => 'settings.pages',      'label' => 'Pages',          'module' => 'Settings', 'route' => 'settings.pages',      'abilities' => $access],
+        ['key' => 'settings.data_views', 'label' => 'Data Views',     'module' => 'Settings', 'route' => 'settings.data-views', 'abilities' => $access],
+        ['key' => 'settings.shifts',     'label' => 'Shift Settings', 'module' => 'Settings', 'route' => 'settings.shifts',     'abilities' => $access],
+        ['key' => 'settings.service_types', 'label' => 'Service Types', 'module' => 'Settings', 'route' => 'settings.service-types', 'abilities' => $crud],
+        // One page holding two lists (causes + origins), edited inline — so
+        // 'edit' is the whole write ability; there is no separate create/delete.
+        ['key' => 'settings.waste',      'label' => 'Waste Settings', 'module' => 'Settings', 'route' => 'settings.waste',      'abilities' => ['view', 'edit']],
     ],
 
     // Display labels for ability columns in the Role matrix (order matters).
