@@ -5,6 +5,165 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-09-02 — BIL Sales Delivery; the scheduler; returns counted once
+
+Two commits: `cfb5fa2` (Delivery) and `9176045` (in-transit + the stock fix).
+One migration, sub-second. **The scheduler below is the only thing that needs a
+change outside the repo, and without it a page shows stale numbers.**
+
+### ⚠️ Wire up the Laravel scheduler — nothing runs it today
+
+`routes/console.php` now schedules **`bil:reconcile-fg-stock --fix`** nightly at
+**02:30**. That entry does nothing at all unless the machine runs
+`php artisan schedule:run` **every minute**. Before this release nothing in the
+app was scheduled, so on most environments this task does not exist yet.
+
+**Windows / Laragon** — Task Scheduler, repeat every 1 minute, indefinitely:
+
+```
+C:\laragon\bin\php\php-8.3.30-Win32-vs16-x64\php.exe C:\path\to\gds\artisan schedule:run
+```
+
+Use the **CLI** PHP, not the web one — they are different builds on the Laragon
+boxes (see the CLI≠Web note under the 2026-07-24 settings).
+
+**Linux**:
+
+```
+* * * * * cd /path/to/gds && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Confirm with `php artisan schedule:list` — it should print the 02:30 job and
+its next due time.
+
+**Why it matters.** `finished_goods_warehouse_stock` is a **cache**. Receipts,
+adjustments and transfers move it as they happen through
+`FinishedGoodsStock::apply()`, but goods **leaving are derived, not mirrored**:
+dispatch is read straight out of the legacy `sales_loading`, because the legacy
+loading screen writes that table too and mirroring from gds alone would miss
+half of it. Nothing therefore takes a loading off the cached total until the
+reconcile runs. Left unscheduled it drifts by exactly the day's dispatch, and
+the Warehouse Stock page shows goods that have already gone out — it was out by
+937 bundles across four products when this was found.
+
+Everything **derived** stays correct regardless: statistics, the reconcile
+report, and the new in-transit figure. Only the cached column goes stale. The
+command is idempotent and writes no adjustment rows, so running it by hand at
+any time is safe:
+
+```
+php artisan bil:reconcile-fg-stock        # report only
+php artisan bil:reconcile-fg-stock --fix  # write the corrections
+```
+
+**Run it once by hand after deploying**, so the first night is not the first
+time the cache is right.
+
+**Still unscheduled, decide before go-live:** `bil:refresh-fg-order-frequency`
+feeds the Warehouse Stock page's "Orders (90d)" columns (the page prints how
+stale they are, so this is visible rather than silent).
+`bil:reconcile-rm-stock` and `bil:reconcile-warehouse-stock` look like
+on-demand checks rather than nightly jobs.
+
+### 🐛 Returns were subtracted twice from stock
+
+`sales_loading.quantityloaded` is stored **NET** of returns — the legacy return
+script writes `SET quantityloaded = <gross> - <return>` and gds's
+`recordReturn()` does the same — and
+`FinishedGoodsStock::loadedSinceCutover()` then subtracted
+`sales_loading_return` **again**. Every returned bundle was taken off dispatch
+twice, so warehouse stock read high by that amount.
+
+The data settles it past any reading of the code: **13,022** returned lines have
+`quantityloaded = 0`, which cannot happen if the column were gross, and on
+**16,946** the return exceeds `quantityloaded`.
+
+Dispatch since the cut-over goes from 887 to the true **937** bundles. Anything
+written later that computes dispatch must `SUM(quantityloaded)` and net nothing
+off it.
+
+### New page: BIL → Sales → Delivery
+
+`bil/sales/delivery`, rebuilt from `sales_delivery.php` and
+`sales_delivery_modification.php`. Same shape as Loading — a queue of loads
+still on the floor, the selected load on the right, Print Outs top-right.
+Modification is not a peer screen; it is the undo of the confirm button and
+sits next to it.
+
+Kept from the legacy because the legacy still reads it: one `sales_delivery`
+row per load, the delivery number restarting daily, the
+`{yy}-{mm}-{dd}-{letter}{n}D-{nnn}` barcode, and the refusal to undo once a
+waybill exists. **`dateofdelivery` is the LOAD's `dateofloading`, never today**
+— a delivery points at its load only through (`loadnumber`, `dateofdelivery`),
+so dating it today would orphan it from the load, the note and the waybill.
+
+**One legacy bug is not reproduced.** Its request script checked the load
+number existed but never that it was still open, so a stale page could confirm
+the same load twice — **462 load numbers in the history carry two deliveries**.
+`confirm()` now refuses a load with no open lines, and `undo()` refuses anything
+but the last delivery of a load number.
+
+### New: an in-transit figure
+
+`SalesLoadings::inTransit()` — bundles loaded and not yet delivered. These are
+**already off** warehouse stock (loading is the deduction point, here and in the
+legacy); the figure is the part of what has gone that nobody confirmed arrived.
+
+⚠️ **It is deliberately two numbers, not one.** 23,483 bundles are undelivered
+but only 937 were loaded today: 22,546 sit on 71 loads nobody ever closed, the
+oldest raised in **May 2018**. A single figure would read as goods on the road
+and be wrong by 96%. Split at `config('warehouses.dispatch_stale_days')` — env
+**`FG_DISPATCH_STALE_DAYS`**, default 14 — into "on the road" and "not
+confirmed", with age buckets. Shown on the Delivery page and as an In Transit
+column on Warehouse Stock.
+
+### Migration
+
+`2026_09_02_100000_index_sales_delivery` — `(dateofdelivery, deliverynumber)`
+and `barcode` on `sales_delivery`. `ALGORITHM=INPLACE, LOCK=NONE`, ~0.5s on
+129,583 rows. The legacy schema indexed the identity columns the waybill chain
+joins on but never the date, so every date-scoped read was a full scan: a day's
+list 216ms, the next number 116ms, one barcode 193ms.
+
+⚠️ A long-running query on `sales_loading` or `sales_delivery` holds a metadata
+lock that blocks the `ALTER`, even with `LOCK=NONE`. One ad-hoc `COUNT` stalled
+it for ten minutes locally. If the migration hangs, `SHOW FULL PROCESSLIST` and
+`KILL QUERY <id>`.
+
+### Order of operations
+
+1. `php artisan migrate --force`
+2. `php artisan gds:sync-pages` — adds `bil.sales.delivery`
+   (`view` / `confirm` / `delete`), then grant it to the delivery roles.
+3. `php artisan bil:reconcile-fg-stock --fix` — absorbs the dispatch the cache
+   never took off.
+4. Wire up `schedule:run` as above.
+5. `php artisan config:clear` if config is cached (`warehouses.php` changed).
+
+### What to check afterwards
+
+- `php artisan schedule:list` prints the 02:30 job.
+- `php artisan bil:reconcile-fg-stock` says stock agrees.
+- Delivery page: the queue lists open loads; confirming one closes it, prints a
+  note with **three** signatures (Sent By / Received by Driver / Customer), and
+  clears it from the in-transit figure.
+- Warehouse Stock shows an In Transit column, amber where part of it is stale.
+
+### If it goes wrong
+
+The migration's `down()` drops both indexes. The Delivery page is additive —
+revoking `bil.sales.delivery:view` hides it and the legacy screens still work.
+The returns fix and the reconcile only correct numbers; re-running the reconcile
+is idempotent.
+
+**Negative warehouse stock is expected and is NOT caused by any of this.** Goods
+can be loaded straight off the factory floor before ever being entered at
+Warehouse Entrance. The 22 negative rows come from the 12 Aug 2026
+opening-balance seed, not from post-cut-over loading, so they will not
+self-heal through entrance receipts — only a physical count will clear them.
+
+---
+
 ## 2026-08-28 — Three dead tables dropped from `core`
 
 `2026_08_28_170000_drop_dead_inter_transfer_tables`, plus a legacy-side change.
