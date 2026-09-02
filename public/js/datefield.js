@@ -126,6 +126,23 @@
                 if (o.disabled && this.fp.altInput) {
                     this.fp.altInput.setAttribute('disabled', 'disabled');
                 }
+
+                // Flatpickr renders its calendar as a portal on <body>, so to
+                // any ancestor it is NOT inside the field. A modal closing on
+                // `@click.outside` therefore closed the moment you clicked the
+                // previous-month arrow.
+                //
+                // Stopping propagation at the calendar keeps the click from
+                // reaching the document listener Alpine's `.outside` uses, while
+                // flatpickr's own handlers — bound to the arrows and day cells
+                // below this node — have already run by the time it bubbles
+                // here. Done centrally so no modal has to remember the problem.
+                const cal = this.fp.calendarContainer;
+                if (cal) {
+                    ['mousedown', 'click'].forEach((evt) => {
+                        cal.addEventListener(evt, (e) => e.stopPropagation());
+                    });
+                }
             },
             destroy() {
                 if (this.fp) {

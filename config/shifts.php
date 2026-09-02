@@ -25,6 +25,7 @@ return [
 
         ['key' => 'bil.jumbo_rolls.factory_entrance', 'label' => 'BIL Jumbo Rolls Factory Entrance', 'module' => 'BIL', 'windows' => $dayNight],
         ['key' => 'bil.jumbo_rolls.consumption',      'label' => 'BIL Jumbo Rolls Consumption',      'module' => 'BIL', 'windows' => $dayNight],
+        ['key' => 'bil.jumbo_rolls.returns',          'label' => 'BIL Jumbo Rolls Returns',          'module' => 'BIL', 'windows' => $dayNight],
 
         /*
         | Conversion. These two do more than gate a page: their windows define

@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Clear phantom jumbo-roll stock left in the BPL stores by the old system.
@@ -41,6 +42,12 @@ return new class extends Migration
 
     public function up(): void
     {
+        // The whole `jumboreel_*` route was retired shortly after this ran, so
+        // on a rebuilt environment there is nothing left to clean up.
+        if (! Schema::connection('core')->hasTable('jumboreel_storeentrance')) {
+            return;
+        }
+
         $barcodes = $this->staleBarcodes();
 
         if ($barcodes === []) {
@@ -55,6 +62,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::connection('core')->hasTable('jumboreel_storeentrance')) {
+            return;
+        }
+
         DB::connection('core')->table('jumboreel_storeentrance')
             ->where('status', self::CLOSED)
             ->update(['status' => null]);

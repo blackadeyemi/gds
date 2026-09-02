@@ -17,8 +17,11 @@ use Modules\Bil\Livewire\RawMaterials\Reports\RawMaterialReport;
  *
  *   BPL Factory    on the paper machine floor, not yet shipped out of BPL
  *                  (`bpl_production.status IS NULL`)
- *   BPL Warehouse  received into a PM store and not yet released from it
- *                  (`jumboreel_storeentrance.status IS NULL`)
+ *   BPL Warehouse  received into one of BPL's stores and not yet released
+ *                  (`bpl_storeentrance.status IS NULL`) — BPL holds a large
+ *                  amount of finished stock for BIL, so this is a real position
+ *                  rather than a formality. Note `bpl_storeentrance` is the LIVE
+ *                  table; `jumboreel_storeentrance` is the dead 2018-19 route.
  *   BIL Factory    on a BIL factory floor, whole or part-used — the legacy page
  *                  (`factory_entrance_reel.status IS NULL` or `'mid'`)
  *
@@ -127,10 +130,50 @@ class Stock extends RawMaterialReport
         return "'" . str_replace("'", "''", $value) . "'";
     }
 
-    protected function stockSet()
+    /**
+     * @param  bool  $withWeight  false skips the per-reel remaining-weight
+     *                            rollup for callers that only read the labels
+     *                            (the filter dropdowns). The union runs three
+     *                            times per render — options, count, page — so
+     *                            not doing that work twice for nothing matters.
+     */
+    /**
+     * A location's DISPLAY name, resolved through the core master.
+     *
+     * The movement tables store legacy strings — a factory code on
+     * `factory_entrance_reel.location`, a paper machine on
+     * `bpl_production.papermachine`, a `bpl_stock_locations` id on
+     * `bpl_storeentrance.location_id`. Reading those straight through means
+     * renaming a factory or warehouse in Admin changes nothing here, and it
+     * shows "PM2" where the rest of the app says "Paper Machine 2".
+     *
+     * Written as a scalar subquery rather than a join so it cannot multiply
+     * rows, and wrapped in COALESCE so a location with no master row still
+     * appears under its legacy name instead of vanishing.
+     */
+    private function factoryName(string $codeExpr): string
+    {
+        return "COALESCE((SELECT `name` FROM `core`.`factories`"
+            . " WHERE `code` = {$codeExpr} AND `deleted_at` IS NULL LIMIT 1), {$codeExpr})";
+    }
+
+    private function warehouseName(string $legacyIdExpr, string $fallbackExpr, int $companyId): string
+    {
+        return "COALESCE((SELECT `name` FROM `core`.`warehouses`"
+            . " WHERE `legacy_location_id` = {$legacyIdExpr} AND `company_id` = {$companyId}"
+            . " AND `deleted_at` IS NULL LIMIT 1), {$fallbackExpr})";
+    }
+
+    protected function stockSet(bool $withWeight = true)
     {
         $conn = DB::connection('bil');
         $customer = (int) config('bil.jumbo_roll_customer_id');
+
+        // Which company's warehouses to resolve store ids against. `legacy_location_id`
+        // is only unique WITHIN a company — the raw-material stores use the same
+        // small integers — so this scoping is load-bearing, not tidiness.
+        $bplCompanyId = (int) DB::connection('core')->table('companies')
+            ->where('code', 'BPL')->value('id');
 
         $columns = "%s as `place`, %s as `location`, %s as `since`, %s as `weight`,"
             . " `prod`.`barcode`, `prod`.`hardrollnumber`, `pr`.`productname`, `pr`.`gradetype`";
@@ -144,23 +187,30 @@ class Stock extends RawMaterialReport
             ->selectRaw(sprintf(
                 $columns,
                 $this->literal(self::AT_BPL_FACTORY),
-                '`prod`.`papermachine`',
+                $this->factoryName('`prod`.`papermachine`'),
                 '`prod`.`dateofmanufacture`',
                 'ROUND(`prod`.`weight`, 2)'
             ));
 
-        // In a PM store, not yet released.
-        $inStore = $conn->table('jumboreel_storeentrance as se')
+        // In one of BPL's own stores, not yet released. BPL holds a lot of
+        // finished reels for BIL — this is the largest position after the BIL
+        // factory floors, not a rounding error.
+        //
+        // `bpl_storeentrance` is the LIVE store table. `jumboreel_storeentrance`
+        // is the dead 2018-19 route and must not be used here.
+        $inStore = $conn->table('bpl_storeentrance as se')
             ->join('bpl_production as prod', 'prod.barcode', '=', 'se.barcode')
             ->leftJoin('bpl_products as pr', 'pr.id', '=', 'prod.product_id')
+            ->leftJoin('bpl_stock_locations as store', 'store.id', '=', 'se.location_id')
             ->whereNull('se.status')
+            ->whereNull('se.deleted_at')
             ->where('prod.customer_id', $customer)
             ->whereNull('prod.deleted_at')
             ->selectRaw(sprintf(
                 $columns,
                 $this->literal(self::AT_BPL_WAREHOUSE),
-                '`se`.`entrancelocation`',
-                '`se`.`dateofentrance`',
+                $this->warehouseName('`se`.`location_id`', '`store`.`location`', $bplCompanyId),
+                '`se`.`date`',
                 'ROUND(`prod`.`weight`, 2)'
             ));
 
@@ -175,12 +225,23 @@ class Stock extends RawMaterialReport
             ->selectRaw(sprintf(
                 str_replace('`prod`.`barcode`', '`f`.`barcode`', $columns),
                 $this->literal(self::AT_BIL_FACTORY),
-                '`f`.`location`',
+                $this->factoryName('`f`.`location`'),
                 '`f`.`dateofentrance`',
-                'ROUND(' . self::REMAINING . ', 2)'
+                $withWeight ? 'ROUND(' . self::REMAINING . ', 2)' : '0'
             ));
 
         return $atMachine->unionAll($inStore)->unionAll($onFloor);
+    }
+
+    /**
+     * The unfiltered live position, for another screen to aggregate.
+     *
+     * The Statistics dashboard reads this rather than rebuilding the three legs
+     * of its own, so the two can never quietly disagree about what is in stock.
+     */
+    public function positionQuery()
+    {
+        return $this->stockSet();
     }
 
     protected function base()
@@ -200,9 +261,27 @@ class Stock extends RawMaterialReport
     /* ---------------- Filters ---------------- */
 
     /**
+     * The filters, outermost first. Each one narrows the options offered by the
+     * ones after it: picking Where = BIL Factory leaves Location offering Bil-1
+     * and Gambini, not the paper machines.
+     *
+     * filter key => the column it filters on.
+     */
+    private const FILTER_CASCADE = [
+        'place' => 'place',
+        'location' => 'location',
+        'gradetype' => 'gradetype',
+        'product' => 'productname',
+    ];
+
+    /**
      * Filter options come from the stock itself, not from the master tables:
      * offering all 4,300 hardroll products when 30 are in stock makes the
-     * dropdown useless. One query, cached for the render.
+     * dropdown useless — and offering a location that holds none of what you
+     * have already selected is the same mistake one level down.
+     *
+     * The whole position is a few hundred rows, so it is fetched once and the
+     * cascade is applied in memory rather than as a query per dropdown.
      */
     protected function options(): array
     {
@@ -210,18 +289,25 @@ class Stock extends RawMaterialReport
             return $this->optCache;
         }
 
-        $rows = DB::connection('bil')->query()->fromSub($this->stockSet(), 's')
+        $pool = DB::connection('bil')->query()->fromSub($this->stockSet(false), 's')
             ->select('s.place', 's.location', 's.gradetype', 's.productname')->get();
 
-        $distinct = fn (string $field) => $rows->pluck($field)->filter(fn ($v) => (string) $v !== '')
-            ->unique()->sort()->values()->mapWithKeys(fn ($v) => [$v => $v])->all();
+        $options = [];
 
-        return $this->optCache = [
-            'places' => $distinct('place'),
-            'locations' => $distinct('location'),
-            'gradetypes' => $distinct('gradetype'),
-            'products' => $distinct('productname'),
-        ];
+        foreach (self::FILTER_CASCADE as $filter => $column) {
+            $options[$filter] = $pool->pluck($column)
+                ->filter(fn ($v) => (string) $v !== '')
+                ->unique()->sort()->values()
+                ->mapWithKeys(fn ($v) => [$v => $v])->all();
+
+            // Everything after this dropdown sees only what this choice leaves.
+            $chosen = $this->filters[$filter] ?? '';
+            if ($chosen !== '' && $chosen !== 'all') {
+                $pool = $pool->where($column, $chosen);
+            }
+        }
+
+        return $this->optCache = $options;
     }
 
     public function filterDefs(): array
@@ -229,11 +315,35 @@ class Stock extends RawMaterialReport
         $o = $this->options();
 
         return [
-            'place' => ['label' => 'Where', 'options' => $o['places']],
-            'location' => ['label' => 'Location', 'options' => $o['locations']],
-            'gradetype' => ['label' => 'Grade Type', 'options' => $o['gradetypes']],
-            'product' => ['label' => 'Product', 'options' => $o['products']],
+            'place' => ['label' => 'Where', 'options' => $o['place']],
+            'location' => ['label' => 'Location', 'options' => $o['location']],
+            'gradetype' => ['label' => 'Grade Type', 'options' => $o['gradetype']],
+            'product' => ['label' => 'Product', 'options' => $o['product']],
         ];
+    }
+
+    /**
+     * Changing a filter clears the ones it narrows.
+     *
+     * Without this, switching Where to BPL Factory while Location still says
+     * Bil-1 leaves an impossible pair selected and an empty table with nothing
+     * explaining why. The options cache is dropped too, since what each
+     * dropdown may offer has just changed.
+     */
+    public function updatedFilters($value = null, $key = null): void
+    {
+        $downstream = array_keys(self::FILTER_CASCADE);
+        $position = $key === null ? false : array_search($key, $downstream, true);
+
+        if ($position !== false) {
+            foreach (array_slice($downstream, $position + 1) as $filter) {
+                $this->filters[$filter] = '';
+            }
+        }
+
+        $this->optCache = null;
+
+        parent::updatedFilters();
     }
 
     /* ---------------- Views ---------------- */

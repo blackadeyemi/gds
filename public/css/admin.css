@@ -303,3 +303,13 @@
 [data-theme="dark"] .flatpickr-current-month .flatpickr-monthDropdown-months { color: var(--ink); background: var(--surface); }
 [data-theme="dark"] .flatpickr-calendar.arrowTop::before, [data-theme="dark"] .flatpickr-calendar.arrowTop::after { border-bottom-color: var(--surface); }
 [data-theme="dark"] .flatpickr-calendar.arrowBottom::before, [data-theme="dark"] .flatpickr-calendar.arrowBottom::after { border-top-color: var(--surface); }
+
+/* ---- Monospaced reference codes ----
+   Transporter and customer codes are eight digits read aloud, copied onto
+   paperwork and compared down a column — tabular figures keep the digits in
+   line so a transposed pair is visible. */
+.mono {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    letter-spacing: .04em;
+}

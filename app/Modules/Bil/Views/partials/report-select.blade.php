@@ -4,8 +4,16 @@
     filter. Writes the chosen value to `filters.<name>` via $wire (live).
 
     Params: $name (filter key), $label, $options ([value => label]).
+
+    The key carries a hash of the OPTIONS, not just the filter name. Alpine
+    snapshots `items` when x-data is evaluated, which happens once per element;
+    with a constant key Livewire's DOM diffing keeps the old element alive, so a
+    re-render with a narrowed option list would leave the dropdown still showing
+    the original one. Changing the key forces a replacement and a fresh snapshot.
+    Filters whose options never change hash the same and are untouched.
 --}}
-<div class="form-group" style="margin:0;min-width:170px;" wire:key="rfilter-{{ $name }}"
+<div class="form-group" style="margin:0;min-width:170px;"
+     wire:key="rfilter-{{ $name }}-{{ substr(md5(json_encode($options)), 0, 8) }}"
      x-data="{
         open: false,
         query: '',

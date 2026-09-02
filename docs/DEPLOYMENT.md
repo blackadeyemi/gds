@@ -173,6 +173,86 @@ including a rollback and re-apply. `bil:reconcile-fg-stock` and
 
 ---
 
+## 2026-08-28 — BIL Sales: Orders, Customers, Transporters
+
+New nav group **BIL → Sales** — Orders, Customers and Transporters — plus a
+geography reference set the customer form reads.
+
+### Order of operations
+
+```bash
+php artisan migrate                       # 5 migrations, see below
+php artisan gds:import-geo --download     # ~154k rows, 1-2 min, needs internet ONCE
+php artisan gds:sync-pages
+php artisan gds:sync-data-views
+```
+
+Then grant the new pages in **Admin → Roles**. All three are new, so only Admin
+has them today:
+
+| Page | Legacy equivalent | Abilities |
+|---|---|---|
+| `bil.sales.orders` | `sales_order.php` (levels 1, 12) | view, delete, **backdate** |
+| `bil.sales.customers` | `sales_customers.php` (levels 1, 12, 70) | view, create, edit, delete, export |
+| `bil.sales.transporters` | `sales_transporters.php` | view, create, edit, delete, export |
+
+⚠️ **Grant `backdate` to the Sales Order role**, or clerks can only enter
+today's orders. Legacy let any level-12 user date an order freely.
+
+### Migrations
+
+| Migration | What it does | Reversible |
+|---|---|---|
+| `…_add_sales_code_to_warehouses_and_register_depots` | `warehouses.legacy_sales_code`; maps FG → `01` (Lagos), adds Kano (`02`, inactive) and Abuja (`03`) | yes |
+| `…_index_sales_order_customerid` | Index on `bil.sales_order.customerid` | yes |
+| `…_create_geo_reference_tables` | `core.geo_countries` / `geo_states` / `geo_cities` | yes |
+| `…_add_transporter_code_to_sales_transporters` | `transportercode` + UNIQUE index; mints codes for the 143 existing rows | yes |
+| `…_index_sales_loading_transporterid` | Index on `bil.sales_loading.transporterid` | yes |
+
+**The indexes are the ones to notice.** `sales_order` indexed only `orderid` and
+`dateoforder`. Counting a customer's orders scanned all 97,291 rows per
+customer, so exporting the 1,898-customer list took **150 seconds**; it is now
+517 ms. Legacy gains too — its balance and invoice reports filter on that column.
+Adding it locks the table briefly (~0.8 s here); do it outside order entry.
+`sales_loading.transporterid` had the same hole and the same fix (~5 s over 642k
+rows) — the Transporters page asks "has this haulier carried anything?" for every
+row it shows, and legacy's `report_sales_loading_transporter.php` groups on it.
+
+### Geo import
+
+`gds:import-geo` fills the `geo_*` tables from the
+[Countries States Cities Database](https://github.com/dr5hn/countries-states-cities-database)
+(ODbL v1.0 — attribution is in the README and the migration). Downloads to
+`storage/app/geo/`, which is git-ignored, so **production needs internet for
+this one command** — or copy the three CSVs across and run it without
+`--download`. Idempotent: it upserts on the dataset's ids.
+
+Without it the customer form has no country list and cannot be saved. Check:
+
+```bash
+php artisan tinker --execute="echo Modules\Core\Support\Geography::isLoaded() ? 'ok' : 'NOT IMPORTED';"
+```
+
+The legacy `countries` and `states` tables are untouched — the old app reads
+`countries` via `Bil\Country`.
+
+### Verify
+
+- `/bil/sales/orders` — place an order; it must write `warehousecode` `01`/`03`,
+  not a warehouse id, or legacy loading barcodes break.
+- `/bil/sales/customers` — the Unclassified view is the data-quality worklist.
+- `/bil/sales/transporters` — every row must show an 8-digit code; the two with
+  no loadings are the only deletable ones.
+- `php artisan test --filter="Sales"` — 23 tests, read-only.
+
+### Rolling back
+
+`migrate:rollback` on all five is safe; the geo tables are dropped and the depot
+rows removed only if they have no gates. Sales orders written by gds stay — they
+are ordinary legacy rows the old app can read.
+
+---
+
 ## 2026-08-14 — Finished Goods Statistics
 
 ```
@@ -205,77 +285,6 @@ stock against the Factory Floor Stock report, in-stock against the Warehouse
 Stock page, waste against the waste entries, transfers against the transfer
 lines. Warehouse receipts exclude imported history, so the dashboard agrees with
 the Warehouse Entrance report rather than counting 1.16M backfilled rows.
-
----
-
-## 2026-08-13 (e) — BIL Sales: Orders + Customers
-
-New nav group **BIL → Sales**, two pages, and a geography reference set.
-
-### Order of operations
-
-```bash
-php artisan migrate                       # 4 migrations, see below
-php artisan gds:import-geo --download     # ~154k rows, 1-2 min, needs internet ONCE
-php artisan gds:sync-pages
-php artisan gds:sync-data-views
-```
-
-Then grant the new pages in **Admin → Roles**. Both are new, so only Admin has
-them today:
-
-| Page | Legacy equivalent | Abilities |
-|---|---|---|
-| `bil.sales.orders` | `sales_order.php` (levels 1, 12) | view, delete, **backdate** |
-| `bil.sales.customers` | `sales_customers.php` (levels 1, 12, 70) | view, create, edit, delete, export |
-
-⚠️ **Grant `backdate` to the Sales Order role**, or clerks can only enter
-today's orders. Legacy let any level-12 user date an order freely.
-
-### Migrations
-
-| Migration | What it does | Reversible |
-|---|---|---|
-| `…_add_sales_code_to_warehouses_and_register_depots` | `warehouses.legacy_sales_code`; maps FG → `01` (Lagos), adds Kano (`02`, inactive) and Abuja (`03`) | yes |
-| `…_index_sales_order_customerid` | Index on `bil.sales_order.customerid` | yes |
-| `…_create_geo_reference_tables` | `core.geo_countries` / `geo_states` / `geo_cities` | yes |
-
-**The index is the one to notice.** `sales_order` indexed only `orderid` and
-`dateoforder`. Counting a customer's orders scanned all 97,291 rows per
-customer, so exporting the 1,898-customer list took **150 seconds**; it is now
-517 ms. Legacy gains too — its balance and invoice reports filter on that column.
-Adding it locks the table briefly (~0.8 s here); do it outside order entry.
-
-### Geo import
-
-`gds:import-geo` fills the `geo_*` tables from the
-[Countries States Cities Database](https://github.com/dr5hn/countries-states-cities-database)
-(ODbL v1.0 — attribution is in the README and the migration). Downloads to
-`storage/app/geo/`, which is git-ignored, so **production needs internet for
-this one command** — or copy the three CSVs across and run it without
-`--download`. Idempotent: it upserts on the dataset's ids.
-
-Without it the customer form has no country list and cannot be saved. Check:
-
-```bash
-php artisan tinker --execute="echo Modules\Core\Support\Geography::isLoaded() ? 'ok' : 'NOT IMPORTED';"
-```
-
-The legacy `countries` and `states` tables are untouched — the old app reads
-`countries` via `Bil\Country`.
-
-### Verify
-
-- `/bil/sales/orders` — place an order; it must write `warehousecode` `01`/`03`,
-  not a warehouse id, or legacy loading barcodes break.
-- `/bil/sales/customers` — the Unclassified view is the data-quality worklist.
-- `php artisan test --filter="Sales"` — 14 tests, read-only.
-
-### Rolling back
-
-`migrate:rollback` on all four is safe; the geo tables are dropped and the depot
-rows removed only if they have no gates. Sales orders written by gds stay — they
-are ordinary legacy rows the old app can read.
 
 ---
 

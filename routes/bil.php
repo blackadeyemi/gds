@@ -19,6 +19,11 @@ use Modules\Bil\Livewire\FinishedGoods\Products as FinishedGoodsProducts;
 use Modules\Bil\Livewire\FinishedGoods\Stock as FinishedGoodsStockPage;
 use Modules\Bil\Livewire\JumboRolls\Consumption as JumboRollConsumption;
 use Modules\Bil\Livewire\JumboRolls\FactoryEntrance as JumboRollFactoryEntrance;
+use Modules\Bil\Livewire\JumboRolls\Reports\Consumption as JumboRollConsumptionReport;
+use Modules\Bil\Livewire\JumboRolls\Reports\FactoryEntrance as JumboRollFactoryEntranceReport;
+use Modules\Bil\Livewire\JumboRolls\Reports\Returns as JumboRollReturnsReport;
+use Modules\Bil\Livewire\JumboRolls\Returns as JumboRollReturns;
+use Modules\Bil\Livewire\JumboRolls\Statistics as JumboRollStatistics;
 use Modules\Bil\Livewire\JumboRolls\Stock as JumboRollStock;
 use Modules\Bil\Livewire\Machines\Lines as MachineLines;
 use Modules\Bil\Livewire\Machines\Projects as MachineProjects;
@@ -48,7 +53,9 @@ use Modules\Bil\Livewire\RawMaterials\Suppliers;
 use Modules\Bil\Livewire\RawMaterials\WarehouseEntry;
 use Modules\Bil\Livewire\RawMaterials\WarehouseExit;
 use Modules\Bil\Livewire\Sales\Customers as SalesCustomers;
+use Modules\Bil\Livewire\Sales\Loading as SalesLoadingPage;
 use Modules\Bil\Livewire\Sales\Orders as SalesOrders;
+use Modules\Bil\Livewire\Sales\Transporters as SalesTransporters;
 
 /*
 | BIL module routes — factory, raw materials, sales, store, quality.
@@ -181,6 +188,32 @@ Route::middleware('auth')
             ->middleware('page:bil.sales.customers')->name('customers');
         Route::get('/orders', SalesOrders::class)
             ->middleware('page:bil.sales.orders')->name('orders');
+        Route::get('/loading', SalesLoadingPage::class)
+            ->middleware('page:bil.sales.loading')->name('loading');
+
+        /*
+        | The loading print-out. Takes a comma-separated list of barcodes so a
+        | day's loads print in one document — the legacy screen made you open a
+        | browser tab per load, which is what the cageroom is used to but not
+        | what it wanted.
+        */
+        Route::get('/loading/print', function () {
+            $barcodes = array_values(array_filter(array_map(
+                'trim', explode(',', (string) request('loads', ''))
+            )));
+
+            abort_if($barcodes === [], 404);
+            // A runaway list would build an unprintable document and a very
+            // large query; a day is never near this.
+            abort_if(count($barcodes) > 100, 422, 'Too many loads in one print run.');
+
+            $loads = \Modules\Bil\Support\SalesLoadings::printouts($barcodes);
+            abort_if($loads === [], 404);
+
+            return view('bil::print.loading', ['loads' => $loads]);
+        })->middleware('page:bil.sales.loading')->name('loading.print');
+        Route::get('/transporters', SalesTransporters::class)
+            ->middleware('page:bil.sales.transporters')->name('transporters');
     });
 
 /*
@@ -370,14 +403,43 @@ Route::middleware('auth')
             ->middleware('page:bil.jumbo_rolls.factory_entrance')->name('factory-entrance');
         Route::get('/consumption', JumboRollConsumption::class)
             ->middleware('page:bil.jumbo_rolls.consumption')->name('consumption');
+        Route::get('/returns', JumboRollReturns::class)
+            ->middleware('page:bil.jumbo_rolls.returns')->name('returns');
         Route::get('/stock', JumboRollStock::class)
             ->middleware('page:bil.jumbo_rolls.stock')->name('stock');
+
+        Route::get('/statistics', JumboRollStatistics::class)
+            ->middleware('page:bil.jumbo_rolls.statistics')->name('statistics');
+        // Direct download of the current statistics section as xlsx/csv/pdf.
+        Route::get('/statistics/export', function () {
+            abort_unless((bool) request()->user()?->canDo('bil.jumbo_rolls.statistics', 'export'), 403);
+
+            $format = strtolower((string) request('format', 'xlsx'));
+            abort_unless(in_array($format, ['xlsx', 'csv', 'pdf'], true), 404);
+
+            $c = new JumboRollStatistics();
+            $c->section = (string) request('section', '');
+            $c->range = (string) request('range', '30d');
+            $c->figures = (string) request('figures', 'rounded');
+
+            return $c->exportResponse($format);
+        })->middleware('page:bil.jumbo_rolls.statistics')->name('statistics.export');
 
         // Print / download for the report-framework pages in this group, on the
         // same contract as the other modules: slug => [component, page key].
         Route::prefix('reports')->name('reports.')->group(function () {
+            Route::get('/factory-entrance', JumboRollFactoryEntranceReport::class)
+                ->middleware('page:bil.jumbo_rolls.reports.factory_entrance')->name('factory-entrance');
+            Route::get('/consumption', JumboRollConsumptionReport::class)
+                ->middleware('page:bil.jumbo_rolls.reports.consumption')->name('consumption');
+            Route::get('/returns', JumboRollReturnsReport::class)
+                ->middleware('page:bil.jumbo_rolls.reports.returns')->name('returns');
+
             $reports = [
                 'stock' => [JumboRollStock::class, 'bil.jumbo_rolls.stock'],
+                'factory-entrance' => [JumboRollFactoryEntranceReport::class, 'bil.jumbo_rolls.reports.factory_entrance'],
+                'consumption' => [JumboRollConsumptionReport::class, 'bil.jumbo_rolls.reports.consumption'],
+                'returns' => [JumboRollReturnsReport::class, 'bil.jumbo_rolls.reports.returns'],
             ];
 
             $hydrate = function (array $report) {
@@ -386,6 +448,11 @@ Route::middleware('auth')
                 $c->view = (string) request('view', '');
                 $c->search = (string) request('search', '');
                 $c->filters = array_map('strval', (array) request('filters', []));
+                // Stock is a snapshot and ignores these; the movement reports need
+                // them. Defaulted to today like the other modules, so a bare URL
+                // exports one day rather than every row ever recorded.
+                $c->dateFrom = (string) request('dateFrom', now()->format('Y-m-d'));
+                $c->dateTo = (string) request('dateTo', now()->format('Y-m-d'));
 
                 return $c;
             };

@@ -101,7 +101,9 @@ return [
         // and editing one, and `delete` is the withdrawal — which is refused
         // outright once anything has been loaded against the order.
         ['key' => 'bil.sales.customers', 'label' => 'Customers', 'module' => 'BIL / Sales', 'route' => 'bil.sales.customers', 'abilities' => $crud],
+        ['key' => 'bil.sales.transporters', 'label' => 'Transporters', 'module' => 'BIL / Sales', 'route' => 'bil.sales.transporters', 'abilities' => $crud],
         ['key' => 'bil.sales.orders', 'label' => 'Orders', 'module' => 'BIL / Sales', 'route' => 'bil.sales.orders', 'abilities' => ['view', 'delete', 'backdate']],
+        ['key' => 'bil.sales.loading', 'label' => 'Loading', 'module' => 'BIL / Sales', 'route' => 'bil.sales.loading', 'abilities' => ['view', 'create', 'modify', 'return'], 'gates' => 'warehouse'],
 
         // BIL — Raw Materials
         ['key' => 'bil.raw_materials.statistics',          'label' => 'Statistics',          'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.statistics',          'abilities' => $snapshot],
@@ -128,11 +130,21 @@ return [
         ['key' => 'bil.raw_materials.reports.damaged_goods',       'label' => 'Damaged Goods',       'module' => 'BIL / Raw Materials Reports', 'route' => 'bil.raw-materials.reports.damaged-goods',       'abilities' => $report],
 
         // BIL — Jumbo Rolls (the reels BPL makes for BIL, from the gate inwards)
+        ['key' => 'bil.jumbo_rolls.statistics',      'label' => 'Statistics',       'module' => 'BIL / Jumbo Rolls', 'route' => 'bil.jumbo-rolls.statistics',      'abilities' => $snapshot],
         ['key' => 'bil.jumbo_rolls.factory_entrance', 'label' => 'Factory Entrance', 'module' => 'BIL / Jumbo Rolls', 'route' => 'bil.jumbo-rolls.factory-entrance', 'abilities' => ['view', 'backdate', 'bypass-shift'], 'gates' => 'factory'],
         // Consumption picks a machine, not a gate, so no gate checklist.
         ['key' => 'bil.jumbo_rolls.consumption',      'label' => 'Consumption',      'module' => 'BIL / Jumbo Rolls', 'route' => 'bil.jumbo-rolls.consumption',      'abilities' => ['view', 'backdate', 'bypass-shift']],
+        // Sending a reel back to BPL. Carries its own date of return, so the
+        // day the truck left can be recorded rather than the day it was typed.
+        ['key' => 'bil.jumbo_rolls.returns',         'label' => 'Returns',          'module' => 'BIL / Jumbo Rolls', 'route' => 'bil.jumbo-rolls.returns',         'abilities' => ['view', 'backdate', 'bypass-shift']],
         // A live snapshot derived from the movement tables — nothing to edit here.
         ['key' => 'bil.jumbo_rolls.stock',           'label' => 'Stock',            'module' => 'BIL / Jumbo Rolls', 'route' => 'bil.jumbo-rolls.stock',           'abilities' => $snapshot],
+
+        // BIL — Jumbo Rolls Reports. Read-outs: the screens that write these
+        // rows own the corrections, so no edit/delete here.
+        ['key' => 'bil.jumbo_rolls.reports.factory_entrance', 'label' => 'Factory Entrance', 'module' => 'BIL / Jumbo Rolls Reports', 'route' => 'bil.jumbo-rolls.reports.factory-entrance', 'abilities' => $snapshot],
+        ['key' => 'bil.jumbo_rolls.reports.consumption',      'label' => 'Consumption',      'module' => 'BIL / Jumbo Rolls Reports', 'route' => 'bil.jumbo-rolls.reports.consumption',      'abilities' => $snapshot],
+        ['key' => 'bil.jumbo_rolls.reports.returns',          'label' => 'Returns',          'module' => 'BIL / Jumbo Rolls Reports', 'route' => 'bil.jumbo-rolls.reports.returns',          'abilities' => $snapshot],
 
         // BPL — Jumbo Rolls
         ['key' => 'bpl.jumbo_rolls.grades',            'label' => 'Grades',              'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.grades',            'abilities' => $crud],
@@ -154,6 +166,8 @@ return [
         'approve' => 'Approve',
         'bypass-shift' => 'Bypass shift',
         'cancel' => 'Cancel',
+        'modify' => 'Modify',
+        'return' => 'Return',
         'confirm' => 'Confirm',
         'reopen' => 'Re-open',
         'bypass-waste-lock' => 'Bypass waste lock',

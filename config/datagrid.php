@@ -31,6 +31,7 @@ return [
 
         // BIL — Sales
         \Modules\Bil\Livewire\Sales\Customers::class,
+        \Modules\Bil\Livewire\Sales\Transporters::class,
 
         // BIL — Finished Goods
         \Modules\Bil\Livewire\FinishedGoods\Products::class,

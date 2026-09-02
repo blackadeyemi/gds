@@ -93,22 +93,6 @@ class JumboRollStockPageTest extends TestCase
         );
     }
 
-    /**
-     * Reels the old system left flagged as sitting in a PM store are closed off,
-     * not counted (migration 2026_08_14_140000).
-     */
-    public function test_pre_golive_store_entrances_are_not_stock(): void
-    {
-        $stale = DB::connection('bil')->table('jumboreel_storeentrance as se')
-            ->join('bpl_production as prod', 'prod.barcode', '=', 'se.barcode')
-            ->whereNull('se.status')
-            ->where('se.dateofentrance', '<', '2021/03/01')
-            ->where('prod.customer_id', (int) config('bil.jumbo_roll_customer_id'))
-            ->count();
-
-        $this->assertSame(0, $stale, 'pre-go-live store entrances are back in stock');
-    }
-
     /** Each leg matches a direct count against the table that defines it. */
     public function test_each_leg_matches_its_source_table(): void
     {
@@ -128,12 +112,38 @@ class JumboRollStockPageTest extends TestCase
             ->count();
         $this->assertSame($atMachine, $byPlace[Stock::AT_BPL_FACTORY] ?? 0);
 
-        $inStore = $bil->table('jumboreel_storeentrance as se')
+        $inStore = $bil->table('bpl_storeentrance as se')
             ->join('bpl_production as prod', 'prod.barcode', '=', 'se.barcode')
-            ->whereNull('se.status')
+            ->whereNull('se.status')->whereNull('se.deleted_at')
             ->where('prod.customer_id', $customer)->whereNull('prod.deleted_at')
             ->count();
         $this->assertSame($inStore, $byPlace[Stock::AT_BPL_WAREHOUSE] ?? 0);
+    }
+
+    /**
+     * BPL holds a large amount of BIL's stock in its own warehouses, and it is
+     * read from the LIVE store table.
+     *
+     * `jumboreel_storeentrance` was the dead 2018-19 route; reading it instead
+     * (as this page originally did) reported zero and hid ~700 tonnes. That
+     * whole route has since been dropped from `bil`/`bpl`/`core`, so a leg
+     * reading it would now fail loudly rather than quietly — but the position
+     * itself is what this guards.
+     */
+    public function test_bpl_warehouse_stock_comes_from_the_live_store_table(): void
+    {
+        $inStore = $this->rows('by_location')->where('place', Stock::AT_BPL_WAREHOUSE);
+
+        $this->assertNotEmpty($inStore, 'no BIL stock reported in a BPL warehouse');
+        $this->assertGreaterThan(0, (int) $inStore->sum('quantity'));
+
+        // Every store it reports must be a real BPL store location.
+        $stores = DB::connection('bpl')->table('bpl_stock_locations')->where('type', 1)->pluck('id');
+        $held = DB::connection('bil')->table('bpl_storeentrance')
+            ->whereNull('status')->whereNull('deleted_at')
+            ->whereIn('location_id', $stores)->count();
+
+        $this->assertGreaterThan(0, $held);
     }
 
     /**
@@ -215,6 +225,137 @@ class JumboRollStockPageTest extends TestCase
         $this->assertGreaterThan(0, $bilOnly->count());
         $this->assertLessThan($all, $bilOnly->count());
         $this->assertSame([Stock::AT_BIL_FACTORY], $bilOnly->pluck('place')->unique()->values()->all());
+    }
+
+    /**
+     * The filters cascade: Where narrows Location, Location narrows Grade Type,
+     * Grade Type narrows Product. Each dropdown only offers what the choices
+     * above it leave standing.
+     */
+    public function test_the_filters_cascade(): void
+    {
+        Livewire::actingAs($this->admin());
+        $c = Livewire::test(Stock::class);
+        $optionsFor = fn (string $filter) => array_keys($c->instance()->filterDefs()[$filter]['options']);
+
+        $allLocations = $optionsFor('location');
+        $allProducts = $optionsFor('product');
+
+        // Where -> Location
+        $c->set('filters.place', Stock::AT_BIL_FACTORY);
+        $bilLocations = $optionsFor('location');
+        $this->assertNotEmpty($bilLocations);
+        $this->assertEmpty(array_diff($bilLocations, $allLocations));
+        $this->assertLessThan(count($allLocations), count($bilLocations), 'Where did not narrow Location');
+
+        // Location -> Grade Type -> Product
+        $c->set('filters.location', $bilLocations[0]);
+        $grades = $optionsFor('gradetype');
+        $this->assertNotEmpty($grades);
+
+        $productsAtLocation = $optionsFor('product');
+        $c->set('filters.gradetype', $grades[0]);
+        $productsInGrade = $optionsFor('product');
+
+        $this->assertNotEmpty($productsInGrade);
+        $this->assertEmpty(array_diff($productsInGrade, $productsAtLocation));
+        $this->assertLessThan(count($allProducts), count($productsInGrade), 'Grade Type did not narrow Product');
+    }
+
+    /**
+     * The RENDERED dropdown narrows, not just filterDefs().
+     *
+     * The filter is an Alpine combobox that snapshots its options when x-data
+     * is evaluated. With a constant wire:key, Livewire's DOM diffing kept the
+     * old element alive and the dropdown went on showing every location while
+     * the server had already narrowed the list — the query was right and the UI
+     * was wrong. The key now carries a hash of the options, so this asserts on
+     * the markup the browser actually receives.
+     */
+    public function test_the_rendered_location_dropdown_narrows(): void
+    {
+        Livewire::actingAs($this->admin());
+        $c = Livewire::test(Stock::class);
+
+        /** @return array{key: string, items: string[]} */
+        $dropdown = function (string $filter) use ($c): array {
+            $pattern = '/wire:key="rfilter-' . $filter . '-([0-9a-f]{8})"(.*?)items: JSON\.parse\(\'(.*?)\'\)/s';
+            if (! preg_match($pattern, $c->html(), $m)) {
+                $this->fail("could not find the rendered {$filter} filter");
+            }
+            $json = str_replace(['\\u0022', "\\'"], ['"', "'"], $m[3]);
+
+            return ['key' => $m[1], 'items' => array_column(json_decode($json, true) ?: [], 'label')];
+        };
+
+        $before = $dropdown('location');
+        $this->assertContains('Bil-1', $before['items']);
+
+        $c->set('filters.place', Stock::AT_BPL_WAREHOUSE);
+        $after = $dropdown('location');
+
+        $this->assertNotContains('Bil-1', $after['items'], 'the rendered dropdown still offers a BIL factory');
+        $this->assertLessThan(count($before['items']), count($after['items']));
+        $this->assertNotSame(
+            $before['key'],
+            $after['key'],
+            'wire:key did not change, so Alpine would keep the stale option list'
+        );
+    }
+
+    /** Changing an upstream filter clears the ones it narrows. */
+    public function test_changing_where_clears_the_filters_below_it(): void
+    {
+        Livewire::actingAs($this->admin());
+        $c = Livewire::test(Stock::class)->set('filters.place', Stock::AT_BIL_FACTORY);
+
+        $location = array_key_first($c->instance()->filterDefs()['location']['options']);
+        $c->set('filters.location', $location);
+        $grade = array_key_first($c->instance()->filterDefs()['gradetype']['options']);
+        $c->set('filters.gradetype', $grade);
+
+        $c->set('filters.place', Stock::AT_BPL_FACTORY);
+
+        $this->assertSame('', $c->get('filters.location'), 'stale location survived a Where change');
+        $this->assertSame('', $c->get('filters.gradetype'), 'stale grade survived a Where change');
+        $this->assertSame('', $c->get('filters.product'));
+
+        // And the offered locations followed the new Where.
+        $this->assertNotContains($location, array_keys($c->instance()->filterDefs()['location']['options']));
+    }
+
+    /**
+     * Locations read their display name from the core masters, so renaming a
+     * factory or warehouse in Admin flows through to this page.
+     *
+     * The movement tables hold legacy strings — a factory code, a paper machine
+     * name, a `bpl_stock_locations` id — and reading those straight through
+     * would show "PM2" where the rest of the app says "Paper Machine 2".
+     */
+    public function test_locations_use_the_names_from_the_core_masters(): void
+    {
+        $locations = $this->rows('by_location')->pluck('location')->unique();
+
+        $factories = DB::connection('core')->table('factories')->whereNull('deleted_at');
+        $warehouses = DB::connection('core')->table('warehouses')->whereNull('deleted_at');
+
+        // A paper machine's code is PM2/PM3; its NAME is what should be shown.
+        $machineNames = (clone $factories)->whereIn('code', ['PM2', 'PM3'])->pluck('name');
+        foreach ($machineNames as $name) {
+            $this->assertNotSame('PM2', $name);   // guards the fixture, not the code
+        }
+
+        $known = (clone $factories)->pluck('name')
+            ->merge((clone $warehouses)->pluck('name'))
+            ->all();
+
+        foreach ($locations as $location) {
+            $this->assertContains(
+                $location,
+                $known,
+                "'{$location}' is not a name any factory or warehouse carries — the page is showing a raw legacy string"
+            );
+        }
     }
 
     public function test_filter_options_are_drawn_from_the_stock_not_the_master_tables(): void
