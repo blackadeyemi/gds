@@ -490,6 +490,11 @@
                                         <span class="label">Waybill</span>
                                     </a>
                                     @endcanPage
+                                    @canPage('bil.sales.reports.damaged_goods')
+                                    <a href="{{ route('bil.sales.reports.damaged-goods') }}" class="nav-link {{ $is('bil/sales/reports/damaged-goods*') }}" title="Damaged Goods">
+                                        <span class="label">Damaged Goods</span>
+                                    </a>
+                                    @endcanPage
                                 </div>
                             </div>
                             @endcanPrefix

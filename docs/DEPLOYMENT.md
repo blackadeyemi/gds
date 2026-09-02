@@ -5,6 +5,231 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-09-02 (d) — Sales Reports (Orders, Loading, Delivery, Returns, Waybill, Damaged Goods)
+
+Commits `250f838` and the Damaged Goods follow-up. **Two schema migrations, one
+of which rebuilds a 534k-row table and blocks writes while it runs.** Deploy
+after the Waybill release below.
+
+### Six new pages
+
+`bil/sales/reports/{orders,loading,delivery,returns,waybill,damaged-goods}`,
+rebuilt from the legacy `report_sales.php` switcher plus the pages split off it
+(`report_sales_loading_cageroom.php`, `..._transporter.php`, `..._return.php`,
+`report_waybill.php`). They sit on the same report framework as the Raw
+Materials and Finished Goods reports, so filters, view switching, search, sort,
+paging, print and xlsx/csv/pdf export all come with them.
+
+All six lead with **Summary (by customer)**, and every row of that summary opens
+its own records in a modal — the shape Machines → Reports → Services uses for
+summary-by-project.
+
+Page keys `bil.sales.reports.orders`, `.loading`, `.delivery`, `.returns`,
+`.waybill`, `.damaged_goods`; abilities `view` / `export` (they are read-outs —
+a wrong loading is corrected on the Loading screen, which keeps the stock and
+the delivery it feeds straight). Run `php artisan gds:sync-pages` and grant them.
+
+Waybill is worth gating separately from the rest: it is the only page in the
+module that shows what haulage cost.
+
+### ⚠️ `2026_09_02_140000_sales_order_details_orderid_collation` — a table rebuild
+
+`sales_order_details.orderid` was `utf8mb3` while `sales_order.orderid` is
+`latin1`. The table itself is latin1; only that one column was overridden, and
+it is the column every sales query joins on.
+
+The mismatch made the join one-directional. MySQL widens latin1 to utf8mb3, so
+`sales_order` → details worked; the reverse — details back to the order, which
+is how loading, delivery, return and waybill all reach the customer — could not
+use `sales_order.orderid` at all, and the optimizer abandoned the date range to
+full-scan 97k orders instead:
+
+| | before | after |
+|---|---|---|
+| loading → details → order, one week, 50 rows | 20,091ms | 29ms |
+| the same, COUNT over one year | 11,974ms | 1,074ms |
+
+That is also why the existing Loading and Delivery screens fetch their orders in
+a second indexed query instead of joining. Those workarounds still work and are
+left alone.
+
+**Safe to convert**: 534,191 rows, every value a numeric order id, zero outside
+ASCII (checked with `orderid <> CONVERT(orderid USING latin1)`), zero rows
+without a matching `sales_order`, and no view reads the table.
+
+**But it is `ALGORITHM=COPY`.** A charset change rebuilds the table, and WRITES
+ARE BLOCKED while it runs (reads are not). It took 12 seconds on a dev box with
+the same row count. Before running it:
+
+1. Take a dump of `bil` — this one is not reversible in the "and the data comes
+   back" sense, though `down()` does restore the type.
+2. Make sure the cageroom is not loading and nobody is placing an order.
+3. `SHOW FULL PROCESSLIST` and confirm nothing is holding a metadata lock on
+   `sales_order_details`. An ALTER queues behind an open transaction and takes
+   the write lock with it while it waits — that is how the August migration
+   appeared to hang for ten minutes.
+
+### `2026_09_02_150000_index_sales_reports_joins` — two composite indexes
+
+`ALGORITHM=INPLACE, LOCK=NONE`, seconds, no rows rewritten.
+
+* `sales_loading (status, loadnumber)`
+* `sales_delivery (dateofdelivery, loadnumber)`
+
+`loadnumber` is a per-DAY sequence — it restarts at 1 every morning — so a load
+is identified by (date, number) and never by the number alone. Neither table
+indexed the pair, so every hop across it matched ten years of same-numbered
+loads and threw almost all of them away. On the waybill report, which reaches
+the customer through waybill → delivery → loading → order, that was the whole
+cost: **39,500ms → 577ms** for a summary by customer over one year.
+
+### Three things the legacy report got wrong, fixed here
+
+Worth knowing about, because the figures on the new pages will not match the old
+ones and that is the point:
+
+* **Delivered bundles were inflated.** 462 `(date, loadnumber)` pairs carry two
+  `sales_delivery` rows — the double-confirmation the legacy screen had no guard
+  against, and which the rebuilt Delivery screen now refuses. Joining that table
+  doubled the bundles on those loads: 429,791 reported against 428,040 actually
+  confirmed on 31 Jan 2022. The delivery barcode is now a scalar subquery, which
+  cannot return two rows.
+* **71,972 loadings were invisible.** They point at an order line that no longer
+  exists — almost all 2017-18 rows written before `sod_id` was populated at all
+  — and carry 6.7 million bundles that did leave the warehouse. An inner join
+  dropped every one. They are LEFT joined and grouped as *no order line*, so a
+  depot's totals reconcile with the table.
+* **Ordered was multiplied by the number of loadings.** `SUM(quantityordered)`
+  across a join to `sales_loading` counts the order line once per truck it went
+  out on. Loaded is a correlated subquery instead.
+
+### Damaged Goods
+
+`bil/sales/reports/damaged-goods` reports `sales_return.quantityrejected` — what
+came back unsellable — and states the current holding of the Damaged Goods (FG)
+warehouse in its subtitle. **Rejected is a part of returned, not additional to
+it**: a return of 100 with 30 rejected put 70 bundles back into sellable stock
+and 30 into the damaged warehouse. It did not bring back 130.
+
+It sits under Sales rather than Finished Goods because that is where the figure
+is entered. Not to be confused with Raw Materials → Reports → Damaged Goods,
+which is raw material written off inside the factory, over a different table.
+
+### After deploying
+
+```
+php artisan migrate --force
+php artisan gds:sync-pages
+php artisan optimize:clear
+```
+
+Then grant the six new pages to the roles that should have them.
+
+### What to check afterwards
+
+* Each of the six opens on Summary (by customer) and a row expands.
+* `Loading → Summary (by customer)` for a single day totals the same bundles as
+  `SELECT SUM(quantityloaded) FROM sales_loading WHERE dateofloading = ?`. If it
+  does not, the LEFT joins have been changed back to inner ones.
+* `Waybill → Summary (by customer)` over a month returns in well under a second.
+  Seconds means `sl_status_loadnumber_idx` is missing.
+* `Delivery → Summary (by customer)` for a day totals
+  `SUM(quantityloaded) WHERE status = ?` exactly. Anything higher means
+  `sales_delivery` has been joined back in.
+
+### If it goes wrong
+
+`php artisan migrate:rollback --step=2` restores the previous column type and
+drops the two indexes. The reports get slow again; nothing else in the app
+depends on either change.
+
+---
+
+## 2026-09-02 (c) — BIL Sales Waybill; transport cost to DECIMAL
+
+Commits `392c6bb`, `bfe941f`, `fc60276`. Two migrations; one of them **rewrites
+13,043 rows and is not reversible**.
+
+### New page: BIL → Sales → Waybill
+
+`bil/sales/waybill`, from `sales_waybill.php`. The last step of the chain and
+the thinnest: a delivery already says what went and to whom, and the waybill
+adds a receipt number and a transport cost.
+
+One difference from Loading and Delivery, forced by the data. Their queues are
+"everything still open"; the equivalent here would be every delivery without a
+waybill, which is 74,692 of them — most deliveries never get one, because a
+customer collecting in their own truck has no haulier to pay. An unwaybilled
+delivery is a normal end state, not work outstanding. So the queue is scoped to
+a date, as the legacy's was, and the screen opens on the most recent date that
+still has a waybill to raise rather than on today.
+
+Page key `bil.sales.waybill`, abilities `view` / `create` / `modify` /
+`delete`. `delete` is separate from `modify` on purpose: removing a waybill is
+the only thing that re-opens its delivery for undo.
+
+### ⚠️ `2026_09_02_130000_transport_cost_to_decimal` — rewrites values
+
+`sales_waybill.transportcost` was a single-precision FLOAT holding money. About
+seven significant digits, so ₦125,000.50 came back as ₦125,000 and the 50 kobo
+was gone with no error anywhere. Not theoretical: 17,907 of 54,894 rows carry a
+fraction, and the float noise is visible in what was stored — 91197.7969 for a
+figure someone typed as 91,197.80.
+
+Converted to `DECIMAL(12,2)`. **13,043 rows round to the two decimals they were
+meant to have.** The whole table moves by 12 kobo across ₦7.38 billion — the
+rounding recovers what was typed rather than changing it — but
+
+**take a dump of `bil` first, and export the column to CSV before running it:**
+
+```sql
+SELECT id, dateofwaybill, barcode, transportcost FROM sales_waybill
+INTO OUTFILE '/tmp/transportcost_before.csv'
+FIELDS TERMINATED BY ',' ENCLOSED BY '"' LINES TERMINATED BY '\n';
+```
+
+`down()` restores the FLOAT type; it cannot restore the lost precision, and
+would not want to.
+
+`DECIMAL(12,2)` reaches ₦9,999,999,999.99, four thousand times the largest cost
+ever recorded, and the legacy app keeps working: it writes the value as a string
+in an INSERT and reads it back as one.
+
+### `2026_09_02_120000_index_sales_waybill_date`
+
+`sw_date_idx (dateofwaybill)`. `ALGORITHM=INPLACE, LOCK=NONE`. The page was
+1,935ms without it.
+
+### The `backdate` ability on Loading
+
+Loading date can be backdated, and the page gained a `backdate` ability for it.
+**`gds:sync-pages` sets abilities only on CREATE**, so it will not add one to a
+page that already exists. On each environment, either:
+
+* Settings → Pages → Loading → "reset to code defaults", or
+* re-run the sync after deleting the row (loses its grants).
+
+Check `bil.sales.loading:backdate` exists in permissions afterwards, then grant
+it. Without it nobody can enter yesterday's loading.
+
+### After deploying
+
+```
+php artisan migrate --force
+php artisan gds:sync-pages
+php artisan optimize:clear
+```
+
+### What to check afterwards
+
+* A waybill with kobo saves and reads back with the kobo intact.
+* `SELECT SUM(transportcost) FROM sales_waybill` is within a rounding of what it
+  was before the migration (₦7.38bn, moving by ~12 kobo).
+* Loading shows a date field for a user with `backdate`, and does not for one
+  without.
+
+---
+
 ## 2026-09-02 (b) — BIL Sales Returns; a damaged-goods warehouse
 
 Commit `d0f2ade`. One migration, sub-second, plus a page and a change to how

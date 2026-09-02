@@ -58,6 +58,7 @@ use Modules\Bil\Livewire\Sales\Returns as SalesReturnsPage;
 use Modules\Bil\Livewire\Sales\Waybill as SalesWaybillPage;
 use Modules\Bil\Livewire\Sales\Loading as SalesLoadingPage;
 use Modules\Bil\Livewire\Sales\Orders as SalesOrders;
+use Modules\Bil\Livewire\Sales\Reports\DamagedGoods as SalesDamagedGoodsReport;
 use Modules\Bil\Livewire\Sales\Reports\Delivery as SalesDeliveryReport;
 use Modules\Bil\Livewire\Sales\Reports\Loading as SalesLoadingReport;
 use Modules\Bil\Livewire\Sales\Reports\Orders as SalesOrdersReport;
@@ -308,6 +309,8 @@ Route::middleware('auth')
                 ->middleware('page:bil.sales.reports.returns')->name('returns');
             Route::get('/waybill', SalesWaybillReport::class)
                 ->middleware('page:bil.sales.reports.waybill')->name('waybill');
+            Route::get('/damaged-goods', SalesDamagedGoodsReport::class)
+                ->middleware('page:bil.sales.reports.damaged_goods')->name('damaged-goods');
 
             $reports = [
                 'orders' => SalesOrdersReport::class,
@@ -315,6 +318,7 @@ Route::middleware('auth')
                 'delivery' => SalesDeliveryReport::class,
                 'returns' => SalesReturnsReport::class,
                 'waybill' => SalesWaybillReport::class,
+                'damaged-goods' => SalesDamagedGoodsReport::class,
             ];
 
             $hydrate = function (string $class) {
