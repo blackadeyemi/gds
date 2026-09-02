@@ -164,9 +164,12 @@ class Loading extends SalesReport
             ['Product', 'productname', fn ($r) => e($r->productname ?: '—')],
             ['Type', 'foc', fn ($r) => $r->foc === null ? '—' : $this->focCell($r->foc)],
             ['Bundles', 'loaded', fn ($r) => $this->num($r->loaded)],
+            // No confirmation yet: the load is LIVE — still being worked, not
+            // a delivery to chase. Green rather than amber for that reason;
+            // an open load is the normal state of a load, not a problem.
             ['Delivered', 'status', fn ($r) => $r->status
                 ? e($this->fmtDate($r->status))
-                : '<span class="badge badge-warning">In transit</span>'],
+                : '<span class="badge badge-success">Live</span>'],
         ]);
     }
 
@@ -189,7 +192,7 @@ class Loading extends SalesReport
                     ['Loads', 'loads', fn ($r) => $this->num($r->loads)],
                     ['Lines', 'linecount', fn ($r) => $this->num($r->linecount)],
                     ['Bundles', 'loaded', fn ($r) => $this->num($r->loaded)],
-                    ['In transit', 'intransit', fn ($r) => $this->qty($r->intransit)],
+                    ['Live', 'intransit', fn ($r) => $this->qty($r->intransit)],
                 ],
                 'sortable' => ['customername', 'loads', 'linecount', 'loaded', 'intransit'],
                 'query' => fn () => $this->base()
@@ -347,6 +350,6 @@ class Loading extends SalesReport
 
         return $this->num($row->loads) . ' load(s) · ' . $this->num($row->linecount) . ' line(s) · '
             . $this->num($row->loaded) . ' bundles · '
-            . $this->num($row->intransit) . ' still in transit';
+            . $this->num($row->intransit) . ' still live';
     }
 }

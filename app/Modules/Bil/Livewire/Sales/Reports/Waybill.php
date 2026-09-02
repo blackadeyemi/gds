@@ -179,7 +179,7 @@ class Waybill extends SalesReport
             ['Receipt No.', 'receiptnumber', fn ($r) => e(
                 $r->receiptnumber === null || $r->receiptnumber === '' ? '—' : (string) $r->receiptnumber
             )],
-            ['Transport Cost (₦)', 'transportcost', fn ($r) => $this->money($r->transportcost)],
+            ['Transport Cost (₦)', 'transportcost', fn ($r) => $this->moneyCell($r->transportcost)],
         ]);
     }
 
@@ -193,8 +193,8 @@ class Waybill extends SalesReport
                     ['Customer', 'customername', fn ($r) => e($r->customername ?: '— unmatched delivery —')],
                     ['Waybills', 'waybills', fn ($r) => $this->num($r->waybills)],
                     ['Bundles', 'bundles', fn ($r) => $this->qty($r->bundles)],
-                    ['Transport Cost (₦)', 'transportcost', fn ($r) => $this->money($r->transportcost)],
-                    ['Average (₦)', 'average', fn ($r) => $this->money($r->average)],
+                    ['Transport Cost (₦)', 'transportcost', fn ($r) => $this->moneyCell($r->transportcost)],
+                    ['Average (₦)', 'average', fn ($r) => $this->moneyCell($r->average)],
                 ],
                 'sortable' => ['customername', 'waybills', 'bundles', 'transportcost', 'average'],
                 // Summed off the per-waybill rows, not off the join: the cost
@@ -223,7 +223,7 @@ class Waybill extends SalesReport
                     ['Customers', 'customers', fn ($r) => $this->num($r->customers)],
                     ['Waybills', 'waybills', fn ($r) => $this->num($r->waybills)],
                     ['Bundles', 'bundles', fn ($r) => $this->qty($r->bundles)],
-                    ['Transport Cost (₦)', 'transportcost', fn ($r) => $this->money($r->transportcost)],
+                    ['Transport Cost (₦)', 'transportcost', fn ($r) => $this->moneyCell($r->transportcost)],
                 ],
                 'query' => fn () => $this->fromBills(
                     'b.transportername, COUNT(DISTINCT b.customerid) as customers, COUNT(*) as waybills,
@@ -239,7 +239,7 @@ class Waybill extends SalesReport
                     ['Waybills', 'waybills', fn ($r) => $this->num($r->waybills)],
                     ['Customers', 'customers', fn ($r) => $this->num($r->customers)],
                     ['Bundles', 'bundles', fn ($r) => $this->qty($r->bundles)],
-                    ['Transport Cost (₦)', 'transportcost', fn ($r) => $this->money($r->transportcost)],
+                    ['Transport Cost (₦)', 'transportcost', fn ($r) => $this->moneyCell($r->transportcost)],
                 ],
                 'query' => fn () => $this->fromBills(
                     'b.dateofwaybill, COUNT(*) as waybills, COUNT(DISTINCT b.customerid) as customers,

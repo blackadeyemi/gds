@@ -30,6 +30,12 @@
     --danger-bg: #fef2f2;
     --danger-border: #fecaca;
     --warning: #d97706;
+    --warning-bg: #fef3c7;
+    /* Money. Deliberately NOT brand (reads as a link), success (reads as a
+       gain) or danger (reads as a problem) — a transport cost is none of
+       those. Teal is unused elsewhere, so a currency column is recognisable
+       at a glance without being alarming. */
+    --money: #0f766e;
     --shadow: rgba(17, 24, 39, 0.06);
     --shadow-lg: rgba(17, 24, 39, 0.12);
 
@@ -69,6 +75,8 @@
     --danger-bg: rgba(127, 29, 29, 0.25);
     --danger-border: #7f1d1d;
     --warning: #fbbf24;
+    --warning-bg: rgba(120, 53, 15, 0.35);
+    --money: #5eead4;
     --shadow: rgba(0, 0, 0, 0.4);
     --shadow-lg: rgba(0, 0, 0, 0.55);
 
@@ -277,6 +285,12 @@ table.data { --check-size: 1.05rem; }
 .badge { display: inline-flex; align-items: center; font-size: 0.72rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: 0.28em 0.6em; border-radius: 999px; }
 .badge-success { background: var(--success-bg); color: var(--success); }
 .badge-muted { background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+/* Both of these were in use in eighteen places across the app before they
+   existed here, so they rendered as unstyled grey pills — "Cancelled",
+   "Unassigned", "In transit" and a negative stock figure all looked the same
+   as a neutral label. */
+.badge-danger { background: var(--danger-bg); color: var(--danger); }
+.badge-warning { background: var(--warning-bg); color: var(--warning); }
 
 /* ---- Tables ---- */
 .table-wrap { overflow-x: auto; }
@@ -393,5 +407,10 @@ table.data .col-actions { text-align: right; white-space: nowrap; }
 .flex { display: flex; } .items-center { align-items: center; } .justify-between { justify-content: space-between; }
 .gap-2 { gap: 0.5rem; } .gap-3 { gap: 0.75rem; } .ml-auto { margin-left: auto; }
 .text-muted { color: var(--muted); } .text-sm { font-size: 0.85rem; }
+.text-danger { color: var(--danger); } .text-success { color: var(--success); }
+.text-warning { color: var(--warning); }
+/* Currency. `tabular-nums` as well as the colour: a column of money only reads
+   as a column when the digits are the same width. */
+.text-money { color: var(--money); font-variant-numeric: tabular-nums; }
 .mt-2 { margin-top: 0.5rem; } .mb-0 { margin-bottom: 0; }
 [x-cloak] { display: none !important; }

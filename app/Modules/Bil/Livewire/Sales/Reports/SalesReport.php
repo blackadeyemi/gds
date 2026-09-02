@@ -157,10 +157,31 @@ abstract class SalesReport extends RawMaterialReport
         return number_format((float) $value, 2);
     }
 
+    /**
+     * A currency figure in a table. Coloured and tabular-figured so a column of
+     * money reads as one — `money()` stays plain for the places that put a
+     * figure inside a sentence.
+     */
+    protected function moneyCell($value): string
+    {
+        return '<span class="text-money">' . $this->money($value) . '</span>';
+    }
+
+    /**
+     * Sold or free of charge, spelled FOC and coloured red.
+     *
+     * FOC is the word the office uses, and it is the one thing on a line that
+     * changes what the line MEANS: the same product on the same order, ordered
+     * twice, is money once and a giveaway the other time. It has to be findable
+     * by eye down a long table, which a neutral badge was not.
+     *
+     * Exports and printouts strip the markup and keep the word, so a
+     * spreadsheet still says FOC rather than 1.
+     */
     protected function focCell($value): string
     {
         return (int) $value === 1
-            ? '<span class="badge badge-warning">Free</span>'
+            ? '<strong class="text-danger">FOC</strong>'
             : '<span class="text-muted">Sold</span>';
     }
 

@@ -105,7 +105,7 @@ class Orders extends SalesReport
             ['Depot', 'warehousecode', fn ($r) => e($this->depot($r->warehousecode))],
             ['Code', 'productcode'],
             ['Product', 'productname'],
-            ['Type', 'foc', fn ($r) => $this->focCell($r->foc)],
+            ['Type', 'foc', fn ($r) => $r->foc === null ? '—' : $this->focCell($r->foc)],
             ['Ordered', 'ordered', fn ($r) => $this->num($r->ordered)],
             ['Loaded', 'loaded', fn ($r) => $this->qty($r->loaded)],
             ['Balance', 'balance', fn ($r) => $this->num($r->balance)],

@@ -66,7 +66,7 @@ class DamagedGoods extends SalesReport
 
     public function filterDefs(): array
     {
-        return $this->commonFilterDefs();
+        return $this->commonFilterDefs() + ['foc' => $this->focFilterDef()];
     }
 
     /**
@@ -113,6 +113,7 @@ class DamagedGoods extends SalesReport
             ['Sales Order', 'orderid', fn ($r) => e($r->orderid ?: '—')],
             ['Code', 'productcode', fn ($r) => e($r->productcode ?: '—')],
             ['Product', 'productname', fn ($r) => e($r->productname ?: '—')],
+            ['Type', 'foc', fn ($r) => $r->foc === null ? '—' : $this->focCell($r->foc)],
             ['Rejected', 'rejected', fn ($r) => $this->num($r->rejected)],
             ['Of a return of', 'returned', fn ($r) => $this->num($r->returned)],
             ['Share', 'rejected', fn ($r) => e($this->share($r))],
@@ -132,7 +133,7 @@ class DamagedGoods extends SalesReport
     {
         return $q->select('r.id', 'r.returnnumber', 'r.dateofreturn', 'r.username',
             'so.orderid', 'so.customerid', 'c.customername', 'p.productcode', 'p.productname',
-            'r.quantityreturned as returned', 'r.quantityrejected as rejected');
+            'sod.foc', 'r.quantityreturned as returned', 'r.quantityrejected as rejected');
     }
 
     public function views(): array
@@ -162,7 +163,7 @@ class DamagedGoods extends SalesReport
                 'columns' => $this->lineColumns(withCustomer: true),
                 // Share is computed per row from two columns, not selected.
                 'sortable' => ['returnnumber', 'dateofreturn', 'customername', 'orderid',
-                    'productcode', 'productname', 'rejected', 'returned', 'username'],
+                    'productcode', 'productname', 'foc', 'rejected', 'returned', 'username'],
                 'query' => fn () => $this->lineSelect($this->base())
                     ->orderByDesc('r.dateofreturn')->orderByDesc('r.id'),
             ],
