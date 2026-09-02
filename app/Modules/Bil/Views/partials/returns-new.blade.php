@@ -95,10 +95,77 @@
                         Nothing of this product is left returnable — everything delivered has already come back.
                     </div>
                 @else
-                    <div class="text-sm text-muted" style="margin:.2rem 0 .8rem;">
-                        <strong>{{ number_format($this->totalEligible()) }}</strong> bundles delivered and not yet
+                    @php
+                        $want = (int) $quantity;
+                        $totalLeft = $this->totalEligible();
+                        $tooMany = $want > $totalLeft;
+                        $ready = $want > 0 && ! $tooMany;
+                    @endphp
+
+                    {{-- WHAT WILL HAPPEN, AND THE BUTTON THAT DOES IT — both
+                         directly under the fields that decide them.
+
+                         These used to sit under the deliveries table, which
+                         meant scrolling past reference data to find the action
+                         and then scrolling back to check what it would do. The
+                         table below is for overriding the choice, which is the
+                         rarer job, so it comes second. --}}
+                    <div class="card" style="background:var(--surface-2);padding:.75rem 1rem;margin:.2rem 0 1rem;">
+                        <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
+                            <div style="flex:1;min-width:240px;">
+                                @if ($want <= 0)
+                                    <div class="text-sm text-muted">
+                                        Enter a quantity to see which delivery it will come off.
+                                    </div>
+                                @elseif ($tooMany)
+                                    <div class="text-sm" style="color:#c62828;font-weight:600;">
+                                        Only {{ number_format($totalLeft) }} bundles of this product were delivered
+                                        to this customer and not already returned.
+                                    </div>
+                                @elseif ($needsSplit || $split)
+                                    <div class="text-sm" style="font-weight:600;">
+                                        @if ($needsSplit)
+                                            <span style="color:#b45309;">No single delivery has
+                                            {{ number_format($want) }} left</span> — it will be split:
+                                        @else
+                                            Will be split across deliveries, newest first:
+                                        @endif
+                                    </div>
+                                    <ul class="text-sm text-muted" style="margin:.3rem 0 0 1.1rem;">
+                                        @foreach ($this->splitPlan as $step)
+                                            <li>{{ number_format($step['quantity']) }} off
+                                                <strong>{{ $step['line']->orderid }}</strong>
+                                                ({{ $step['line']->last_delivery ?: $step['line']->dateoforder }})</li>
+                                        @endforeach
+                                    </ul>
+                                @elseif ($default)
+                                    <div class="text-sm">
+                                        Will be booked against <strong>{{ $default->orderid }}</strong>,
+                                        delivered {{ $default->last_delivery ?: $default->dateoforder }}.
+                                    </div>
+                                @endif
+                            </div>
+
+                            <button type="button" class="btn btn-primary" style="flex:none;"
+                                    wire:click="addLine" @disabled(! $ready)>
+                                Add to return
+                            </button>
+                        </div>
+
+                        @unless ($needsSplit)
+                            <label class="flex items-center gap-2"
+                                   style="cursor:pointer;font-size:.9rem;margin-top:.6rem;">
+                                <input type="checkbox" wire:model.live="split">
+                                <span>Split this return across more than one delivery</span>
+                            </label>
+                        @endunless
+                    </div>
+
+                    <div class="text-sm text-muted" style="margin:0 0 .5rem;">
+                        <strong>{{ number_format($totalLeft) }}</strong> bundles delivered and not yet
                         returned, across {{ count($eligible) }} deliver{{ count($eligible) === 1 ? 'y' : 'ies' }}.
-                        Rejected is part of the quantity returned, not extra to it.
+                        Pick a different one below to override. Rejected is part of the quantity returned,
+                        not extra to it.
                     </div>
 
                     {{-- The deliveries. Booking a return needs one of these,
@@ -108,8 +175,10 @@
                             <tr>
                                 <th style="width:44px;"></th>
                                 <th>Sales order</th>
-                                <th style="width:120px;">Ordered</th>
-                                <th style="width:120px;">Delivered</th>
+                                {{-- Two columns once both read "Delivered" —
+                                     one a date, one a quantity. --}}
+                                <th style="width:120px;">Ordered on</th>
+                                <th style="width:120px;">Delivered on</th>
                                 <th style="width:110px;text-align:right;">Delivered</th>
                                 <th style="width:110px;text-align:right;">Returned</th>
                                 <th style="width:110px;text-align:right;">Left</th>
@@ -151,50 +220,6 @@
                         </tbody>
                     </table>
 
-                    {{-- The fallback. Shown as a choice normally, and forced
-                         when no single delivery can carry the quantity. --}}
-                    <div style="margin-top:.8rem;">
-                        @if ($needsSplit)
-                            <div class="card" style="background:var(--surface-2);padding:.7rem 1rem;">
-                                <div class="text-sm" style="color:#b45309;font-weight:600;">
-                                    No single delivery has {{ number_format((int) $quantity) }} left on it.
-                                </div>
-                                <div class="text-sm text-muted" style="margin-top:.3rem;">
-                                    It will be split across deliveries, newest first:
-                                </div>
-                                <ul class="text-sm" style="margin:.4rem 0 0 1.1rem;">
-                                    @foreach ($this->splitPlan as $step)
-                                        <li>{{ number_format($step['quantity']) }} off
-                                            <strong>{{ $step['line']->orderid }}</strong>
-                                            ({{ $step['line']->last_delivery ?: $step['line']->dateoforder }})</li>
-                                    @endforeach
-                                </ul>
-                            </div>
-                        @else
-                            <label class="flex items-center gap-2" style="cursor:pointer;font-size:.9rem;">
-                                <input type="checkbox" wire:model.live="split">
-                                <span>Split this return across more than one delivery</span>
-                            </label>
-                            @if ($split)
-                                <ul class="text-sm text-muted" style="margin:.4rem 0 0 1.1rem;">
-                                    @foreach ($this->splitPlan as $step)
-                                        <li>{{ number_format($step['quantity']) }} off
-                                            <strong>{{ $step['line']->orderid }}</strong>
-                                            ({{ $step['line']->last_delivery ?: $step['line']->dateoforder }})</li>
-                                    @endforeach
-                                </ul>
-                            @elseif ($default)
-                                <div class="text-sm text-muted" style="margin-top:.3rem;">
-                                    Will be booked against <strong>{{ $default->orderid }}</strong>,
-                                    delivered {{ $default->last_delivery ?: $default->dateoforder }}.
-                                </div>
-                            @endif
-                        @endif
-                    </div>
-
-                    <div class="flex" style="justify-content:flex-end;margin-top:1rem;">
-                        <button type="button" class="btn btn-ghost" wire:click="addLine">Add to return</button>
-                    </div>
                 @endif
             @endif
         </div>
