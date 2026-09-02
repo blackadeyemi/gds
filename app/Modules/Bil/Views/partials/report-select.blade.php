@@ -6,12 +6,10 @@
     Params: $name (filter key), $label, $options ([value => label]), and an
     optional $width in px.
 
-    $width exists because the default 170px is right for a status or a depot and
-    wrong for a name. A customer at the 95th percentile is 36 characters
-    ("LAGOS AIRPORT HOTEL CARAT 24 BUSINESS HOTEL AND SUITES" is 51) and a
-    product 40, so those two get 300px and everything else stays as it was. The
-    dropdown panel is pinned to the input's edges, so widening the field widens
-    the list with it.
+    $width is resolved by RawMaterialReport::filterWidth(), which measures the
+    filter's own options — 170px is right for "Day / Night" and wrong for a
+    name — and a report can override it per filter. The dropdown panel is pinned
+    to the input's edges, so widening the field widens the list with it.
 
     The key carries a hash of the OPTIONS, not just the filter name. Alpine
     snapshots `items` when x-data is evaluated, which happens once per element;

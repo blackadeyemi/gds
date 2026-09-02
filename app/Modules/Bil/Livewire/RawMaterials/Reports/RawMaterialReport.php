@@ -208,12 +208,64 @@ abstract class RawMaterialReport extends Component
     }
 
     /**
-     * Dropdown filters: name => ['label' => string, 'options' => [value => label]].
-     * The selected value is applied to a column by the report's own queries.
+     * Dropdown filters: name => ['label' => string, 'options' => [value => label],
+     * 'width' => ?int]. The selected value is applied to a column by the
+     * report's own queries.
      */
     public function filterDefs(): array
     {
         return [];
+    }
+
+    /* ---------------- Filter field width ---------------- */
+
+    /** A field wide enough for a shift, a status or a gate — most filters. */
+    public const FILTER_WIDTH = 170;
+
+    /**
+     * As wide as a filter is ever allowed to get. The bar wraps, so a wide field
+     * costs vertical space; past this the type-ahead is the answer, not more
+     * pixels.
+     */
+    public const FILTER_WIDTH_MAX = 300;
+
+    /**
+     * How wide to draw one filter, MEASURED FROM ITS OWN OPTIONS.
+     *
+     * 170px everywhere was right for "Day / Night" and wrong for a name: the
+     * product lists run to 38 characters at the 90th percentile against a field
+     * that shows about 20, so every product filter in the app was truncating.
+     * Sizing from the options fixes that once, for filters that do not exist yet
+     * as much as the ones that do, and leaves the sixty-odd short filters
+     * untouched — measured across every report, only product (290-298px),
+     * supplier (233px) and a handful of gate/project lists (182px) move at all.
+     *
+     * The 90th percentile rather than the longest: one 59-character product name
+     * should not widen the field for the other 292. Anything past the field is
+     * still readable in the dropdown, which wraps nothing and ellipsises.
+     *
+     * A report can override with an explicit `width` on the filter — the Sales
+     * reports do, because their customer and product pickers are the ones people
+     * actually read down and are worth the full width.
+     */
+    public function filterWidth(array $def): int
+    {
+        if (isset($def['width'])) {
+            return (int) $def['width'];
+        }
+
+        $lengths = array_map(fn ($label) => mb_strlen((string) $label), $def['options'] ?? []);
+
+        if ($lengths === []) {
+            return self::FILTER_WIDTH;
+        }
+
+        sort($lengths);
+        $p90 = $lengths[(int) floor(count($lengths) * 0.9)] ?? end($lengths);
+
+        // 7.2px per character is the measured average for the form font at
+        // 0.9rem; 24px covers the field's own padding.
+        return max(self::FILTER_WIDTH, min(self::FILTER_WIDTH_MAX, (int) round(24 + $p90 * 7.2)));
     }
 
     /**
