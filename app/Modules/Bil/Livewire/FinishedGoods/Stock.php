@@ -8,6 +8,7 @@ use Livewire\Attributes\Title;
 use Modules\Bil\Models\FgWarehouseStock;
 use Modules\Bil\Support\FinishedGoodsStock;
 use Modules\Bil\Support\FinishedGoodsStockMovements;
+use Modules\Bil\Support\SalesLoadings;
 use Modules\Core\Livewire\DataGrid;
 use Modules\Core\Models\Warehouse;
 
@@ -88,6 +89,26 @@ class Stock extends DataGrid
                     ['Bundles', 'bundles', fn ($r) => $r->bundles < 0
                         ? '<span class="badge badge-danger">' . number_format($r->bundles) . '</span>'
                         : number_format($r->bundles)],
+                    // Already deducted from Bundles — this is how much of what
+                    // has gone out nobody has confirmed arrived. Amber when
+                    // some of it has been standing too long to be a real truck.
+                    ['In Transit', 'in_transit', function ($r) {
+                        $total = (int) $r->in_transit;
+                        $stale = (int) $r->in_transit_stale;
+
+                        if ($total === 0) {
+                            return '<span class="text-muted">—</span>';
+                        }
+
+                        $title = $stale > 0
+                            ? e(number_format($stale) . ' of these are on loads never confirmed delivered')
+                            : 'Loaded and on the road';
+
+                        return $stale > 0
+                            ? '<span class="badge" style="background:rgba(217,119,6,.14);color:#b45309;" title="'
+                                . $title . '">' . number_format($total) . '</span>'
+                            : '<span title="' . $title . '">' . number_format($total) . '</span>';
+                    }],
                     ['Orders (90d)', 'orders_90d', fn ($r) => $r->orders_90d
                         ? number_format($r->orders_90d)
                         : '<span class="text-muted">0</span>'],
@@ -99,7 +120,7 @@ class Stock extends DataGrid
                 // Every column sorts, including the product: `products` is
                 // joined, so the sort happens in SQL before the page is taken.
                 'sortable' => ['productcode', 'productname', 'warehouse_name', 'bundles',
-                    'orders_90d', 'ordered_qty_90d', 'updated_at'],
+                    'in_transit', 'orders_90d', 'ordered_qty_90d', 'updated_at'],
                 'searchable' => ['p.productname', 'p.productcode', 'w.name'],
                 'query' => fn () => $this->base(),
             ],
@@ -212,14 +233,43 @@ class Stock extends DataGrid
      */
     protected function base()
     {
+        // Bundles that have LEFT on a truck and not been confirmed delivered.
+        // Loading is the deduction point, so these are already off `bundles`;
+        // the column says how much of what has gone is still unacknowledged.
+        //
+        // A derived table rather than a correlated subquery: `sales_loading`
+        // has an index on `status`, only ~360 rows of 583k are open, and MySQL
+        // materialises this once for the page instead of per row.
+        //
+        // `fresh` is the part loaded recently enough to be a truck on the road;
+        // the rest is a load nobody closed. See SalesLoadings::staleAfterDays().
+        $since = now()->subDays(SalesLoadings::staleAfterDays())->format('Y/m/d');
+
+        $transit = DB::connection('bil')->table('sales_loading as l')
+            ->join('sales_order_details as sd', 'l.sod_id', '=', 'sd.id')
+            ->whereNull('l.status')
+            ->groupBy('sd.productid')
+            ->selectRaw('sd.productid, SUM(l.quantityloaded) as bundles,
+                         SUM(CASE WHEN l.dateofloading >= ? THEN l.quantityloaded ELSE 0 END) as fresh', [$since]);
+
+        // Loadings belong to one finished-goods warehouse — see the note on
+        // FinishedGoodsStock::loadingWarehouseId(). Showing the same figure
+        // against a depot's row would double-count it by eye.
+        $loadWarehouse = (int) (FinishedGoodsStock::loadingWarehouseId() ?? 0);
+
         // Eloquent rather than the query builder: the grid blade calls
         // `$row->getKey()` for row actions, which a stdClass has not got.
         return FgWarehouseStock::query()->from('finished_goods_warehouse_stock as s')
             ->leftJoin('core.warehouses as w', 's.warehouse_id', '=', 'w.id')
             ->leftJoin('products as p', 'p.productid', '=', 's.productid')
+            ->leftJoinSub($transit, 'it', 'it.productid', '=', 's.productid')
             ->select('s.id', 's.warehouse_id', 's.productid', 'p.productname', 'p.productcode',
                 's.bundles', 's.orders_90d', 's.ordered_qty_90d', 's.orders_counted_at',
-                's.updated_at', 'w.name as warehouse_name');
+                's.updated_at', 'w.name as warehouse_name')
+            ->selectRaw('CASE WHEN s.warehouse_id = ? THEN COALESCE(it.bundles, 0) ELSE 0 END as in_transit',
+                [$loadWarehouse])
+            ->selectRaw('CASE WHEN s.warehouse_id = ? THEN COALESCE(it.bundles, 0) - COALESCE(it.fresh, 0) ELSE 0 END as in_transit_stale',
+                [$loadWarehouse]);
     }
 
     /** When the order counts were last recounted — a stale figure should show. */

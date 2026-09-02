@@ -128,6 +128,29 @@ class Delivery extends Component
         return SalesDeliveries::pendingLoads($this->search ?: null, $this->allowedCageroomCodes());
     }
 
+    /**
+     * What has left the warehouse and not been confirmed as arrived.
+     *
+     * It belongs on THIS page because this is the only screen that can clear
+     * it: every bundle in the figure is waiting for the button on the right.
+     */
+    #[Computed]
+    public function inTransit(): array
+    {
+        return SalesLoadings::inTransit();
+    }
+
+    /** Whole days since a load was raised, for the queue's age badges. */
+    public function ageOf(?string $dateSlash): ?int
+    {
+        return SalesLoadings::ageInDays($dateSlash);
+    }
+
+    public function staleAfter(): int
+    {
+        return SalesLoadings::staleAfterDays();
+    }
+
     /** Deliveries already confirmed on a date — how one is reached to undo it. */
     #[Computed]
     public function deliveredLoads(): array

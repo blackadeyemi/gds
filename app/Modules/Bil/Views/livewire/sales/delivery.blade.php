@@ -36,6 +36,57 @@
         <div class="card" style="border-color:var(--danger);color:var(--danger);margin-bottom:1rem;padding:0.7rem 1.25rem;">{{ session('err') }}</div>
     @endif
 
+    {{-- ---------------- In transit ----------------
+         Loading is the stock deduction point, so everything below has already
+         left the warehouse. Splitting it matters: added together it reads as
+         "23,483 bundles on the road", when almost all of it is loads nobody
+         ever closed. The two halves need different actions, so they are shown
+         as different numbers. --}}
+    @php $transit = $this->inTransit; @endphp
+    @if ($transit['loads'] > 0)
+        <div class="card" style="margin-bottom:1rem;">
+            <div class="card-pad" style="display:flex;gap:2rem;flex-wrap:wrap;align-items:flex-start;">
+                <div>
+                    <div class="form-label">On the road</div>
+                    <div style="font-size:1.5rem;font-weight:600;line-height:1.2;">
+                        {{ number_format($transit['fresh_bundles']) }}
+                        <span class="text-sm text-muted" style="font-weight:400;">bundles</span>
+                    </div>
+                    <div class="text-sm text-muted">
+                        {{ $transit['fresh_loads'] }} load(s), loaded in the last {{ $transit['stale_after'] }} days
+                    </div>
+                </div>
+
+                @if ($transit['stale_loads'] > 0)
+                    <div>
+                        <div class="form-label">Not confirmed</div>
+                        <div style="font-size:1.5rem;font-weight:600;line-height:1.2;color:#b45309;">
+                            {{ number_format($transit['stale_bundles']) }}
+                            <span class="text-sm text-muted" style="font-weight:400;">bundles</span>
+                        </div>
+                        <div class="text-sm text-muted">
+                            {{ $transit['stale_loads'] }} load(s) older than that — oldest {{ $transit['oldest'] }}
+                        </div>
+                    </div>
+                @endif
+
+                <div style="margin-left:auto;">
+                    <div class="form-label">By age</div>
+                    <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+                        @foreach ($transit['buckets'] as $label => $bucket)
+                            <span class="badge badge-muted" title="{{ number_format($bucket[1]) }} bundles">
+                                {{ $label }}: {{ $bucket[0] }}
+                            </span>
+                        @endforeach
+                    </div>
+                    <div class="text-sm text-muted" style="margin-top:.35rem;">
+                        These bundles are already off warehouse stock — loading is what deducts.
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <div style="display:grid;grid-template-columns:minmax(280px,360px) 1fr;gap:1rem;align-items:start;">
 
         {{-- ---------------- The queue ---------------- --}}
@@ -58,7 +109,17 @@
                         <button type="button" wire:key="p-{{ $l->barcode }}" wire:click="openLoad('{{ $l->barcode }}')"
                                 class="btn btn-ghost"
                                 style="display:block;width:100%;text-align:left;padding:0.55rem 0.7rem;margin-bottom:0.2rem;border-radius:6px;{{ $l->barcode === $barcode ? 'background:var(--accent-soft,rgba(59,130,246,.12));' : '' }}">
-                            <div style="font-weight:600;font-family:monospace;">{{ $l->barcode }}</div>
+                            @php $age = $this->ageOf($l->dateofloading); @endphp
+                            <div style="display:flex;align-items:center;gap:.4rem;">
+                                <span style="font-weight:600;font-family:monospace;">{{ $l->barcode }}</span>
+                                {{-- An age badge, because a load standing for
+                                     months is a different job from today's: it
+                                     wants closing, not sending. --}}
+                                @if ($age !== null && $age > $this->staleAfter())
+                                    <span class="badge" style="background:rgba(217,119,6,.14);color:#b45309;"
+                                          title="Loaded {{ $l->dateofloading }} and never confirmed">{{ $age }}d</span>
+                                @endif
+                            </div>
                             <div class="text-sm text-muted">{{ $l->customername ?: 'No customer' }}</div>
                             <div class="text-sm text-muted">
                                 {{ $l->trucknumber }} · {{ $l->line_count }} line(s) · {{ number_format($l->loaded) }} bundles

@@ -55,6 +55,17 @@ return [
     'finished_goods_cutover' => env('FG_STOCK_CUTOVER', '2026-08-12'),
 
     /*
+    | After how many days an undelivered load stops counting as "in transit".
+    |
+    | Loading is the stock deduction point, so a load that has not been
+    | confirmed delivered is stock that has left the warehouse and not been
+    | acknowledged anywhere. For a day or two that is a truck on the road; past
+    | this threshold it is a load nobody closed, and the two must not be added
+    | together or the figure means nothing.
+    */
+    'dispatch_stale_days' => env('FG_DISPATCH_STALE_DAYS', 14),
+
+    /*
     | Which way goods move through a gate. `both` exists because a single
     | elevator or roller door is often used in either direction.
     */

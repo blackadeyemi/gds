@@ -20,10 +20,19 @@ use Modules\Bil\Models\SalesLoadingReturn;
  * the truck is loaded + returned. Every figure here says which of the two it
  * means rather than leaving the caller to guess.
  *
- * STOCK LOOKS AFTER ITSELF. FinishedGoodsStock::loadedSinceCutover() reads
- * `sales_loading` directly and nets returns against it, so a load written here
- * takes bundles off warehouse stock with no further action. Adding an
- * adjustment would double-count it.
+ * STOCK IS DERIVED FROM THIS TABLE, NOT MIRRORED INTO IT.
+ * FinishedGoodsStock::loadedSinceCutover() reads `sales_loading` directly, so a
+ * load written here needs no stock movement of its own — writing an adjustment
+ * as well would take the same bundles off twice. Note `quantityloaded` is
+ * stored NET of returns, so it needs no netting either.
+ *
+ * ⚠️ The DISPLAYED total (`finished_goods_warehouse_stock`) is a cache that
+ * only moves when something calls FinishedGoodsStock::apply(), and nothing here
+ * does. It absorbs loadings when `bil:reconcile-fg-stock --fix` runs, which is
+ * scheduled nightly — see routes/console.php. Between a load and that run, the
+ * Warehouse Stock page is behind by what has gone out. That is deliberate: the
+ * legacy screen writes this table too, so mirroring from gds alone would be
+ * wrong more often than it was right.
  */
 class SalesLoadings
 {
@@ -527,6 +536,139 @@ class SalesLoadings
         });
 
         return true;
+    }
+
+    /* ---------------- In transit ---------------- */
+
+    /**
+     * After how many days an undelivered load stops being "on the road".
+     *
+     * A truck is out for a day, two at the far end of a long haul. Beyond that
+     * a load is not in transit, it is UNCONFIRMED — almost certainly delivered
+     * with nobody having said so — and counting it as goods in motion makes the
+     * figure meaningless. It matters here: of 23,483 bundles currently
+     * undelivered, 22,546 sit on loads more than a fortnight old, the oldest
+     * raised in May 2018.
+     */
+    public static function staleAfterDays(): int
+    {
+        return max(1, (int) config('warehouses.dispatch_stale_days', 14));
+    }
+
+    /**
+     * Bundles per product on a truck now — loaded and not yet delivered.
+     *
+     * These bundles have ALREADY left warehouse stock: loading is the deduction
+     * point, here and in the legacy (`sales_loading_request.php` decrements
+     * `storebundle_floor`; the delivery and waybill scripts touch stock not at
+     * all). So this is not another balance to add or subtract — it is the part
+     * of what has gone out that nobody has yet confirmed arrived.
+     *
+     * `quantityloaded` is stored NET of returns, so nothing is netted off it.
+     *
+     * ⚠️ The per-product total is SHORT of inTransit()'s headline by the rows
+     * whose `sod_id` points at an order detail that no longer exists — 29 rows
+     * and 1,840 bundles, all of them raised before the cut-over by the legacy
+     * order screen that deleted detail rows out from under their loadings.
+     * They are dropped by the join, exactly as FinishedGoodsStock does, so
+     * stock and this figure stay consistent with each other. Nothing since the
+     * cut-over is orphaned, so the stock picture is unaffected.
+     *
+     * @param  bool  $freshOnly  exclude loads older than staleAfterDays()
+     * @return array<int,int>  productid => bundles
+     */
+    public static function inTransitByProduct(bool $freshOnly = false): array
+    {
+        return DB::connection('bil')->table('sales_loading as l')
+            ->join('sales_order_details as d', 'l.sod_id', '=', 'd.id')
+            ->whereNull('l.status')
+            ->when($freshOnly, fn ($q) => $q->where('l.dateofloading', '>=',
+                now()->subDays(self::staleAfterDays())->format('Y/m/d')))
+            ->groupBy('d.productid')
+            ->selectRaw('d.productid, SUM(l.quantityloaded) as bundles')
+            ->pluck('bundles', 'productid')
+            ->map(fn ($b) => (int) $b)
+            ->reject(fn ($b) => $b === 0)
+            ->all();
+    }
+
+    /**
+     * What is on the road, and how long it has been there.
+     *
+     * Returns the headline split into `fresh` (genuinely in transit) and
+     * `stale` (undelivered long enough that it is a paperwork problem, not a
+     * logistics one), plus age buckets for the Delivery queue. Reporting one
+     * combined number would say "23,483 bundles in transit" when the honest
+     * answer is "937, and 22,546 loads nobody ever closed".
+     */
+    public static function inTransit(): array
+    {
+        $rows = DB::connection('bil')->table('sales_loading')
+            ->whereNull('status')
+            ->groupBy('dateofloading')
+            ->selectRaw('dateofloading, COUNT(DISTINCT barcode) as loads, SUM(quantityloaded) as bundles')
+            ->get();
+
+        $stale = self::staleAfterDays();
+        $buckets = [
+            'Today' => [0, 0], '1–3 days' => [0, 0], '4–14 days' => [0, 0],
+            '15–60 days' => [0, 0], 'Over 60 days' => [0, 0],
+        ];
+
+        $out = [
+            'loads' => 0, 'bundles' => 0,
+            'fresh_loads' => 0, 'fresh_bundles' => 0,
+            'stale_loads' => 0, 'stale_bundles' => 0,
+            'oldest' => null, 'stale_after' => $stale,
+        ];
+
+        foreach ($rows as $r) {
+            $age = self::ageInDays((string) $r->dateofloading);
+            $loads = (int) $r->loads;
+            $bundles = (int) $r->bundles;
+
+            $out['loads'] += $loads;
+            $out['bundles'] += $bundles;
+
+            if ($age !== null && $age <= $stale) {
+                $out['fresh_loads'] += $loads;
+                $out['fresh_bundles'] += $bundles;
+            } else {
+                $out['stale_loads'] += $loads;
+                $out['stale_bundles'] += $bundles;
+            }
+
+            $key = match (true) {
+                $age === null => 'Over 60 days',
+                $age === 0 => 'Today',
+                $age <= 3 => '1–3 days',
+                $age <= 14 => '4–14 days',
+                $age <= 60 => '15–60 days',
+                default => 'Over 60 days',
+            };
+            $buckets[$key][0] += $loads;
+            $buckets[$key][1] += $bundles;
+
+            if ($out['oldest'] === null || $r->dateofloading < $out['oldest']) {
+                $out['oldest'] = (string) $r->dateofloading;
+            }
+        }
+
+        $out['buckets'] = array_filter($buckets, fn ($b) => $b[0] > 0);
+
+        return $out;
+    }
+
+    /** Whole days since a legacy `Y/m/d` date, or null if it will not parse. */
+    public static function ageInDays(?string $dateSlash): ?int
+    {
+        if (! $dateSlash) {
+            return null;
+        }
+
+        $date = \DateTimeImmutable::createFromFormat('Y/m/d|', $dateSlash);
+
+        return $date ? (int) $date->diff(now()->startOfDay())->format('%r%a') : null;
     }
 
     /* ---------------- Print-outs ---------------- */
