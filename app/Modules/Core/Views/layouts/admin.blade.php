@@ -449,6 +449,12 @@
                                 <span class="label">Returns</span>
                             </a>
                             @endcanPage
+                            @canPage('bil.sales.waybill')
+                            <a href="{{ route('bil.sales.waybill') }}" class="nav-link {{ $is('bil/sales/waybill*') }}" title="Waybill">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h3"/></svg>
+                                <span class="label">Waybill</span>
+                            </a>
+                            @endcanPage
                         </div>
                     </div>
                     @endcanPrefix

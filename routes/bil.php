@@ -55,6 +55,7 @@ use Modules\Bil\Livewire\RawMaterials\WarehouseExit;
 use Modules\Bil\Livewire\Sales\Customers as SalesCustomers;
 use Modules\Bil\Livewire\Sales\Delivery as SalesDeliveryPage;
 use Modules\Bil\Livewire\Sales\Returns as SalesReturnsPage;
+use Modules\Bil\Livewire\Sales\Waybill as SalesWaybillPage;
 use Modules\Bil\Livewire\Sales\Loading as SalesLoadingPage;
 use Modules\Bil\Livewire\Sales\Orders as SalesOrders;
 use Modules\Bil\Livewire\Sales\Transporters as SalesTransporters;
@@ -259,6 +260,27 @@ Route::middleware('auth')
 
             return view('bil::print.sales-return', ['returns' => $returns]);
         })->middleware('page:bil.sales.returns')->name('returns.print');
+        Route::get('/waybill', SalesWaybillPage::class)
+            ->middleware('page:bil.sales.waybill')->name('waybill');
+
+        /*
+        | The waybill sheet. Takes a comma-separated list of WAYBILL barcodes,
+        | for the same reason the other three do: the office prints a day's
+        | paperwork in a run.
+        */
+        Route::get('/waybill/print', function () {
+            $barcodes = array_values(array_filter(array_map(
+                'trim', explode(',', (string) request('waybills', ''))
+            )));
+
+            abort_if($barcodes === [], 404);
+            abort_if(count($barcodes) > 100, 422, 'Too many waybills in one print run.');
+
+            $waybills = \Modules\Bil\Support\SalesWaybills::printouts($barcodes);
+            abort_if($waybills === [], 404);
+
+            return view('bil::print.sales-waybill', ['waybills' => $waybills]);
+        })->middleware('page:bil.sales.waybill')->name('waybill.print');
         Route::get('/transporters', SalesTransporters::class)
             ->middleware('page:bil.sales.transporters')->name('transporters');
     });
