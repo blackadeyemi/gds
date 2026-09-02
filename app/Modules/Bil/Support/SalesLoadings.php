@@ -538,7 +538,7 @@ class SalesLoadings
                 'l.id', 'l.barcode', 'l.loadnumber', 'l.dateofloading', 'l.quantityloaded',
                 'l.cageroomcode', 'l.loader', 'l.trucknumber', 'l.truckdriver', 'l.status',
                 'l.sales_loading_customerid as customerid', 't.transportername',
-                'd.orderid', 'd.foc', 'p.productname', 'p.productcode',
+                'd.orderid', 'd.foc', 'd.productid', 'p.productname', 'p.productcode',
             ]);
 
         if ($rows->isEmpty()) {
@@ -587,7 +587,7 @@ class SalesLoadings
                 'transportername' => $first->transportername,
                 'trucknumber' => $first->trucknumber,
                 'truckdriver' => $first->truckdriver,
-                'lines' => $lines->values()->all(),
+                'lines' => self::printLines($lines),
                 'total' => (int) $lines->sum('quantityloaded'),
             ];
         }
@@ -597,6 +597,37 @@ class SalesLoadings
             <=> array_search($b->barcode, $barcodes, true));
 
         return $out;
+    }
+
+    /**
+     * The print-out's product rows: ONE PER PRODUCT, quantities summed.
+     *
+     * An order can carry the same product twice — the sold line and a free-of-
+     * charge one — and each becomes its own `sales_loading` row. The truck
+     * carries one quantity of that product, so the sheet shows one line, which
+     * is what the legacy printout did: SUM(quantityloaded) GROUP BY productid,
+     * ordered by product name, with `foc` not selected at all.
+     *
+     * FOC is still flagged, but only when the WHOLE quantity is free of charge.
+     * Marking a merged row that is mostly sold would misstate what is owed, and
+     * that is the one thing this sheet must not do.
+     */
+    protected static function printLines($lines): array
+    {
+        return $lines->groupBy('productid')
+            ->map(fn ($group) => (object) [
+                'productid' => $group->first()->productid,
+                'productcode' => $group->first()->productcode,
+                'productname' => $group->first()->productname,
+                'quantityloaded' => (int) $group->sum('quantityloaded'),
+                'foc' => $group->every(fn ($l) => (int) $l->foc === 1),
+            ])
+            // Case-INSENSITIVELY, to match the collation MySQL sorted the
+            // legacy sheet with: "Rose of Africa" sorts before "Rose Plus"
+            // there, and after it under PHP's byte order. The printed row order
+            // is what operators scan down, so it stays as it was.
+            ->sortBy(fn ($l) => mb_strtolower((string) $l->productname))
+            ->values()->all();
     }
 
     /* ---------------- Helpers ---------------- */
