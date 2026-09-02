@@ -5,6 +5,108 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-09-02 (b) — BIL Sales Returns; a damaged-goods warehouse
+
+Commit `d0f2ade`. One migration, sub-second, plus a page and a change to how
+stock is derived. Deploy after the Delivery release above.
+
+### New page: BIL → Sales → Returns
+
+`bil/sales/returns`, from `sales_return.php` and
+`sales_return_modification.php`. Same pattern as Loading and Delivery, with one
+deliberate difference: it is the only screen in the chain that does **not**
+start from a document. Bundles arrive back with no paperwork of their own, so
+entry runs customer → product → quantity → which delivery it is booked against.
+
+That last step cannot be skipped — `sales_return.sod_id` is a
+sales-order-detail id, and it is the only handle the table has on the goods. The
+screen lists the customer's deliveries of that product, newest first, with what
+is still returnable on each, and pre-selects the newest that can cover the
+quantity. Across 366 return lines since 2024 a single delivery always had
+enough, so that is the ordinary path; when none does, the quantity is split
+newest-first rather than refusing a return that physically happened.
+
+Page key `bil.sales.returns`, abilities `view` / `create` / `modify` /
+`delete`. Run `php artisan gds:sync-pages` and grant them.
+
+### ⚠️ Stock now counts returns — it did not before
+
+`FinishedGoodsStock::expected()` had **no returns term at all**. A customer
+return appeared in the Warehouse Stock movements modal and was invisible to the
+stock figure, so goods sent back never went back on. Two derived terms are added,
+the same way dispatch is derived from `sales_loading`:
+
+| | goes to |
+|---|---|
+| `quantityreturned - quantityrejected` | the finished-goods warehouse |
+| `quantityrejected` | the new damaged-goods warehouse |
+
+`quantityrejected` is a PART of `quantityreturned`, not additional to it.
+
+No live returns exist after the 2026-08-12 cut-over (the last one is
+2026-07-29), so this changes no current figure — but it changes every figure
+from the first return recorded after deploying.
+
+### New warehouse: `Damaged Goods (FG)`
+
+`2026_09_02_110000_create_damaged_goods_warehouse` — one row in
+`core.warehouses`, code **`FG-DMG`**, module `finished-goods`, `sort_order` 90.
+
+⚠️ **The sort order is load-bearing.** `FinishedGoodsStock::loadingWarehouseId()`
+takes the FIRST finished-goods warehouse by sort order; a damaged warehouse
+sorting before Ogba (5) would have every loading attributed to it. It is also
+excluded from that lookup by code, so both guards have to be removed before it
+could go wrong.
+
+Nothing writes into this warehouse directly — its stock is derived from
+`sales_return`, so it needs no gates and no receiving screen. It appears as its
+own row on Warehouse Stock.
+
+The legacy contradicted itself about rejected goods, which is why they were
+never right: `sales_return_request.php` added the WHOLE return back to
+`storebundle_floor` — and on a second return against the same line, the
+cumulative total again — while the `stock_update()` call two lines below added
+only returned-minus-rejected. So damaged bundles either went back on sale or
+vanished, depending which figure you read.
+
+### Other legacy behaviour not reproduced
+
+- Its quantity and date guards lived **only in JavaScript**, so anything
+  reaching the request script directly was written unchecked. They are now
+  server-side and re-read at save time, so a screen left open cannot book the
+  same bundles twice.
+- It `UPDATE`d by `sod_id` with **no date filter**, so an August return merged
+  into a March one and rewrote its date. That is why only 3 of 2,377 sod_ids
+  carry two rows in nine years. Each return line is its own row now.
+- `sales_return_delete_request.php` selects `productid, warehousecode` **from
+  `sales_return`, which has neither column** — that path has been dead. The
+  working delete is `sales_return_modification_request.php`.
+
+### Order of operations
+
+1. `php artisan migrate --force`
+2. `php artisan gds:sync-pages`, then grant `bil.sales.returns`.
+3. `php artisan bil:reconcile-fg-stock` — should report agreement.
+4. `php artisan config:clear` if config is cached.
+
+### What to check afterwards
+
+- Warehouse Stock lists a **Damaged Goods (FG)** row, and loadings are still
+  attributed to Ogba (the In Transit column stays on Ogba's rows).
+- A test return of 10 with 2 rejected raises the FG warehouse by 8 and the
+  damaged warehouse by 2 after the nightly reconcile.
+- The return note prints with **both** quantity columns and no barcode.
+
+### If it goes wrong
+
+`down()` removes the warehouse and its derived stock rows, but **refuses** if
+anyone has recorded a manual adjustment against it — those would be lost. The
+page is additive: revoking `bil.sales.returns:view` hides it and the legacy
+screens still work. The stock terms are derived, so reverting the code and
+re-running the reconcile restores the previous figures exactly.
+
+---
+
 ## 2026-09-02 — BIL Sales Delivery; the scheduler; returns counted once
 
 Two commits: `cfb5fa2` (Delivery) and `9176045` (in-transit + the stock fix).
