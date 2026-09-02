@@ -54,6 +54,7 @@ use Modules\Bil\Livewire\RawMaterials\WarehouseEntry;
 use Modules\Bil\Livewire\RawMaterials\WarehouseExit;
 use Modules\Bil\Livewire\Sales\Customers as SalesCustomers;
 use Modules\Bil\Livewire\Sales\Delivery as SalesDeliveryPage;
+use Modules\Bil\Livewire\Sales\Returns as SalesReturnsPage;
 use Modules\Bil\Livewire\Sales\Loading as SalesLoadingPage;
 use Modules\Bil\Livewire\Sales\Orders as SalesOrders;
 use Modules\Bil\Livewire\Sales\Transporters as SalesTransporters;
@@ -237,6 +238,27 @@ Route::middleware('auth')
 
             return view('bil::print.sales-delivery', ['deliveries' => $deliveries]);
         })->middleware('page:bil.sales.delivery')->name('delivery.print');
+        Route::get('/returns', SalesReturnsPage::class)
+            ->middleware('page:bil.sales.returns')->name('returns');
+
+        /*
+        | The return note. Takes a comma-separated list of "{date}|{number}"
+        | keys — that pair IS a return, because the number restarts every day
+        | and the sheet carries no id or barcode of its own.
+        */
+        Route::get('/returns/print', function () {
+            $keys = array_values(array_filter(array_map(
+                'trim', explode(',', (string) request('returns', ''))
+            )));
+
+            abort_if($keys === [], 404);
+            abort_if(count($keys) > 100, 422, 'Too many returns in one print run.');
+
+            $returns = \Modules\Bil\Support\SalesReturns::printouts($keys);
+            abort_if($returns === [], 404);
+
+            return view('bil::print.sales-return', ['returns' => $returns]);
+        })->middleware('page:bil.sales.returns')->name('returns.print');
         Route::get('/transporters', SalesTransporters::class)
             ->middleware('page:bil.sales.transporters')->name('transporters');
     });

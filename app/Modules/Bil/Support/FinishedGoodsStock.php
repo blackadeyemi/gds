@@ -13,15 +13,20 @@ use Illuminate\Support\Facades\DB;
  * one row per warehouse per product.
  *
  * THE PROPERTY WORTH PROTECTING: stock is **derivable**. It is not a number
- * someone typed; it is the sum of three things that each leave a record:
+ * someone typed; it is the sum of four things that each leave a record:
  *
  *     bundles = SUM(receipts WHERE NOT is_historic)     goods received in gds
  *             + SUM(adjustments)                        manual corrections
  *             - SUM(loadings since the cut-over)        goods dispatched
+ *             + SUM(returns - rejects since cut-over)   sent back and sellable
  *
- * so `bil:reconcile-fg-stock` can always prove or repair it. The old totals
- * could not be — nothing recorded which floor a bundle had been counted onto,
- * so drift was permanent and undetectable.
+ * — so `bil:reconcile-fg-stock` can always prove or repair it. The old totals
+ * could not be: nothing recorded which floor a bundle had been counted onto, so
+ * drift was permanent and undetectable.
+ *
+ * The REJECTED part of a return is the one thing that does not land here. It
+ * goes to the damaged-goods warehouse (`DAMAGED_CODE`), where it is still
+ * counted but can never be sold.
  *
  * The aggregate is still maintained incrementally rather than computed on read,
  * because it is queried per product on screens that would otherwise scan the
@@ -33,11 +38,17 @@ use Illuminate\Support\Facades\DB;
  * nonsense. Stock therefore starts from the cut-over, which is what the manual
  * adjustments are for — set the opening balance once, then let movements run.
  *
- * **Goods leaving are read, not mirrored.** gds has no dispatch screen yet, so
- * outbound comes from the legacy `sales_loading` (joined to
- * `sales_order_details` for the product, since loading rows carry only a sales
- * order detail id). Deriving avoids a second copy that could drift from the
- * table it copies.
+ * **Goods moving in and out of the customer's hands are read, not mirrored.**
+ * Dispatch comes from the legacy `sales_loading` and returns from
+ * `sales_return` — both joined to `sales_order_details` for the product, since
+ * those rows carry only a sales-order-detail id. gds now has screens for both,
+ * but the legacy screens still write the same tables, so deriving is the only
+ * way the figure stays right whichever app was used. It also avoids a second
+ * copy that could drift from the table it copies.
+ *
+ * ⚠️ Nothing here calls apply() for a loading or a return, so the CACHED total
+ * only absorbs them when `bil:reconcile-fg-stock --fix` runs — nightly, see
+ * routes/console.php.
  *
  * ⚠️ **Loadings cannot be split per warehouse.** `sales_loading` identifies a
  * cage room, and every cage room maps to warehouse code '01' — the legacy model
@@ -142,7 +153,7 @@ class FinishedGoodsStock
     /* ---------------- Reconciliation ---------------- */
 
     /**
-     * What the totals SHOULD be, from the three things that move stock.
+     * What the totals SHOULD be, from everything that moves stock.
      *
      * Returns ['{warehouse_id}:{productid}' => bundles].
      */
@@ -177,6 +188,19 @@ class FinishedGoodsStock
         if ($loadWarehouse && (! $warehouseId || $warehouseId === $loadWarehouse)) {
             foreach (self::loadedSinceCutover() as $productid => $bundles) {
                 $add($loadWarehouse . ':' . $productid, -$bundles);
+            }
+
+            // 4. Goods the customer sent back, minus what came back unsellable.
+            foreach (self::returnedSinceCutover() as $productid => $bundles) {
+                $add($loadWarehouse . ':' . $productid, $bundles);
+            }
+        }
+
+        // 5. The unsellable part, held apart so it is counted but never sold.
+        $damaged = self::damagedWarehouseId();
+        if ($damaged && (! $warehouseId || $warehouseId === $damaged)) {
+            foreach (self::rejectedSinceCutover() as $productid => $bundles) {
+                $add($damaged . ':' . $productid, $bundles);
             }
         }
 
@@ -223,8 +247,58 @@ class FinishedGoodsStock
     {
         return DB::connection('core')->table('warehouses')
             ->where('module', 'finished-goods')->whereNull('deleted_at')
+            ->where('code', '<>', self::DAMAGED_CODE)
             ->orderBy('sort_order')->orderBy('id')
             ->value('id');
+    }
+
+    /** Where rejected returns are held: counted, but never sellable. */
+    public const DAMAGED_CODE = 'FG-DMG';
+
+    public static function damagedWarehouseId(): ?int
+    {
+        return DB::connection('core')->table('warehouses')
+            ->where('code', self::DAMAGED_CODE)->whereNull('deleted_at')
+            ->value('id');
+    }
+
+    /**
+     * Bundles per product COMING BACK from customers since the cut-over.
+     *
+     * Net of what came back unsellable: `quantityrejected` is part of
+     * `quantityreturned`, not additional to it, so sellable stock gains the
+     * difference and the rejected part goes to the damaged warehouse instead.
+     *
+     * Derived from `sales_return` rather than mirrored, for the same reason
+     * dispatch is: the legacy return screen writes that table too.
+     */
+    public static function returnedSinceCutover(): array
+    {
+        return self::returnTotals('SUM(r.quantityreturned - r.quantityrejected)');
+    }
+
+    /** Bundles per product that came back unsellable since the cut-over. */
+    public static function rejectedSinceCutover(): array
+    {
+        return self::returnTotals('SUM(r.quantityrejected)');
+    }
+
+    /**
+     * `sales_return` carries a sales-order-detail id rather than a product, so
+     * the product comes from `sales_order_details` — the same join, and the
+     * same orphan behaviour, as loadedSinceCutover().
+     */
+    private static function returnTotals(string $expression): array
+    {
+        return DB::connection('bil')->table('sales_return as r')
+            ->join('sales_order_details as d', 'r.sod_id', '=', 'd.id')
+            ->where('r.dateofreturn', '>=', str_replace('-', '/', self::cutover()))
+            ->groupBy('d.productid')
+            ->selectRaw("d.productid, {$expression} as bundles")
+            ->pluck('bundles', 'productid')
+            ->map(fn ($b) => (int) $b)
+            ->reject(fn ($b) => $b === 0)
+            ->all();
     }
 
     /** What the totals currently say, in the same shape as expected(). */
