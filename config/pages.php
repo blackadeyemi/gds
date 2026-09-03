@@ -78,6 +78,7 @@ return [
         // screen, so there is no separate `create`: `view` is placing an order
         // and editing one, and `delete` is the withdrawal — which is refused
         // outright once anything has been loaded against the order.
+        ['key' => 'bil.sales.statistics', 'label' => 'Statistics', 'module' => 'BIL / Sales', 'route' => 'bil.sales.statistics', 'abilities' => $snapshot],
         ['key' => 'bil.sales.customers', 'label' => 'Customers', 'module' => 'BIL / Sales', 'route' => 'bil.sales.customers', 'abilities' => $crud],
         ['key' => 'bil.sales.transporters', 'label' => 'Transporters', 'module' => 'BIL / Sales', 'route' => 'bil.sales.transporters', 'abilities' => $crud],
         ['key' => 'bil.sales.orders', 'label' => 'Orders', 'module' => 'BIL / Sales', 'route' => 'bil.sales.orders', 'abilities' => ['view', 'delete', 'backdate']],

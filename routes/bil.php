@@ -59,6 +59,7 @@ use Modules\Bil\Livewire\Sales\Waybill as SalesWaybillPage;
 use Modules\Bil\Livewire\Sales\Loading as SalesLoadingPage;
 use Modules\Bil\Livewire\Sales\Orders as SalesOrders;
 use Modules\Bil\Livewire\Sales\Reports\DamagedGoods as SalesDamagedGoodsReport;
+use Modules\Bil\Livewire\Sales\Statistics as SalesStatistics;
 use Modules\Bil\Livewire\Sales\Reports\Delivery as SalesDeliveryReport;
 use Modules\Bil\Livewire\Sales\Reports\Loading as SalesLoadingReport;
 use Modules\Bil\Livewire\Sales\Reports\Orders as SalesOrdersReport;
@@ -193,6 +194,22 @@ Route::middleware('auth')
 Route::middleware('auth')
     ->prefix('sales')->name('sales.')
     ->group(function () {
+        Route::get('/statistics', SalesStatistics::class)
+            ->middleware('page:bil.sales.statistics')->name('statistics');
+        // Direct download of the current statistics section as xlsx/csv/pdf.
+        Route::get('/statistics/export', function () {
+            abort_unless((bool) request()->user()?->canDo('bil.sales.statistics', 'export'), 403);
+
+            $format = strtolower((string) request('format', 'xlsx'));
+            abort_unless(in_array($format, ['xlsx', 'csv', 'pdf'], true), 404);
+
+            $c = new SalesStatistics();
+            $c->section = (string) request('section', '');
+            $c->range = (string) request('range', '30d');
+            $c->figures = (string) request('figures', 'rounded');
+
+            return $c->exportResponse($format);
+        })->middleware('page:bil.sales.statistics')->name('statistics.export');
         Route::get('/customers', SalesCustomers::class)
             ->middleware('page:bil.sales.customers')->name('customers');
         Route::get('/orders', SalesOrders::class)

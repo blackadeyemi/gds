@@ -50,7 +50,8 @@
         const n = Number(v);
         if (kind === 'pct') return n.toFixed(1) + '%';
         const base = compact ? compactNum(n) : n.toLocaleString(undefined, { maximumFractionDigits: 0 });
-        return base + ({ kg: ' kg', hrs: ' h' }[kind] || '');
+        // Money leads with its symbol; everything else trails with its unit.
+        return ({ ngn: '\u20A6' }[kind] || '') + base + ({ kg: ' kg', hrs: ' h' }[kind] || '');
     };
 
     // Chart.js shared defaults.

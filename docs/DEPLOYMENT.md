@@ -5,6 +5,130 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-09-03 — Sales Statistics; the report filters size themselves
+
+One migration, seconds, no rows rewritten. Deploy after the Sales Reports
+release below.
+
+### New page: BIL → Sales → Statistics
+
+`bil/sales/statistics`, on the same `StatisticsPage` base as the Raw Materials,
+Finished Goods, Jumbo Rolls and Machines dashboards. Seven tabs: Overview,
+**Sold vs Free**, Orders, Loading & Delivery, Returns, Transport, Customers.
+
+Page key `bil.sales.statistics`, abilities `view` / `export`. Run
+`php artisan gds:sync-pages` and grant them. It appears at the top of the Sales
+group in the nav, as Statistics does in every other module.
+
+**⚠️ Every figure is in BUNDLES, not money, except the Transport tab.** There is
+no price anywhere in the sales schema — not on the order line, not on the order,
+not on the product — so "free of charge" is volume given away and can never be
+revenue foregone. The page says so; anyone reading a Sold-vs-Free figure as
+naira is reading it wrong.
+
+Worth knowing about the Sold vs Free numbers before someone queries them:
+
+* Free is about **1.1% of bundles loaded** over the last year (3.2% all-time),
+  but **13.9% of ORDER LINES**. Both are on the tab, because they are different
+  questions: a free line is usually a small one.
+* A loading whose order line has been deleted has no `foc` flag. It counts as
+  SOLD — it has to land in one half or the other, or sold + free would stop
+  equalling what left the warehouse.
+
+### `2026_09_03_100000_widen_sales_loading_stat_indexes`
+
+Not two new indexes — the same two, widened:
+
+```
+sl_loading_date_idx  (dateofloading)  ->  (dateofloading, sod_id, quantityloaded, status, barcode)
+sl_status_idx        (status)         ->  (status, sod_id, quantityloaded)
+```
+
+`ALGORITHM=INPLACE, LOCK=NONE`, about 14s on 583k rows, nothing rewritten. Both
+keep their original column as the leading prefix, so every query that used the
+narrow index still uses the wide one. `sl_status_idx` was already redundant —
+`sl_status_loadnumber_idx` leads with `status` — so rebuilding it wider costs
+nothing.
+
+It closes the gap between counting rows and reading them. Over twelve months
+(about 50,000 loadings):
+
+| | |
+|---|---|
+| `SELECT COUNT(*) ... WHERE dateofloading BETWEEN` | 58ms |
+| `SELECT SUM(quantityloaded) ... WHERE dateofloading BETWEEN` | 535ms → 114ms |
+
+The count was answered off the index; the sum was 50,000 random primary-key
+lookups to fetch one integer each.
+
+### Speed, honestly
+
+The dashboard defaults to **Last 30 days**, where a tab is 120–220ms. The range
+control also offers 7 days (~60–90ms), 90 days (~600–970ms) and 12 months
+(**3.3–5s**).
+
+Twelve months is the outlier and it is not a bug: 50,000 loadings each need a
+lookup into `sales_order_details` for the `foc` flag and into `sales_order` for
+the customer, and no index on `sales_loading` can remove that. It was 10–13s
+before two things fixed most of it, and both matter if a tile is ever added:
+
+* **one query per table per tab** — `loadTotals()` and `orderTotals()` answer
+  every tile in a single pass and are memoised, rather than a query per figure
+  over the same rows (the Overview is 9 queries, not 30);
+* **join no further than the question needs** — bundles need no join at all, the
+  sold/free split needs the order line, and only the customer and the depot need
+  the order. Each hop costs about 500ms over a year.
+
+If 12 months ever needs to be faster than this, the answer is denormalising
+`foc` onto `sales_loading`, not another index.
+
+### A naira format for charts
+
+`chartSpec()` gained `'valueFmt' => 'ngn'`, which prefixes ₦ in the tooltips
+(`public/js/statistics.js`) and writes `₦1,234.50` with the kobo intact in an
+export (`StatisticsPage::fmtExport()`). Additive — every existing chart is
+untouched.
+
+### Report filters now size themselves
+
+`RawMaterialReport::filterWidth()` measures a filter from its own options
+instead of everything being 170px, which truncated every product and supplier
+list in the app. Clamped to 170–300px; an explicit `width` on the filter still
+wins (the Sales customer/product/transporter pickers use it). **Across all
+eighteen reports, 30 of 82 fields move and 52 are untouched** — product
+(290–298px), supplier (233px), and a few gate/entrance/project lists (182px).
+No deploy step; it is a rendering change.
+
+### After deploying
+
+```
+php artisan migrate --force
+php artisan gds:sync-pages
+php artisan optimize:clear
+```
+
+Then grant `bil.sales.statistics` to the roles that should have it. It shows
+transport spend, so it is worth gating like the Waybill report rather than like
+the depot screens.
+
+### What to check afterwards
+
+* The dashboard opens on Overview / Last 30 days in well under a second.
+* Sold vs Free: the Sold and Free tiles add up to the Loaded tile on Overview.
+* Transport: the cost tile matches
+  `SELECT SUM(transportcost) FROM sales_waybill WHERE dateofwaybill BETWEEN ...`
+  — if it is higher, the per-waybill grouping in `transporterSpend()` has been
+  flattened and bills are being counted once per product on the truck.
+* The other four statistics dashboards still render (the shared base and
+  `statistics.js` both changed).
+
+### If it goes wrong
+
+`php artisan migrate:rollback --step=1` puts both indexes back to their single
+column. The 12-month range gets slower; nothing else depends on the change.
+
+---
+
 ## 2026-09-02 (d) — Sales Reports (Orders, Loading, Delivery, Returns, Waybill, Damaged Goods)
 
 Commits `250f838` and the Damaged Goods follow-up. **Two schema migrations, one
