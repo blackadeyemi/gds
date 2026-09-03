@@ -5,6 +5,87 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-09-03 (b) — Closing loadings that were never confirmed delivered
+
+No migration. One new console command, and **a data change that has to be run by
+hand on each environment** — it is not a migration, so nothing runs it for you.
+
+### ⚠️ Still to run on production
+
+```
+php artisan bil:close-stale-loadings              # DRY RUN — read this first
+php artisan bil:close-stale-loadings --apply      # then write
+```
+
+It has been run on dev. **It has NOT been run on production.**
+
+### What it does
+
+`sales_loading.status` holds the delivery date and is NULL while the load is
+still out. Loads that were never confirmed sit in the Delivery queue and in the
+"in transit" figure for ever — and some of them left the warehouse in 2018. They
+are not deliveries anyone is still chasing; they are paperwork that was never
+closed.
+
+The command stamps `status` = the row's own `dateofloading`, which is **exactly
+what `SalesDeliveries::confirm()` writes** — confirm stamps the loading date,
+not the day the button was pressed. So a closed row is indistinguishable from a
+properly confirmed one, and the delivered figures land in the month the goods
+actually went out rather than piling into whichever month the command was run.
+
+**It does not create `sales_delivery` rows.** A real delivery produces a note
+with a number and a barcode that someone signs; these loads produced no such
+note, and inventing thirty of them would be fabricating documents. They close
+with no delivery barcode, and the Delivery report shows a dash for it — which is
+the truth.
+
+### What it closed on dev
+
+| | |
+|---|---|
+| Rows | 118 |
+| Loads | 34 |
+| Bundles | 6,235 |
+| Range | 2018-05-18 to 2025-05-21 |
+| Already had a delivery note | 37 (for these it is a repair, not a write-off) |
+| Nothing loaded on them | 9 |
+
+In transit went from **73 loads / 23,483 bundles** to **39 / 17,248**, all of it
+this year, oldest 2026-01-30. Production's numbers will differ — the dry run is
+the source of truth there.
+
+### Safety
+
+* **Dry run by default.** `--apply` is required to write.
+* Writes an undo file to `storage/app/close-stale-loadings-*.json` naming every
+  id **before** touching anything. **Keep it.**
+  `--reopen=<file>` puts them back, and skips any row that has been properly
+  delivered in the meantime rather than tearing it open again.
+* Transactional — `sales_loading` is InnoDB.
+* `--before=YYYY-MM-DD` overrides the default (1 January of the current year).
+  The command **refuses a date after the finished-goods cut-over (2026-08-12)**:
+  past that a loading feeds the derived stock figure, and closing one would move
+  bundles the reconciler then has to explain.
+
+### Stock is not affected
+
+`FinishedGoodsStock` derives dispatch from `dateofloading` since the cut-over,
+and everything in scope is older than that. Verified after the dev run: the
+stock table still has the same 22 negative rows it had before, and
+`delivered + still open == everything ever loaded` still holds exactly
+(50,212,517 + 17,248 = 50,229,765).
+
+### What to check afterwards
+
+* `SELECT COUNT(*) FROM sales_loading WHERE status IS NULL AND dateofloading < '<year>/01/01'`
+  returns 0.
+* The Delivery queue and the in-transit tile on Finished Goods → Warehouse Stock
+  both show only this year's loads.
+* Row count and total `quantityloaded` are unchanged — this moves a flag, not a
+  bundle.
+
+---
+
 ## 2026-09-03 — Sales Statistics; the report filters size themselves
 
 One migration, seconds, no rows rewritten. Deploy after the Sales Reports

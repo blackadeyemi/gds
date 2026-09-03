@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Modules\Bil\Console\BackfillFinishedGoodsReceipts;
+use Modules\Bil\Console\CloseStaleLoadings;
 use Modules\Bil\Console\RefreshFinishedGoodsOrderFrequency;
 use Modules\Bil\Console\SeedFinishedGoodsStock;
 use Modules\Bil\Console\ReconcileFinishedGoodsStock;
@@ -33,7 +34,7 @@ class ModuleServiceProvider extends ServiceProvider
     public function boot(): void
     {
         if ($this->app->runningInConsole()) {
-            $this->commands([SyncDataViews::class, MigrateLegacyAuth::class, CheckMachineMaps::class, RebuildMachineMaps::class, ReconcileWarehouseStock::class, ReconcileFinishedGoodsStock::class, BackfillFinishedGoodsReceipts::class, SeedFinishedGoodsStock::class, RefreshFinishedGoodsOrderFrequency::class, ReconcileRawMaterialsStock::class, SyncShiftContexts::class, SyncPages::class]);
+            $this->commands([SyncDataViews::class, MigrateLegacyAuth::class, CheckMachineMaps::class, RebuildMachineMaps::class, ReconcileWarehouseStock::class, ReconcileFinishedGoodsStock::class, BackfillFinishedGoodsReceipts::class, SeedFinishedGoodsStock::class, RefreshFinishedGoodsOrderFrequency::class, ReconcileRawMaterialsStock::class, CloseStaleLoadings::class, SyncShiftContexts::class, SyncPages::class]);
         }
 
         $modules = base_path('app/Modules');
