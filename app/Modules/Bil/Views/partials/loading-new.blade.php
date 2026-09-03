@@ -18,41 +18,48 @@
     </div>
 
     <div class="card-pad">
-        <div class="form-group">
-            <label class="form-label">Sales order</label>
-            @include('core::partials.searchable-select', [
-                'field' => 'orderid',
-                'options' => $this->orderOptions,
-                'valueKey' => 'value', 'labelKey' => 'label',
-                'placeholder' => '— Select order —',
-                'live' => true,
-            ])
-            @error('orderid') <div class="form-error">{{ $message }}</div> @enderror
-            @if ($order)
-                <div class="text-muted text-sm" style="margin-top:.25rem;">
-                    {{ $order->customername ?: 'No customer on this order' }}
-                </div>
-            @endif
-        </div>
-
-        {{-- The date the truck is loaded ON. Part of the load's identity: the
-             load number restarts daily and the barcode carries the date, so a
-             load keyed the next morning belongs to the day it happened. Only a
-             user with the backdate ability may move it — everyone else sees
-             today, fixed, and saveNew() re-checks rather than trusting it. --}}
-        <div class="form-group" style="max-width:240px;">
-            <label class="form-label">Date of loading</label>
-            @if ($this->canBackdate())
-                @include('bil::partials.date-field', ['model' => 'loadDateIso', 'live' => true])
-                @if ($loadDateIso !== now()->format('Y-m-d'))
-                    <div class="text-sm" style="color:#b45309;margin-top:.25rem;">
-                        Backdated — this load will be numbered in
-                        {{ \Illuminate\Support\Carbon::parse($loadDateIso)->format('d M Y') }}’s sequence.
+        {{-- The order and the date it goes out on, side by side: together they
+             are what identifies the load, and the date is a narrow field that
+             left a whole row to itself. Flex rather than a grid so the order
+             takes the width it needs and the date keeps its own, and the two
+             stack again on a narrow screen. --}}
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-start;">
+            <div class="form-group" style="flex:1 1 260px;min-width:0;">
+                <label class="form-label">Sales order</label>
+                @include('core::partials.searchable-select', [
+                    'field' => 'orderid',
+                    'options' => $this->orderOptions,
+                    'valueKey' => 'value', 'labelKey' => 'label',
+                    'placeholder' => '— Select order —',
+                    'live' => true,
+                ])
+                @error('orderid') <div class="form-error">{{ $message }}</div> @enderror
+                @if ($order)
+                    <div class="text-muted text-sm" style="margin-top:.25rem;">
+                        {{ $order->customername ?: 'No customer on this order' }}
                     </div>
                 @endif
-            @else
-                <input type="text" class="form-control" value="{{ now()->format('Y/m/d') }}" disabled>
-            @endif
+            </div>
+
+            {{-- The date the truck is loaded ON. Part of the load's identity: the
+                 load number restarts daily and the barcode carries the date, so a
+                 load keyed the next morning belongs to the day it happened. Only a
+                 user with the backdate ability may move it — everyone else sees
+                 today, fixed, and saveNew() re-checks rather than trusting it. --}}
+            <div class="form-group" style="flex:0 1 240px;min-width:200px;">
+                <label class="form-label">Date of loading</label>
+                @if ($this->canBackdate())
+                    @include('bil::partials.date-field', ['model' => 'loadDateIso', 'live' => true])
+                    @if ($loadDateIso !== now()->format('Y-m-d'))
+                        <div class="text-sm" style="color:#b45309;margin-top:.25rem;">
+                            Backdated — this load will be numbered in
+                            {{ \Illuminate\Support\Carbon::parse($loadDateIso)->format('d M Y') }}’s sequence.
+                        </div>
+                    @endif
+                @else
+                    <input type="text" class="form-control" value="{{ now()->format('Y/m/d') }}" disabled>
+                @endif
+            </div>
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0.75rem;">
