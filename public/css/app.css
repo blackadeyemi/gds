@@ -159,16 +159,22 @@ a:hover { text-decoration: underline; }
     transition: border-color .15s, box-shadow .15s;
 }
 .form-control:focus { border-color: var(--brand); box-shadow: 0 0 0 4px var(--brand-ring); background: var(--surface); }
-/* A number input's spinner sits hard against the right edge, which is exactly
-   where a right-aligned figure ends — the arrows landed on the digits. Reserve
-   the space instead of hiding them: they are used to nudge a quantity up and
-   down, and the same reasoning gives select.form-control its 2.2em below.
+/* Hide the number spinner. It sits hard against the right edge, which is
+   exactly where a right-aligned figure ends, so the arrows land on the digits.
+   PADDING DOES NOT FIX THIS: the spinner is laid out INSIDE the input's content
+   box, so padding-right moves the arrows inward along with the number and the
+   two stay just as close. The arrows have to go.
 
-   reset.css DOES hide these globally, but the admin layout does not load it
-   (app.css, admin.css and flatpickr only), which is why they show here at all.
+   Nothing is lost — a quantity here is typed, and the field still steps with
+   the up/down keys and the scroll wheel.
 
-   `.qty-input` opts out — it hides its own spinner and centres its text. */
-input[type="number"].form-control:not(.qty-input) { padding-right: 2.2em; }
+   reset.css does this globally, but the admin layout loads app.css, admin.css
+   and flatpickr only, which is why the arrows show here at all. `.qty-input`
+   in admin.css is the same fix applied by hand to the Orders page before this
+   rule existed; it is now redundant but harmless. */
+input[type="number"].form-control::-webkit-outer-spin-button,
+input[type="number"].form-control::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"].form-control { -moz-appearance: textfield; appearance: textfield; }
 select.form-control { appearance: none; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D'12'%20height%3D'8'%20viewBox%3D'0%200%2012%208'%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%3E%3Cpath%20d%3D'M1%201l5%205%205-5'%20stroke%3D'%236b7280'%20stroke-width%3D'2'%20fill%3D'none'%20fill-rule%3D'evenodd'%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 0.8em center; padding-right: 2.2em; }
 .form-error { color: var(--danger); font-size: 0.8rem; margin-top: 0.35em; }
 .form-hint { color: var(--muted); font-size: 0.78rem; margin-top: 0.35em; }
