@@ -93,9 +93,11 @@
         <div class="card">
             <div class="card-head">
                 <div>
-                    <h2 class="card-title">Awaiting delivery</h2>
+                    <h2 class="card-title">{{ $showDelivered ? 'Already delivered' : 'Awaiting delivery' }}</h2>
                     <div class="text-sm text-muted">
-                        @if ($search !== '')
+                        @if ($showDelivered)
+                            {{ count($this->deliveredLoads) }} on the chosen date — open one to reprint or undo it
+                        @elseif ($search !== '')
                             {{ count($this->pendingLoads) }}{{ $this->hasMore() ? '+' : '' }} match{{ count($this->pendingLoads) === 1 ? '' : 'es' }}
                         @else
                             showing {{ count($this->pendingLoads) }} of {{ number_format($this->pendingCount) }} still on the floor
@@ -105,6 +107,52 @@
             </div>
 
             <div class="card-pad">
+                {{-- The two things this list can be, as a switch at the top of
+                     it. Finding a delivery already made used to be a checkbox
+                     BELOW a list 42rem tall, so it was off-screen unless you
+                     scrolled past everything awaiting — and it appended a
+                     second scrolling list under the first. They are one
+                     question ("which load am I working on?") asked of two
+                     sources, so they take turns in one pane. --}}
+                <div class="seg" role="group" aria-label="Which loads to show" style="margin-bottom:0.7rem;">
+                    <button type="button" @class(['active' => ! $showDelivered])
+                            aria-pressed="{{ $showDelivered ? 'false' : 'true' }}"
+                            wire:click="$set('showDelivered', false)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                        <span>Awaiting</span>
+                    </button>
+                    <button type="button" @class(['active' => $showDelivered])
+                            aria-pressed="{{ $showDelivered ? 'true' : 'false' }}"
+                            wire:click="$set('showDelivered', true)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                        <span>Delivered</span>
+                    </button>
+                </div>
+
+                @if ($showDelivered)
+                    {{-- A delivery is found by the day it was made: the number
+                         restarts daily, so the date is the only way in. --}}
+                    <div class="form-group">
+                        @include('bil::partials.date-field', ['model' => 'dateIso', 'live' => true])
+                    </div>
+
+                    <div style="max-height:42rem;overflow:auto;margin:0 -0.4rem;">
+                        @forelse ($this->deliveredLoads as $d)
+                            <button type="button" wire:key="d-{{ $d->id }}"
+                                    wire:click="openLoad('{{ $d->loadbarcode }}', {{ $d->id }})"
+                                    class="btn btn-ghost"
+                                    style="display:block;width:100%;text-align:left;padding:0.55rem 0.7rem;margin-bottom:0.2rem;border-radius:6px;{{ $deliveryId === (int) $d->id ? 'background:var(--accent-soft,rgba(59,130,246,.12));' : '' }}">
+                                <div style="font-weight:600;font-family:monospace;">{{ $d->barcode }}</div>
+                                <div class="text-sm text-muted">
+                                    #{{ $d->deliverynumber }} · {{ $d->customername ?: '—' }}
+                                    @if ($d->waybill) · <span class="badge badge-muted">waybill</span> @endif
+                                </div>
+                            </button>
+                        @empty
+                            <div class="text-muted" style="padding:0.8rem;">No deliveries on that date.</div>
+                        @endforelse
+                    </div>
+                @else
                 <div class="form-group">
                     <input type="search" class="form-control" placeholder="Barcode, truck, driver, customer…"
                            wire:model.live.debounce.400ms="search">
@@ -148,33 +196,6 @@
                         </button>
                     @endif
                 </div>
-
-                {{-- A delivery already made is reached here, to reprint or undo. --}}
-                <label class="flex items-center gap-2" style="cursor:pointer;font-size:0.9rem;margin-top:0.7rem;">
-                    <input type="checkbox" wire:model.live="showDelivered">
-                    <span>Find a delivery already made</span>
-                </label>
-
-                @if ($showDelivered)
-                    <div class="form-group" style="margin-top:.5rem;">
-                        @include('bil::partials.date-field', ['model' => 'dateIso', 'live' => true])
-                    </div>
-                    <div style="max-height:22rem;overflow:auto;margin:0 -0.4rem;">
-                        @forelse ($this->deliveredLoads as $d)
-                            <button type="button" wire:key="d-{{ $d->id }}"
-                                    wire:click="openLoad('{{ $d->loadbarcode }}', {{ $d->id }})"
-                                    class="btn btn-ghost"
-                                    style="display:block;width:100%;text-align:left;padding:0.45rem 0.7rem;margin-bottom:0.15rem;border-radius:6px;{{ $deliveryId === (int) $d->id ? 'background:var(--accent-soft,rgba(59,130,246,.12));' : '' }}">
-                                <div class="text-sm" style="font-family:monospace;">{{ $d->barcode }}</div>
-                                <div class="text-sm text-muted">
-                                    #{{ $d->deliverynumber }} · {{ $d->customername ?: '—' }}
-                                    @if ($d->waybill) · <span class="badge badge-muted">waybill</span> @endif
-                                </div>
-                            </button>
-                        @empty
-                            <div class="text-muted text-sm" style="padding:0.6rem;">No deliveries on that date.</div>
-                        @endforelse
-                    </div>
                 @endif
             </div>
         </div>
