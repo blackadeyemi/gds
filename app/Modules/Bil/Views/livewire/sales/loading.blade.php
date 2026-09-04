@@ -40,9 +40,11 @@
         <div class="card">
             <div class="card-head">
                 <div>
-                    <h2 class="card-title">Open loads</h2>
+                    <h2 class="card-title">{{ $showByDate ? 'Loads by date' : 'Open loads' }}</h2>
                     <div class="text-sm text-muted">
-                        @if ($search !== '')
+                        @if ($showByDate)
+                            {{ count($this->dateLoads) }} on the chosen date — open one to reprint or correct it
+                        @elseif ($search !== '')
                             {{ count($this->openLoads) }}{{ $this->hasMore() ? '+' : '' }} match{{ count($this->openLoads) === 1 ? '' : 'es' }}
                         @else
                             showing {{ count($this->openLoads) }} of {{ number_format($this->openLoadCount) }} on the floor
@@ -64,6 +66,53 @@
                     </button>
                 @endif
 
+                {{-- The two things this list can be, as a switch at the top of
+                     it. Finding a closed load used to be a checkbox BELOW a
+                     list 42rem tall, so it was off-screen unless you scrolled
+                     past every open load — and it appended a second scrolling
+                     list under the first. Same reasoning, and the same control,
+                     as the Delivery queue. --}}
+                <div class="seg" role="group" aria-label="Which loads to show" style="margin-bottom:0.7rem;">
+                    <button type="button" @class(['active' => ! $showByDate])
+                            aria-pressed="{{ $showByDate ? 'false' : 'true' }}"
+                            wire:click="$set('showByDate', false)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                        <span>Open</span>
+                    </button>
+                    <button type="button" @class(['active' => $showByDate])
+                            aria-pressed="{{ $showByDate ? 'true' : 'false' }}"
+                            wire:click="$set('showByDate', true)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        <span>By date</span>
+                    </button>
+                </div>
+
+                @if ($showByDate)
+                    {{-- A closed load is reached by the day it went out: the
+                         load number restarts daily, so the date is the way in.
+                         Open loads from that day are listed too — they are
+                         still correctable, and hiding them here would make the
+                         day look emptier than it was. --}}
+                    <div class="form-group">
+                        @include('bil::partials.date-field', ['model' => 'dateIso', 'live' => true])
+                    </div>
+
+                    <div style="max-height:42rem;overflow:auto;margin:0 -0.4rem;">
+                        @forelse ($this->dateLoads as $l)
+                            <button type="button" wire:key="d-{{ $l->barcode }}" wire:click="openLoad('{{ $l->barcode }}')"
+                                    class="btn btn-ghost"
+                                    style="display:block;width:100%;text-align:left;padding:0.55rem 0.7rem;margin-bottom:0.2rem;border-radius:6px;{{ $l->barcode === $barcode ? 'background:var(--accent-soft,rgba(59,130,246,.12));' : '' }}">
+                                <div style="font-weight:600;font-family:monospace;">{{ $l->barcode }}</div>
+                                <div class="text-sm text-muted">
+                                    {{ $l->customername ?: '—' }}
+                                    @if ($l->status) · <span class="badge badge-muted">closed</span> @endif
+                                </div>
+                            </button>
+                        @empty
+                            <div class="text-muted" style="padding:0.8rem;">No loads on that date.</div>
+                        @endforelse
+                    </div>
+                @else
                 <div class="form-group">
                     <input type="search" class="form-control" placeholder="Barcode, truck, driver, customer…"
                            wire:model.live.debounce.400ms="search">
@@ -97,32 +146,6 @@
                         </button>
                     @endif
                 </div>
-
-                {{-- A closed load is still reachable, read-only, to reprint. --}}
-                <label class="flex items-center gap-2" style="cursor:pointer;font-size:0.9rem;margin-top:0.7rem;">
-                    <input type="checkbox" wire:model.live="showByDate">
-                    <span>Find a closed load by date</span>
-                </label>
-
-                @if ($showByDate)
-                    <div class="form-group" style="margin-top:.5rem;">
-                        @include('bil::partials.date-field', ['model' => 'dateIso', 'live' => true])
-                    </div>
-                    <div style="max-height:22rem;overflow:auto;margin:0 -0.4rem;">
-                        @forelse ($this->dateLoads as $l)
-                            <button type="button" wire:key="d-{{ $l->barcode }}" wire:click="openLoad('{{ $l->barcode }}')"
-                                    class="btn btn-ghost"
-                                    style="display:block;width:100%;text-align:left;padding:0.45rem 0.7rem;margin-bottom:0.15rem;border-radius:6px;{{ $l->barcode === $barcode ? 'background:var(--accent-soft,rgba(59,130,246,.12));' : '' }}">
-                                <div class="text-sm" style="font-family:monospace;">{{ $l->barcode }}</div>
-                                <div class="text-sm text-muted">
-                                    {{ $l->customername ?: '—' }}
-                                    @if ($l->status) · <span class="badge badge-muted">closed</span> @endif
-                                </div>
-                            </button>
-                        @empty
-                            <div class="text-muted text-sm" style="padding:0.6rem;">No loads on that date.</div>
-                        @endforelse
-                    </div>
                 @endif
             </div>
         </div>
