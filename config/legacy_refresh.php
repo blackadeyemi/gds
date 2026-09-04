@@ -63,10 +63,16 @@ return [
         'factoryentrance_details'              => 'bil.factoryentrance_details',
         'damagedgoods_rawmaterial'             => 'bil.damagedgoods_rawmaterial',
         'jumboreel_stock'                      => 'bil.jumboreel_stock',
+        // The sales chain, and it has to be ALL of it. Refreshing the loadings
+        // without the deliveries leaves every load since the last delivery in
+        // the dump marked delivered on its own row with no delivery note to
+        // show for it — 710 of them, and no print-out for any of them.
         'sales_loading'                        => 'bil.sales_loading',
         'sales_loading_return'                 => 'bil.sales_loading_return',
         'sales_order'                          => 'bil.sales_order',
         'sales_order_details'                  => 'bil.sales_order_details',
+        'sales_delivery'                       => 'bil.sales_delivery',
+        'sales_waybill'                        => 'bil.sales_waybill',
         'sales_return'                         => 'bil.sales_return',
 
         // --- BPL: same-name operational tables ---

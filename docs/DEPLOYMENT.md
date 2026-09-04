@@ -75,6 +75,13 @@ stock table still has the same 22 negative rows it had before, and
 `delivered + still open == everything ever loaded` still holds exactly
 (50,212,517 + 17,248 = 50,229,765).
 
+### ⚠️ A legacy refresh undoes it
+
+`gds:refresh-legacy` TRUNCATEs and reloads `sales_loading` from the production
+dump, so every row this closed comes back open. Confirmed on 2026-09-04: a
+refresh reopened all 118. Re-run the command after every refresh, or run it on
+production so the dump carries the closure itself.
+
 ### What to check afterwards
 
 * `SELECT COUNT(*) FROM sales_loading WHERE status IS NULL AND dateofloading < '<year>/01/01'`
