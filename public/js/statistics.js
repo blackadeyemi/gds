@@ -92,7 +92,12 @@
         const series = spec.series || [];
         const kind = spec.valueFmt || 'int';
         const compact = !!spec.compact;
-        const tip = (ctx) => `${ctx.dataset.label ? ctx.dataset.label + ': ' : ''}${fmtNumber(ctx.parsed.y ?? ctx.parsed.x ?? ctx.parsed, kind, compact)}`;
+        // The value lives on the axis OPPOSITE the index axis: y for vertical
+        // bars and lines, x for horizontal bars. Reading y first showed the
+        // category INDEX (0, 1, 2…) in horizontal-bar tooltips instead of the
+        // figure.
+        const valueAxis = type === 'hbar' ? 'x' : 'y';
+        const tip = (ctx) => `${ctx.dataset.label ? ctx.dataset.label + ': ' : ''}${fmtNumber(ctx.parsed?.[valueAxis] ?? ctx.parsed, kind, compact)}`;
 
         if (type === 'donut') {
             return new Chart(canvas, {
