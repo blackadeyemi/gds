@@ -28,7 +28,7 @@
     $onMachineReports = request()->is('bil/machines/reports/*');
     $onBpl = request()->is('bpl/*');
     $onJumboRolls = request()->is('bpl/jumbo-rolls/*');
-    $onBplSales = request()->is('bpl/jumbo-rolls/sales/*');
+    $onBplSales = request()->is('bpl/sales/*');
 
     // Global "View Entries" link: on any BIL entry page whose route
     // (bil.<module>.<slug>) has a matching report route
@@ -53,6 +53,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ $title ?? 'Admin' }} &middot; Consumer Tissue Data System</title>
     <link rel="icon" href="{{ asset('images/bilicon.ico') }}" />
+    @include('core::partials.pwa')
     <script>
         (function () {
             function applyAppearance() {
@@ -603,26 +604,26 @@
                                 <span class="label">Products</span>
                             </a>
                             @endcanPage
-
-                            @canPrefix('bpl.jumbo_rolls.sales.')
-                            <div class="nav-group" :class="{ open: bplSalesOpen }">
-                                <button type="button" class="nav-link" :class="{ active: {{ $onBplSales ? 'true' : 'false' }} && collapsed }" @click="openGroup('bplSalesOpen')" title="Sales">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                                    <span class="label">Sales</span>
-                                    <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-                                </button>
-                                <div class="nav-sub" x-show="bplSalesOpen">
-                                    @canPage('bpl.jumbo_rolls.sales.customers')
-                                    <a href="{{ route('bpl.jumbo-rolls.sales.customers') }}" class="nav-link {{ $is('bpl/jumbo-rolls/sales/customers*') }}" title="Customers">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                                        <span class="label">Customers</span>
-                                    </a>
-                                    @endcanPage
-                                </div>
-                            </div>
-                            @endcanPrefix
                         </div>
                     </div>
+
+                    @canPrefix('bpl.sales.')
+                    <div class="nav-group" :class="{ open: bplSalesOpen }">
+                        <button type="button" class="nav-link" :class="{ active: {{ $onBplSales ? 'true' : 'false' }} && collapsed }" @click="openGroup('bplSalesOpen')" title="Sales">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                            <span class="label">Sales</span>
+                            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                        </button>
+                        <div class="nav-sub" x-show="bplSalesOpen">
+                            @canPage('bpl.sales.customers')
+                            <a href="{{ route('bpl.sales.customers') }}" class="nav-link {{ $is('bpl/sales/customers*') }}" title="Customers">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                <span class="label">Customers</span>
+                            </a>
+                            @endcanPage
+                        </div>
+                    </div>
+                    @endcanPrefix
                 </div>
             </div>
             @endcanPrefix

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Login &middot; Consumer Tissue Data System</title>
     <link type="image/x-icon" rel="icon" href="{{ asset('images/bilicon.ico') }}" />
+    @include('core::partials.pwa')
 
     {{-- Apply saved theme + font size before paint to avoid a flash --}}
     <script>
