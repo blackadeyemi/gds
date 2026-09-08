@@ -19,6 +19,7 @@
     </style>
 </head>
 <body>
+    @if (! empty($logo ?? ''))<img src="{{ $logo }}" alt="" style="height:30px; margin-bottom:6px;">@endif
     <h1>{{ $label }}</h1>
     <div class="meta">Consumer Tissue Data System &middot; {{ now()->format('l, F j, Y \a\t g:i A') }} &middot; {{ count($rows) }} row(s)</div>
     {{-- What was filtered. Printed on the page because a PDF is read away from

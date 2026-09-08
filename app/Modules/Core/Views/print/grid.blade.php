@@ -17,6 +17,7 @@
     </style>
 </head>
 <body onload="window.print()">
+    @if (! empty($logo ?? ''))<img src="{{ $logo }}" alt="" style="height:40px; margin-bottom:10px;">@endif
     <h1>{{ $label }}</h1>
     <div class="meta">Consumer Tissue Data System &middot; {{ now()->format('l, F j, Y \a\t g:i A') }}</div>
     {{-- What was filtered, so a printout is readable on its own. --}}

@@ -375,6 +375,7 @@ abstract class DataGrid extends Component
             'context' => $this->exportContext(),
             'headings' => array_map(fn ($c) => $c[0], $this->exportColumns($view)),
             'rows' => $this->rowsForExport($view),
+            'logo' => \Modules\Core\Support\Branding::logo($this->pageKey()),
         ];
     }
 

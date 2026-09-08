@@ -125,6 +125,7 @@ class GridExporter
         // Lean, border-light template — dompdf is slow with per-cell borders.
         $html = view('core::print.grid-pdf', [
             'label' => $label, 'headings' => $headings, 'rows' => $rows, 'context' => $context,
+            'logo' => Branding::logo($basename),
         ])->render();
 
         // dompdf's own tempDir/fontCache also default to sys_get_temp_dir();
