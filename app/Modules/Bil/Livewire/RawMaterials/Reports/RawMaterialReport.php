@@ -915,6 +915,7 @@ abstract class RawMaterialReport extends Component
                 'rows' => $q
                     ? $q->limit(self::PRINT_ROW_CAP)->get()->map(fn ($r) => $this->mapRow($r, ['columns' => $columns]))->all()
                     : [],
+                'logo' => \Modules\Core\Support\Branding::logo('bil'),
             ];
         }
 
@@ -925,6 +926,7 @@ abstract class RawMaterialReport extends Component
             'context' => $this->reportContext(),
             'headings' => array_map(fn ($c) => $c[0], $view['columns']),
             'rows' => $this->reportRows($view, self::PRINT_ROW_CAP),
+            'logo' => \Modules\Core\Support\Branding::logo('bil'),
         ];
     }
 
@@ -1081,24 +1083,44 @@ abstract class RawMaterialReport extends Component
         $isSummary = ($view['type'] ?? 'table') === 'summary';
         $q = $this->runQuery($view);
 
+        $totals = [];
+
         if ($isSummary) {
-            $rows = $q->get();
+            // Summaries are bounded aggregations. Fetch all (as before), then
+            // paginate the collection in PHP — no extra count query — and total
+            // the figure columns across the WHOLE set for the footer.
+            $all = $q->get();
+            $page = \Illuminate\Pagination\Paginator::resolveCurrentPage('page');
+            $rows = new \Illuminate\Pagination\LengthAwarePaginator(
+                $all->forPage($page, $this->perPage)->values(),
+                $all->count(),
+                $this->perPage,
+                $page,
+                ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'pageName' => 'page']
+            );
+            $totals = $this->totalsFromCollection($view, $all);
         } elseif ($this->usesSimplePagination()) {
             $rows = $q->simplePaginate($this->perPage);
+            // Wide/unbounded range: only total when the report opts in, since a
+            // full SUM over the joined set is as costly as the count we skip.
+            if (! empty($view['totals'])) {
+                $totals = $this->totalsFromQuery($view, (array) $view['totals']);
+            }
         } else {
             // A report may supply a cheap pre-computed total (e.g. a join-free
             // count) so full pagination doesn't run the expensive default
             // COUNT(*) over the display-joined set; null → let paginate() count.
             $total = $this->paginationTotal($view);
             $rows = $q->paginate($this->perPage, ['*'], 'page', null, $total);
+            // Bounded range: totalling the figure columns is as affordable as
+            // the count we already run.
+            $totals = $this->totalsFromQuery($view, $this->totalFields($view, $rows->items()));
         }
 
         // Decide whether PDF export is allowed for the current result set. Reuse
         // a count we already have where possible; otherwise do one cheap capped
         // count (LIMIT PDF_MAX_ROWS+1) so this stays fast even on wide ranges.
-        if ($isSummary) {
-            $exportRows = $rows->count();
-        } elseif ($rows instanceof LengthAwarePaginator) {
+        if ($rows instanceof LengthAwarePaginator) {
             $exportRows = $rows->total();
         } else {
             $exportRows = $this->cappedCount($view, self::PDF_MAX_ROWS + 1);
@@ -1109,6 +1131,7 @@ abstract class RawMaterialReport extends Component
             'gridView' => $view,
             'columns' => $view['columns'],
             'rows' => $rows,
+            'totals' => $totals,
             'paginated' => $rows instanceof Paginator,
             'hasTotal' => $rows instanceof LengthAwarePaginator,
             'pdfBlocked' => $pdfBlocked,
@@ -1130,5 +1153,109 @@ abstract class RawMaterialReport extends Component
         $sub = $this->runQuery($view)->reorder()->limit($cap);
 
         return DB::connection('bil')->query()->fromSub($sub, 't')->count();
+    }
+
+    /* ---------------- Footer totals ---------------- */
+
+    /**
+     * Figure columns to total in the footer. An explicit `'totals' => [field,…]`
+     * on the view wins (and an empty array opts out); otherwise auto-detect —
+     * a column whose sampled values are all numeric and whose field is not an
+     * identifier or date. Text, id/barcode/number and date columns are skipped.
+     */
+    protected function totalFields(array $view, $sample): array
+    {
+        if (array_key_exists('totals', $view)) {
+            return (array) $view['totals'];
+        }
+        $sample = collect($sample)->take(25);
+        if ($sample->isEmpty()) {
+            return [];
+        }
+        $skip = '/(?:id|barcode|number|code|ref|year|phone|date|_at)$|^(?:id|no)$/i';
+        $out = [];
+        foreach ($view['columns'] as $col) {
+            $f = $col[1] ?? null;
+            if (! $f || preg_match($skip, $f)) {
+                continue;
+            }
+            $vals = $sample->map(fn ($r) => data_get($r, $f))->filter(fn ($v) => $v !== null && $v !== '');
+            if ($vals->isNotEmpty() && $vals->every(fn ($v) => is_numeric($v))) {
+                $out[] = $f;
+            }
+        }
+
+        return $out;
+    }
+
+    /** Footer totals summed in PHP from an already-fetched collection (summaries). */
+    protected function totalsFromCollection(array $view, $all): array
+    {
+        $out = [];
+        foreach ($this->totalFields($view, $all) as $f) {
+            $sum = 0.0;
+            $any = false;
+            foreach ($all as $r) {
+                $v = data_get($r, $f);
+                if (is_numeric($v)) {
+                    $sum += (float) $v;
+                    $any = true;
+                }
+            }
+            if ($any) {
+                $out[$f] = $this->formatTotal($view, $f, $sum);
+            }
+        }
+
+        return $out;
+    }
+
+    /** Footer totals summed in SQL over the whole filtered set (paginated tables). */
+    protected function totalsFromQuery(array $view, array $fields): array
+    {
+        $fields = array_values(array_filter($fields));
+        if (! $fields) {
+            return [];
+        }
+        $selects = [];
+        foreach ($fields as $i => $f) {
+            $selects[] = 'SUM(`' . $f . '`) as `t' . $i . '`';
+        }
+        $agg = DB::connection('bil')->query()
+            ->fromSub($this->runQuery($view)->reorder(), 't')
+            ->selectRaw(implode(', ', $selects))->first();
+
+        $out = [];
+        foreach ($fields as $i => $f) {
+            $v = $agg->{'t' . $i} ?? null;
+            if ($v !== null && is_numeric($v)) {
+                $out[$f] = $this->formatTotal($view, $f, (float) $v);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Format a footer total. Runs it through the column's own cell closure when
+     * that closure can work from a bare {field: value} (so a "kg" or rounded
+     * column reads the same in the footer), else falls back to a grouped number.
+     */
+    protected function formatTotal(array $view, string $field, float $value): string
+    {
+        foreach ($view['columns'] as $col) {
+            if (($col[1] ?? null) === $field && isset($col[2]) && is_callable($col[2])) {
+                try {
+                    $s = trim(strip_tags((string) $col[2]((object) [$field => $value])));
+                    if ($s !== '') {
+                        return $s;
+                    }
+                } catch (\Throwable $e) {
+                    // Closure needs more than this one field — use the plain number.
+                }
+            }
+        }
+
+        return number_format($value, ($value == floor($value)) ? 0 : 2);
     }
 }

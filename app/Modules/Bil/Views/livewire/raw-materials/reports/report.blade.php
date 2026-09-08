@@ -190,6 +190,20 @@
                         <tr><td colspan="{{ $spanCount }}" class="empty-row">No records found.</td></tr>
                     @endforelse
                 </tbody>
+                @if (! empty($totals))
+                    {{-- Grand total of the whole filtered set (not just this page). --}}
+                    <tfoot>
+                        <tr class="totals-row">
+                            @if ($expandBy)<td></td>@endif
+                            <td class="totals-label">Total</td>
+                            @foreach ($columns as $col)
+                                @php $tf = $col[1] ?? null; @endphp
+                                <td>@if ($tf !== null && array_key_exists($tf, $totals))<strong>{{ $totals[$tf] }}</strong>@endif</td>
+                            @endforeach
+                            @if ($showActions)<td></td>@endif
+                        </tr>
+                    </tfoot>
+                @endif
             </table>
         </div>
 
