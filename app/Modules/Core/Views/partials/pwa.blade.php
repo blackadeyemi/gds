@@ -5,6 +5,8 @@
 --}}
 <link rel="manifest" href="{{ asset('manifest.webmanifest') }}" />
 <meta name="theme-color" content="#2a78d6" />
+<link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/pwa/favicon-32.png') }}" />
+<link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/pwa/favicon-16.png') }}" />
 <link rel="apple-touch-icon" href="{{ asset('images/pwa/apple-touch-icon.png') }}" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />

@@ -52,7 +52,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ $title ?? 'Admin' }} &middot; Consumer Tissue Data System</title>
-    <link rel="icon" href="{{ asset('images/bilicon.ico') }}" />
     @include('core::partials.pwa')
     <script>
         (function () {
@@ -125,7 +124,7 @@
 
     <aside class="sidebar">
         <div class="sidebar-brand">
-            <img src="{{ asset('images/GDS-1.png') }}" alt="GDS" />
+            <img src="{{ asset('images/gds-mark.svg') }}" alt="GDS" />
             <div class="brand-text">
                 <strong>GDS</strong>
                 <span>Consumer Tissue Data System</span>

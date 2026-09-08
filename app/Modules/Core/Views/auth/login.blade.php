@@ -4,7 +4,6 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Login &middot; Consumer Tissue Data System</title>
-    <link type="image/x-icon" rel="icon" href="{{ asset('images/bilicon.ico') }}" />
     @include('core::partials.pwa')
 
     {{-- Apply saved theme + font size before paint to avoid a flash --}}
@@ -56,7 +55,7 @@
         </div>
         {{-- Shared system brand, centred below --}}
         <div class="gds-row">
-            <img src="{{ asset('images/GDS-1.png') }}" alt="Global Data System" />
+            <img src="{{ asset('images/gds-logo.svg') }}" alt="Global Data System" />
         </div>
 
         <div class="card">
