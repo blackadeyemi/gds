@@ -743,6 +743,9 @@
                 </div>
             </div>
         </nav>
+        <div class="sidebar-foot">
+            <span class="ver">v{{ config('app.version') }}</span>
+        </div>
     </aside>
 
     <div class="main">

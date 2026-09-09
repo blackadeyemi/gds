@@ -68,16 +68,19 @@ body {
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: center;
-    /* Sit the form high on the page (min keeps it clear of the fixed brand). */
-    padding: clamp(64px, 9vh, 128px) 24px 32px;
+    min-height: 100dvh;
+    padding: 24px;
     transition: background .2s, color .2s;
 }
 
 .login-shell {
     width: 100%;
     max-width: 30em;
+    /* auto margins centre the shell on any screen without clipping the top
+       when the content is taller than the viewport (unlike flex centring). */
+    margin: auto;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -90,7 +93,7 @@ body {
     left: 18px;
     z-index: 10;
 }
-.brand-top img { height: 2.6em; width: auto; display: block; }
+.brand-top img { height: 3.8em; width: auto; display: block; }
 
 /* Company logos — in the footer, beneath the website links */
 .company-row {
@@ -210,6 +213,7 @@ body {
 }
 .footer .links a { color: var(--brand); text-decoration: none; font-weight: 600; }
 .footer .links a:hover { text-decoration: underline; }
+.footer .version { margin-top: 1em; font-size: 0.78em; font-weight: 600; letter-spacing: .03em; color: var(--muted); }
 
 /* Settings control (fixed, top-right) */
 .settings-bar {
@@ -258,5 +262,5 @@ body {
     .card { padding: 1.9em 1.5em; }
     .settings-bar { top: 10px; right: 10px; }
     .brand-top { top: 10px; left: 10px; }
-    .brand-top img { height: 2.2em; }
+    .brand-top img { height: 2.8em; }
 }

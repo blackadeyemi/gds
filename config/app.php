@@ -17,6 +17,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Application Version
+    |--------------------------------------------------------------------------
+    |
+    | Displayed in the UI (login page, sidebar footer). Bump this here — it is
+    | the single source of truth. Override per environment with APP_VERSION.
+    |
+    */
+
+    'version' => env('APP_VERSION', '2.0'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

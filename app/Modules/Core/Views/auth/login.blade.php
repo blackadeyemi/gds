@@ -91,6 +91,7 @@
                 <img src="{{ asset('images/belimpex_brands logo.png') }}" alt="Belimpex" />
                 <img src="{{ asset('images/belpapyrus_companies logo.png') }}" alt="Belpapyrus" />
             </div>
+            <div class="version">Version {{ config('app.version') }}</div>
         </div>
     </div>
 
