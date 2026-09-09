@@ -262,15 +262,30 @@ class SalesLoadings
         })->all();
     }
 
-    /** Recent orders, for the New Loading picker. */
-    public static function loadableOrders(int $days = 250, int $limit = 300): array
+    /**
+     * Orders for the New Loading picker: a year of them, uncapped.
+     *
+     * It used to be 250 days AND the 300 newest. The cap was the real problem —
+     * 5,299 orders fell in that window and the picker offered 300 of them, so
+     * 4,999 were unreachable and an order a month old could not be found. The
+     * control filters what it is given, so an order missing from the list is an
+     * order that cannot be loaded against.
+     *
+     * ⚠️ UNCAPPED, DELIBERATELY, AND IT IS NOT FREE. A year is 8,286 orders,
+     * about 523KB of options in the page. The query itself is 49ms — the cost
+     * is payload and the browser's memory, not the database. If the picker ever
+     * feels heavy, the fix is a server-side search (type, then query), not a
+     * smaller cap: a cap silently hides orders, which is the bug this replaces.
+     */
+    public static function loadableOrders(int $days = 365, ?int $limit = null): array
     {
         $since = now()->subDays($days)->format('Y/m/d');
 
         return DB::connection('bil')->table('sales_order as o')
             ->leftJoin('sales_customers as c', 'o.customerid', '=', 'c.id')
             ->where('o.dateoforder', '>=', $since)
-            ->orderByDesc('o.id')->limit($limit)
+            ->orderByDesc('o.id')
+            ->when($limit !== null, fn ($q) => $q->limit($limit))
             ->get(['o.orderid', 'o.warehousecode', 'o.customerid', 'c.customername'])->all();
     }
 
