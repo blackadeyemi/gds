@@ -84,6 +84,16 @@ class Loading extends Component
     public string $orderid = '';
 
     /**
+     * What has been typed into the order picker's search box.
+     *
+     * The picker searches the SERVER. It carried every order of the last year
+     * instead — 8,286 options, half a megabyte of JSON — and re-filtered the
+     * whole array on each keystroke, which froze the page hard enough that
+     * nothing on it could be clicked. See SalesLoadings::loadableOrders().
+     */
+    public string $orderSearch = '';
+
+    /**
      * The date the truck is being loaded ON, which is not always today.
      *
      * A load raised the morning after a night shift, or keyed once the office
@@ -337,10 +347,11 @@ class Loading extends Component
         return SalesLoadings::recentDrivers();
     }
 
+    /** The orders the picker is offering: the newest few, or what was searched. */
     #[Computed]
     public function orders(): array
     {
-        return SalesLoadings::loadableOrders();
+        return SalesLoadings::loadableOrders($this->orderSearch);
     }
 
     #[Computed]
@@ -350,6 +361,21 @@ class Loading extends Component
             'value' => $o->orderid,
             'label' => $o->orderid . ' — ' . ($o->customername ?: 'no customer'),
         ])->all();
+    }
+
+    /**
+     * What the picker's trigger reads.
+     *
+     * Drawn server-side, because the chosen order is usually NOT in the current
+     * match list — the box is cleared on select — so the control cannot look
+     * its own label up any more.
+     */
+    #[Computed]
+    public function selectedOrderLabel(): string
+    {
+        $order = $this->order;
+
+        return $order ? $order->orderid . ' — ' . ($order->customername ?: 'no customer') : '';
     }
 
     #[Computed]
@@ -423,6 +449,7 @@ class Loading extends Component
         $this->mode = 'new';
         $this->barcode = '';
         $this->orderid = '';
+        $this->orderSearch = '';
         $this->toLoad = [];
         $this->newLoadNumber = false;
         $this->loadDateIso = now()->format('Y-m-d');
@@ -436,6 +463,7 @@ class Loading extends Component
         $this->mode = 'queue';
         $this->barcode = '';
         $this->orderid = '';
+        $this->orderSearch = '';
         $this->toLoad = [];
         $this->resetLineEditors();
     }

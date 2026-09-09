@@ -91,8 +91,11 @@ class SalesOrderTrail
      * order number matched nothing and the page said the order did not exist —
      * which is how order 116691 came to look missing when it was there all
      * along.
+     *
+     * Public because every sales search box needs it, not just this one — the
+     * New Loading order picker searches the same latin1 columns.
      */
-    private static function clean(?string $term): string
+    public static function clean(?string $term): string
     {
         $term = (string) $term;
 
@@ -123,7 +126,7 @@ class SalesOrderTrail
      * character in a pasted number. A term latin1 cannot hold could never match
      * one of those columns anyway, so it is answered here as no match.
      */
-    private static function matchable(string $term): bool
+    public static function matchable(string $term): bool
     {
         if ($term === '') {
             return false;

@@ -26,12 +26,23 @@
         <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-start;">
             <div class="form-group" style="flex:1 1 260px;min-width:0;">
                 <label class="form-label">Sales order</label>
+                {{-- Searched on the server: the list is the newest few until
+                     something is typed, and then it is whatever matched, out of
+                     all of history. Handing the control every order instead
+                     locked the browser up. --}}
                 @include('core::partials.searchable-select', [
                     'field' => 'orderid',
                     'options' => $this->orderOptions,
                     'valueKey' => 'value', 'labelKey' => 'label',
                     'placeholder' => '— Select order —',
                     'live' => true,
+                    'ssSearch' => 'orderSearch',
+                    'ssSelectedLabel' => $this->selectedOrderLabel,
+                    'ssSearchPlaceholder' => 'Order number, or customer…',
+                    'ssEmpty' => 'No order matches that',
+                    'ssHint' => $orderSearch === ''
+                        ? 'The ' . count($this->orderOptions) . ' newest orders — type a number or a customer to find any other.'
+                        : null,
                 ])
                 @error('orderid') <div class="form-error">{{ $message }}</div> @enderror
                 @if ($order)

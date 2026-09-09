@@ -262,30 +262,59 @@ class SalesLoadings
         })->all();
     }
 
-    /**
-     * Orders for the New Loading picker: a year of them, uncapped.
-     *
-     * It used to be 250 days AND the 300 newest. The cap was the real problem —
-     * 5,299 orders fell in that window and the picker offered 300 of them, so
-     * 4,999 were unreachable and an order a month old could not be found. The
-     * control filters what it is given, so an order missing from the list is an
-     * order that cannot be loaded against.
-     *
-     * ⚠️ UNCAPPED, DELIBERATELY, AND IT IS NOT FREE. A year is 8,286 orders,
-     * about 523KB of options in the page. The query itself is 49ms — the cost
-     * is payload and the browser's memory, not the database. If the picker ever
-     * feels heavy, the fix is a server-side search (type, then query), not a
-     * smaller cap: a cap silently hides orders, which is the bug this replaces.
-     */
-    public static function loadableOrders(int $days = 365, ?int $limit = null): array
-    {
-        $since = now()->subDays($days)->format('Y/m/d');
+    /** How many orders the New Loading picker shows at a time. */
+    public const ORDER_PICKER_LIMIT = 25;
 
-        return DB::connection('bil')->table('sales_order as o')
-            ->leftJoin('sales_customers as c', 'o.customerid', '=', 'c.id')
-            ->where('o.dateoforder', '>=', $since)
-            ->orderByDesc('o.id')
-            ->when($limit !== null, fn ($q) => $q->limit($limit))
+    /**
+     * Orders for the New Loading picker — SEARCHED ON THE SERVER.
+     *
+     * The two things this has to get right pull against each other, and the
+     * screen has been broken by each of them in turn:
+     *
+     *  1. NOTHING MAY BE HIDDEN. It once offered the 300 newest inside 250
+     *     days, so 4,999 orders in its own window were unreachable and an order
+     *     a month old simply could not be loaded against. A cap does not shrink
+     *     the problem, it silences it.
+     *  2. NOTHING MAY BE SHIPPED THAT THE BROWSER CANNOT HOLD. Removing the cap
+     *     put a year — 8,286 orders, ~550KB of JSON — into the page, where the
+     *     picker snapshots every option into Alpine and re-filters the lot on
+     *     each keystroke. The tab locked up; the whole screen stopped
+     *     responding to clicks.
+     *
+     * Both are answered by asking the database instead. A blank term lists the
+     * newest few, which is the common case (today's order, raised minutes ago);
+     * typing searches ALL of history, so nothing is out of reach, and only the
+     * matches travel.
+     *
+     * Matched the way SalesOrderTrail matches, for the same reasons: a number
+     * is a PREFIX so the unique index on `orderid` does the work with no scan,
+     * an exact hit sorts first so a fully typed number is never buried under
+     * newer ones sharing its opening digits, and anything else is a customer.
+     */
+    public static function loadableOrders(string $term = '', int $limit = self::ORDER_PICKER_LIMIT): array
+    {
+        $q = DB::connection('bil')->table('sales_order as o')
+            ->leftJoin('sales_customers as c', 'o.customerid', '=', 'c.id');
+
+        $term = SalesOrderTrail::clean($term);
+
+        if ($term !== '') {
+            // `orderid` and `customername` are latin1 and MySQL REFUSES a
+            // parameter it cannot convert — a 500 from one pasted invisible
+            // character, not an empty list. Such a term could never match.
+            if (! SalesOrderTrail::matchable($term)) {
+                return [];
+            }
+
+            if (ctype_digit($term)) {
+                $q->where('o.orderid', 'like', $term . '%')
+                    ->orderByRaw('o.orderid = ? DESC', [$term]);
+            } else {
+                $q->where('c.customername', 'like', '%' . $term . '%');
+            }
+        }
+
+        return $q->orderByDesc('o.id')->limit($limit)
             ->get(['o.orderid', 'o.warehousecode', 'o.customerid', 'c.customername'])->all();
     }
 
