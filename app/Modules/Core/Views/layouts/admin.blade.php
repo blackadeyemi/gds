@@ -503,6 +503,11 @@
                                         <span class="label">Damaged Goods</span>
                                     </a>
                                     @endcanPage
+                                    @canPage('bil.sales.reports.order_trail')
+                                    <a href="{{ route('bil.sales.reports.order-trail') }}" class="nav-link {{ $is('bil/sales/reports/order-trail*') }}" title="Order Trail">
+                                        <span class="label">Order Trail</span>
+                                    </a>
+                                    @endcanPage
                                 </div>
                             </div>
                             @endcanPrefix

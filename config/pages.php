@@ -100,6 +100,7 @@ return [
         ['key' => 'bil.sales.reports.returns',  'label' => 'Returns',  'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.returns',  'abilities' => $snapshot],
         ['key' => 'bil.sales.reports.waybill',  'label' => 'Waybill',  'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.waybill',  'abilities' => $snapshot],
         ['key' => 'bil.sales.reports.damaged_goods', 'label' => 'Damaged Goods', 'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.damaged-goods', 'abilities' => $snapshot],
+        ['key' => 'bil.sales.reports.order_trail', 'label' => 'Order Trail', 'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.order-trail', 'abilities' => $snapshot],
 
         // BIL — Raw Materials
         ['key' => 'bil.raw_materials.statistics',          'label' => 'Statistics',          'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.statistics',          'abilities' => $snapshot],

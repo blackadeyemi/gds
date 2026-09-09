@@ -59,6 +59,7 @@ use Modules\Bil\Livewire\Sales\Waybill as SalesWaybillPage;
 use Modules\Bil\Livewire\Sales\Loading as SalesLoadingPage;
 use Modules\Bil\Livewire\Sales\Orders as SalesOrders;
 use Modules\Bil\Livewire\Sales\Reports\DamagedGoods as SalesDamagedGoodsReport;
+use Modules\Bil\Livewire\Sales\Reports\OrderTrail as SalesOrderTrailReport;
 use Modules\Bil\Livewire\Sales\Statistics as SalesStatistics;
 use Modules\Bil\Livewire\Sales\Reports\Delivery as SalesDeliveryReport;
 use Modules\Bil\Livewire\Sales\Reports\Loading as SalesLoadingReport;
@@ -328,6 +329,84 @@ Route::middleware('auth')
                 ->middleware('page:bil.sales.reports.waybill')->name('waybill');
             Route::get('/damaged-goods', SalesDamagedGoodsReport::class)
                 ->middleware('page:bil.sales.reports.damaged_goods')->name('damaged-goods');
+
+            /*
+            | Order Trail stands apart from the six above: it is not a
+            | date-ranged list on the report framework, so it does not go
+            | through the shared {report}/print + {report}/download pair. It
+            | takes an order (and optionally one product) and prints the WHOLE
+            | trail — the page on screen is one product of several, which would
+            | not answer the question the print-out is for.
+            */
+            Route::get('/order-trail', SalesOrderTrailReport::class)
+                ->middleware('page:bil.sales.reports.order_trail')->name('order-trail');
+
+            $trail = function () {
+                $orderid = trim((string) request('order', ''));
+                $order = \Modules\Bil\Support\SalesOrderTrail::find($orderid);
+                abort_unless($order !== null, 404, 'No such order.');
+
+                $productid = request('product') !== null && request('product') !== ''
+                    ? (int) request('product') : null;
+
+                $rows = [];
+                foreach (\Modules\Bil\Support\SalesOrderTrail::lines($orderid, $productid) as $line) {
+                    $product = $line->productname . ($line->productcode ? ' (' . $line->productcode . ')' : '');
+                    foreach (\Modules\Bil\Support\SalesOrderTrail::trail($order, $line) as $e) {
+                        $rows[] = [
+                            $product,
+                            $line->foc ? 'FOC' : 'Sold',
+                            $e['date'],
+                            $e['label'],
+                            $e['reference'],
+                            $e['quantity'] === null ? '' : number_format($e['quantity']),
+                            $e['detail'],
+                        ];
+                    }
+                }
+
+                return [
+                    'label' => 'Order Trail — ' . $order->orderid,
+                    'context' => array_values(array_filter([
+                        ['Order', (string) $order->orderid],
+                        ['Customer', (string) ($order->customername ?: '—')],
+                        ['Date of order', (string) $order->dateoforder],
+                        $order->warehouse ? ['Depot', (string) $order->warehouse] : null,
+                        $productid ? ['Product', (string) (\Modules\Bil\Support\SalesOrderTrail::products($orderid)[$productid] ?? $productid)] : null,
+                    ])),
+                    'headings' => ['Product', 'Type', 'Date', 'Transaction', 'Reference', 'Bundles', 'Detail'],
+                    'rows' => $rows,
+                    'order' => $order,
+                ];
+            };
+
+            $trailAuth = function () {
+                abort_unless((bool) request()->user()?->canDo('bil.sales.reports.order_trail', 'export'), 403);
+            };
+
+            Route::get('/order-trail/print', function () use ($trail, $trailAuth) {
+                $trailAuth();
+
+                return view('core::print.grid', $trail());
+            })->middleware('page:bil.sales.reports.order_trail')->name('order-trail.print');
+
+            Route::get('/order-trail/download', function () use ($trail, $trailAuth) {
+                $trailAuth();
+
+                $format = strtolower((string) request('format', 'xlsx'));
+                abort_unless(in_array($format, ['xlsx', 'csv', 'pdf'], true), 404);
+
+                $payload = $trail();
+                $base = 'order-trail-' . $payload['order']->orderid;
+
+                if ($format === 'pdf') {
+                    return \Modules\Core\Support\GridExporter::pdf($base, $payload['label'],
+                        $payload['headings'], $payload['rows'], $payload['context']);
+                }
+
+                return \Modules\Core\Support\GridExporter::download($format, $base,
+                    $payload['headings'], $payload['rows'], $payload['context']);
+            })->middleware('page:bil.sales.reports.order_trail')->name('order-trail.download');
 
             $reports = [
                 'orders' => SalesOrdersReport::class,
