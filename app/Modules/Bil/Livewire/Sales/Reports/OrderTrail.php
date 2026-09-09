@@ -144,6 +144,29 @@ class OrderTrail extends Component
         return $this->order ? SalesOrderTrail::products($this->orderid) : [];
     }
 
+    /**
+     * The product filter's options, for the searchable select.
+     *
+     * "All products" is an option rather than a placeholder because the control
+     * has no clear button of its own — without a row to pick, narrowing to one
+     * product would be a one-way door.
+     *
+     * A 48-line order is the biggest in this data, so the list is short; it is
+     * searchable because reading nine near-identical tissue names is slower
+     * than typing three letters of the one you want.
+     */
+    #[Computed]
+    public function productOptions(): array
+    {
+        $options = [['value' => '', 'label' => 'All products on this order']];
+
+        foreach ($this->products as $id => $name) {
+            $options[] = ['value' => (string) $id, 'label' => $name];
+        }
+
+        return $options;
+    }
+
     public function pageCount(): int
     {
         return count($this->lines);

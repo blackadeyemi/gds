@@ -473,6 +473,11 @@
                                     <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
                                 </button>
                                 <div class="nav-sub" x-show="salesReportsOpen">
+                                    @canPage('bil.sales.reports.order_trail')
+                                    <a href="{{ route('bil.sales.reports.order-trail') }}" class="nav-link {{ $is('bil/sales/reports/order-trail*') }}" title="Order Trail">
+                                        <span class="label">Order Trail</span>
+                                    </a>
+                                    @endcanPage
                                     @canPage('bil.sales.reports.orders')
                                     <a href="{{ route('bil.sales.reports.orders') }}" class="nav-link {{ $is('bil/sales/reports/orders*') }}" title="Orders">
                                         <span class="label">Orders</span>
@@ -501,11 +506,6 @@
                                     @canPage('bil.sales.reports.damaged_goods')
                                     <a href="{{ route('bil.sales.reports.damaged-goods') }}" class="nav-link {{ $is('bil/sales/reports/damaged-goods*') }}" title="Damaged Goods">
                                         <span class="label">Damaged Goods</span>
-                                    </a>
-                                    @endcanPage
-                                    @canPage('bil.sales.reports.order_trail')
-                                    <a href="{{ route('bil.sales.reports.order-trail') }}" class="nav-link {{ $is('bil/sales/reports/order-trail*') }}" title="Order Trail">
-                                        <span class="label">Order Trail</span>
                                     </a>
                                     @endcanPage
                                 </div>

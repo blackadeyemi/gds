@@ -94,13 +94,13 @@ return [
         // delivery it feeds straight; a report that deleted one would not.
         // Gated one report at a time because they are not equally sensitive —
         // Waybill carries what haulage cost, which is not a depot's business.
+        ['key' => 'bil.sales.reports.order_trail', 'label' => 'Order Trail', 'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.order-trail', 'abilities' => $snapshot],
         ['key' => 'bil.sales.reports.orders',   'label' => 'Orders',   'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.orders',   'abilities' => $snapshot],
         ['key' => 'bil.sales.reports.loading',  'label' => 'Loading',  'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.loading',  'abilities' => $snapshot],
         ['key' => 'bil.sales.reports.delivery', 'label' => 'Delivery', 'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.delivery', 'abilities' => $snapshot],
         ['key' => 'bil.sales.reports.returns',  'label' => 'Returns',  'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.returns',  'abilities' => $snapshot],
         ['key' => 'bil.sales.reports.waybill',  'label' => 'Waybill',  'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.waybill',  'abilities' => $snapshot],
         ['key' => 'bil.sales.reports.damaged_goods', 'label' => 'Damaged Goods', 'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.damaged-goods', 'abilities' => $snapshot],
-        ['key' => 'bil.sales.reports.order_trail', 'label' => 'Order Trail', 'module' => 'BIL / Sales Reports', 'route' => 'bil.sales.reports.order-trail', 'abilities' => $snapshot],
 
         // BIL — Raw Materials
         ['key' => 'bil.raw_materials.statistics',          'label' => 'Statistics',          'module' => 'BIL / Raw Materials', 'route' => 'bil.raw-materials.statistics',          'abilities' => $snapshot],

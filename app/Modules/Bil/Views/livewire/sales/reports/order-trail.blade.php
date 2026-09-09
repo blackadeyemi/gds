@@ -90,10 +90,17 @@
                     </div>
 
                     <div class="flex items-center gap-2" style="margin-left:auto;">
+                        {{-- Labelled, not the three-dot icon the other reports
+                             use. There it sits alone in a sparse filter bar; here
+                             it would be one more glyph in a header already
+                             carrying the customer, four totals and another
+                             button, and it was missed. --}}
                         @if ($this->canExport())
                             <div class="dropdown" x-data="{ open: false }" @click.outside="open = false">
-                                <button class="btn btn-ghost btn-icon btn-sm" @click="open = !open" title="Export / Print">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+                                <button class="btn btn-ghost btn-sm" @click="open = !open" title="Export or print this order's trail">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                                    Export
+                                    <svg width="10" height="7" viewBox="0 0 12 8" fill="none" style="margin-left:.1rem;"><path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                 </button>
                                 <div class="dropdown-menu" x-show="open" x-cloak x-transition @click="open = false">
                                     <a class="dropdown-item" href="{{ $this->downloadUrl('xlsx') }}">
@@ -131,14 +138,21 @@
         {{-- ---------------- The pager, and the optional product filter ---------------- --}}
         <div class="card" style="margin-bottom:1rem;">
             <div class="card-pad" style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;">
-                <div class="form-group mb-0" style="flex:0 1 300px;min-width:220px;margin-bottom:0;">
+                {{-- Searchable: the names on one order differ by a few
+                     characters ("Rose Carla TLT 1X6X8" against "… 4x12"), which
+                     is slower to read down than to type. Keyed on the order so
+                     the control re-initialises with fresh options when another
+                     order is opened. --}}
+                <div class="form-group mb-0" style="flex:0 1 340px;min-width:240px;margin-bottom:0;">
                     <label class="form-label">Product</label>
-                    <select class="form-control" wire:model.live="productid">
-                        <option value="">All products on this order</option>
-                        @foreach ($this->products as $id => $name)
-                            <option value="{{ $id }}">{{ $name }}</option>
-                        @endforeach
-                    </select>
+                    @include('core::partials.searchable-select', [
+                        'field' => 'productid',
+                        'options' => $this->productOptions,
+                        'valueKey' => 'value', 'labelKey' => 'label',
+                        'placeholder' => 'All products on this order',
+                        'live' => true,
+                        'key' => 'ss-product-' . $this->orderid,
+                    ])
                 </div>
 
                 @if ($count > 0)
