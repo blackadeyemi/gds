@@ -47,17 +47,12 @@
         </div>
     </div>
 
-    <div class="login-shell">
-        {{-- Two companies side by side --}}
-        <div class="company-row">
-            <img src="{{ asset('images/belimpex_brands logo.png') }}" alt="Belimpex" />
-            <img src="{{ asset('images/belpapyrus_companies logo.png') }}" alt="Belpapyrus" />
-        </div>
-        {{-- Shared system brand, centred below --}}
-        <div class="gds-row">
-            <img src="{{ asset('images/gds-logo.svg') }}" alt="Global Data System" />
-        </div>
+    {{-- System brand, fixed top-left (mirrors the settings bar, top-right) --}}
+    <div class="brand-top">
+        <img src="{{ asset('images/gds-logo.svg') }}" alt="Global Data System" />
+    </div>
 
+    <div class="login-shell">
         <div class="card">
             <h1>Sign in</h1>
             <p class="subtitle">Consumer Tissue Data System</p>
@@ -90,6 +85,11 @@
             <div class="links">
                 <a href="http://www.belimpex.ng">www.belimpex.ng</a>
                 <a href="http://www.belpapyrus.ng">www.belpapyrus.ng</a>
+            </div>
+            {{-- Company logos, beneath their websites --}}
+            <div class="company-row">
+                <img src="{{ asset('images/belimpex_brands logo.png') }}" alt="Belimpex" />
+                <img src="{{ asset('images/belpapyrus_companies logo.png') }}" alt="Belpapyrus" />
             </div>
         </div>
     </div>
