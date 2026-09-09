@@ -5,6 +5,76 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-09-09 - Order Trail report; gds:replay-backfills
+
+No migration. One new report page and one new console command.
+
+### New page: BIL -> Sales -> Reports -> Order Trail
+
+`bil/sales/reports/order-trail`. Everything that ever happened to ONE order -
+ordered, loaded, taken back at the gate, delivered, waybilled, returned - with
+the date, the reference and the bundles on every row.
+
+Search by order number (matched from the start, so it uses the unique index on
+`orderid`) or by customer name. Then one ORDER LINE per page: the line, not the
+product, because the same product is routinely ordered twice on one order, once
+sold and once free of charge - 81,778 order/product pairs do - and they are
+separate lines with separate loadings. Each page says which it is.
+
+Page key `bil.sales.reports.order_trail`, abilities `view` / `export`. Run
+`php artisan gds:sync-pages` and grant it.
+
+Print and export cover the whole order rather than the page on screen.
+
+### WARNING: `gds:replay-backfills` - run this after EVERY legacy refresh
+
+```
+php artisan gds:replay-backfills            # dry run - what is missing
+php artisan gds:replay-backfills --apply    # fill it
+```
+
+`gds:refresh-legacy` (and any hand restore) TRUNCATEs a legacy table and reloads
+it from the production dump. Production has never run our migrations, so a
+column WE added and backfilled comes back **empty**, while `core.migrations`
+still records the migration as run - it never fires again, and nothing
+complains.
+
+That is what emptied the **Factory column on the Factory Exit report**: all
+1,209,667 rows of `factory_exit.exit_location_id` were NULL after the 2026-09-04
+refresh. Four columns were wiped in total:
+
+| column | rows wiped |
+|---|---|
+| `bil.factory_exit.exit_location_id` | 1,209,667 |
+| `bil.factory_entrance_reel.gate_id` | 90,061 |
+| `bpl.bpl_factoryexit.received_at` | 78,782 |
+| `bil.factory_event.date` | 792 |
+
+Every repair is idempotent and touches only rows missing the value, so running
+it when nothing is broken costs one COUNT each and changes nothing.
+
+**Do NOT `migrate:rollback` to fix this** - every one of those migrations drops
+its column in `down()`.
+
+Generated columns are deliberately not replayed: MySQL recomputes
+`reel_barcode` on insert, so a reload heals it by itself.
+
+One trap worth knowing if a repair is ever added: `reel-entrance-gate` matches
+`factory_entrance_reel.location`, which holds the FACTORY's code (Bil-1,
+Gambini), against `factories.code` joined through `factory_gates`, inbound gates
+only. `factory_gates` has no `code` column of its own - matching on the gate
+name instead silently fills 5 rows out of 90,066.
+
+### What to check afterwards
+
+* `php artisan gds:replay-backfills` reports "Nothing to replay".
+* Finished Goods -> Reports -> Factory Exit shows a factory on every row.
+* The feature suite: replaying fixes two of the four jumbo-roll failures a
+  refresh causes. The other two pick a fixture reel that the refreshed data has
+  since consumed - a test problem, not a code one.
+
+---
+
 ## 2026-09-03 (b) — Closing loadings that were never confirmed delivered
 
 No migration. One new console command, and **a data change that has to be run by
