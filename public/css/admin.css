@@ -67,6 +67,17 @@
 .topbar .icon-btn { background: transparent; border: 0; color: var(--muted); cursor: pointer; padding: 0.4rem; border-radius: 8px; display: inline-flex; }
 .topbar .icon-btn:hover { background: var(--surface-2); color: var(--ink); }
 
+/* Connection status indicator (topbar) */
+.net-status { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 999px; }
+.net-status .net-dot { width: 9px; height: 9px; border-radius: 50%; background: #16a34a; box-shadow: 0 0 0 3px rgba(22, 163, 74, .15); flex: 0 0 auto; }
+.net-status .net-label { display: none; font-size: 0.75rem; font-weight: 600; letter-spacing: .02em; }
+.net-status.offline { background: rgba(245, 158, 11, .12); padding: 4px 10px; }
+.net-status.offline .net-dot { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, .18); animation: net-pulse 1.4s ease-in-out infinite; }
+.net-status.offline .net-label { display: inline; color: #b45309; }
+[data-theme="dark"] .net-status.offline .net-label { color: #fbbf24; }
+@keyframes net-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .net-status.offline .net-dot { animation: none; } }
+
 .content { padding: 1.5rem; flex: 1; }
 .page-head { margin-bottom: 1.25rem; }
 .page-head h1 { font-size: 1.4rem; font-weight: 700; margin: 0 0 0.2rem; display: flex; align-items: center; gap: 0.5rem; }

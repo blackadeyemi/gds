@@ -770,6 +770,16 @@
 
                 <span class="clock" x-data="{ now: '' }" x-init="now = new Date().toLocaleString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' }); setInterval(() => now = new Date().toLocaleString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' }), 30000)" x-text="now"></span>
 
+                {{-- Connection status: quiet when online, amber pill when the
+                     network drops (so users know entries won't save offline). --}}
+                <div class="net-status" x-data="{ online: navigator.onLine }"
+                     @online.window="online = true" @offline.window="online = false"
+                     :class="{ offline: !online }"
+                     :title="online ? 'Online' : 'Offline — you are not connected; changes will not save until you reconnect'">
+                    <span class="net-dot"></span>
+                    <span class="net-label" x-text="online ? 'Online' : 'Offline'"></span>
+                </div>
+
                 <button class="icon-btn" title="Notifications">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                 </button>
