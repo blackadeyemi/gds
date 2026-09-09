@@ -83,10 +83,37 @@ class OrderTrail extends Component
 
     /* ---------------- Finding an order ---------------- */
 
+    /** How many matches the list shows before it says there are more. */
+    public const SUGGEST_LIMIT = 15;
+
+    /**
+     * One more than we show, so the page can say the list was cut short.
+     *
+     * Without that, fifteen hits and five hundred hits look identical, and a
+     * customer with more orders than the cap reads as "these are all of them".
+     */
+    #[Computed]
+    public function matches(): array
+    {
+        $rows = $this->search === ''
+            ? []
+            : SalesOrderTrail::suggest($this->search, self::SUGGEST_LIMIT + 1);
+
+        return [
+            'rows' => array_slice($rows, 0, self::SUGGEST_LIMIT),
+            'more' => count($rows) > self::SUGGEST_LIMIT,
+        ];
+    }
+
     #[Computed]
     public function suggestions(): array
     {
-        return $this->search === '' ? [] : SalesOrderTrail::suggest($this->search);
+        return $this->matches['rows'];
+    }
+
+    public function hasMoreMatches(): bool
+    {
+        return $this->matches['more'];
     }
 
     #[Computed]
@@ -101,7 +128,7 @@ class OrderTrail extends Component
         $this->search = '';
         $this->productid = '';
         $this->lineNo = 1;
-        unset($this->order, $this->lines, $this->products, $this->suggestions);
+        unset($this->order, $this->lines, $this->products, $this->productOptions, $this->matches, $this->suggestions);
     }
 
     /**
@@ -111,10 +138,14 @@ class OrderTrail extends Component
      */
     public function submitSearch(): void
     {
-        $term = trim($this->search);
+        // The order's OWN id, not the text that found it. A pasted number can
+        // carry a non-breaking space; find() looks past that, but storing the
+        // typed text put the invisible character into every later query and the
+        // page then showed the order header with none of its lines.
+        $order = SalesOrderTrail::find($this->search);
 
-        if ($term !== '' && SalesOrderTrail::find($term)) {
-            $this->openOrder($term);
+        if ($order) {
+            $this->openOrder((string) $order->orderid);
 
             return;
         }
@@ -134,7 +165,7 @@ class OrderTrail extends Component
         $this->productid = '';
         $this->lineNo = 1;
         $this->search = '';
-        unset($this->order, $this->lines, $this->products, $this->suggestions);
+        unset($this->order, $this->lines, $this->products, $this->productOptions, $this->matches, $this->suggestions);
     }
 
     /* ---------------- The lines, one per page ---------------- */

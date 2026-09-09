@@ -82,12 +82,65 @@ class SalesOrderTrail
 
     /* ---------------- Finding the order ---------------- */
 
+    /**
+     * Strip what rides along with a copy-paste.
+     *
+     * A number copied off another screen, out of Excel or out of an email very
+     * often carries a NON-BREAKING SPACE or a zero-width character. `trim()`
+     * does not touch either: it only knows the ASCII whitespace. So a pasted
+     * order number matched nothing and the page said the order did not exist —
+     * which is how order 116691 came to look missing when it was there all
+     * along.
+     */
+    private static function clean(?string $term): string
+    {
+        $term = (string) $term;
+
+        // The Unicode spaces, flattened to a plain one.
+        $term = preg_replace(
+            '~[\x{00A0}\x{1680}\x{2000}-\x{200A}\x{202F}\x{205F}\x{3000}]~u', ' ', $term
+        ) ?? $term;
+
+        // The invisibles: zero-width space/non-joiner/joiner, word joiner, BOM.
+        $term = preg_replace('~[\x{200B}-\x{200D}\x{2060}\x{FEFF}]~u', '', $term) ?? $term;
+
+        $term = trim($term);
+
+        // "#116691" is how an order number gets written down, and no customer
+        // name begins with a hash — so the prefix is dropped rather than sending
+        // a perfectly good number off to the name search, which finds nothing.
+        // Only a LEADING hash: a name search for a digit ("4TEES") must stay one.
+        return ltrim($term, '#');
+    }
+
+    /**
+     * Whether a term can be compared against these columns at all.
+     *
+     * `sales_order.orderid` and `sales_customers.customername` are latin1, and
+     * MySQL REFUSES a parameter it cannot convert rather than returning no
+     * rows: "Conversion from collation utf8mb4_unicode_ci into
+     * latin1_swedish_ci impossible for parameter" — a 500, from one invisible
+     * character in a pasted number. A term latin1 cannot hold could never match
+     * one of those columns anyway, so it is answered here as no match.
+     */
+    private static function matchable(string $term): bool
+    {
+        if ($term === '') {
+            return false;
+        }
+
+        $latin1 = @mb_convert_encoding($term, 'ISO-8859-1', 'UTF-8');
+
+        return is_string($latin1)
+            && @mb_convert_encoding($latin1, 'UTF-8', 'ISO-8859-1') === $term;
+    }
+
     /** The order and who it is for, or null. `orderid` is unique. */
     public static function find(string $orderid): ?object
     {
-        $orderid = trim($orderid);
+        $orderid = self::clean($orderid);
 
-        if ($orderid === '') {
+        if (! self::matchable($orderid)) {
             return null;
         }
 
@@ -119,9 +172,9 @@ class SalesOrderTrail
      */
     public static function suggest(string $term, int $limit = 15): array
     {
-        $term = trim($term);
+        $term = self::clean($term);
 
-        if ($term === '') {
+        if (! self::matchable($term)) {
             return [];
         }
 
@@ -131,6 +184,12 @@ class SalesOrderTrail
         if (ctype_digit($term)) {
             // Anchored, so the index does the work: 97,885 orders and no scan.
             $q->where('so.orderid', 'like', $term . '%');
+
+            // AN EXACT MATCH SORTS FIRST. The list is capped, and ordering by
+            // date alone buried the very order that was typed in full behind
+            // fifteen newer ones that merely share its opening digits — the
+            // list then looks like it does not contain your order.
+            $q->orderByRaw('so.orderid = ? DESC', [$term]);
         } else {
             $q->where('c.customername', 'like', '%' . $term . '%');
         }
@@ -153,6 +212,15 @@ class SalesOrderTrail
      */
     public static function lines(string $orderid, ?int $productid = null): array
     {
+        // Cleaned here too, not only where the search enters: `?order=` in the
+        // URL reaches this directly, and a dirty id would find the order header
+        // and none of its lines.
+        $orderid = self::clean($orderid);
+
+        if (! self::matchable($orderid)) {
+            return [];
+        }
+
         $rows = self::db()->table('sales_order_details as sod')
             ->leftJoin('products as p', 'p.productid', '=', 'sod.productid')
             ->where('sod.orderid', $orderid)
@@ -182,6 +250,12 @@ class SalesOrderTrail
     /** The distinct products on an order, for the optional product filter. */
     public static function products(string $orderid): array
     {
+        $orderid = self::clean($orderid);
+
+        if (! self::matchable($orderid)) {
+            return [];
+        }
+
         return self::db()->table('sales_order_details as sod')
             ->leftJoin('products as p', 'p.productid', '=', 'sod.productid')
             ->where('sod.orderid', $orderid)

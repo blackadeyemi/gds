@@ -48,8 +48,23 @@
                         @empty
                             <div class="text-muted" style="padding:0.8rem;">
                                 Nothing matches “{{ $this->search }}”.
+                                <div class="text-sm" style="margin-top:.3rem;">
+                                    An order number is matched from the start, so
+                                    part of one finds it; a name is matched
+                                    anywhere.
+                                </div>
                             </div>
                         @endforelse
+
+                        {{-- Fifteen hits and five hundred look the same without
+                             this, and a customer with more orders than the cap
+                             reads as "that is all of them". --}}
+                        @if ($this->hasMoreMatches())
+                            <div class="text-muted text-sm" style="padding:0.6rem 0.8rem;">
+                                Showing the first {{ \Modules\Bil\Livewire\Sales\Reports\OrderTrail::SUGGEST_LIMIT }} —
+                                type more of the number to narrow it.
+                            </div>
+                        @endif
                     </div>
                 @endif
             @else
