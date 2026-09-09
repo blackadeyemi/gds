@@ -154,7 +154,7 @@
                     </div>
                 @else
                 <div class="form-group">
-                    <input type="search" class="form-control" placeholder="Barcode, truck, driver, customer…"
+                    <input type="search" class="form-control" placeholder="Order no, barcode, truck, driver, customer…"
                            wire:model.live.debounce.400ms="search">
                 </div>
 
@@ -174,7 +174,13 @@
                                           title="Loaded {{ $l->dateofloading }} and never confirmed">{{ $age }}d</span>
                                 @endif
                             </div>
-                            <div class="text-sm text-muted">{{ $l->customername ?: 'No customer' }}</div>
+                            {{-- The order number is shown as well as searched: it is
+                                 what gets quoted down the phone, and a search hit
+                                 you cannot verify is only half an answer. --}}
+                            <div class="text-sm text-muted">
+                                {{ $l->customername ?: 'No customer' }}
+                                @if ($l->orderids) · order {{ str_replace(' ', ', ', $l->orderids) }} @endif
+                            </div>
                             <div class="text-sm text-muted">
                                 {{ $l->trucknumber }} · {{ $l->line_count }} line(s) · {{ number_format($l->loaded) }} bundles
                             </div>

@@ -81,10 +81,17 @@ class SalesLoadings
         $loads = self::decorate($loads);
 
         if ($search) {
+            // THE ORDER NUMBER IS IN HERE. It was not, and a load could not be
+            // found by the one identifier the office quotes down the phone —
+            // "no matches" for a number that was sitting on the load.
+            //
+            // `orderids`, not `orderid`: 13.2% of loads carry more than one
+            // order (a truck takes two orders out together), and the single
+            // column is MAX() of them, so searching for the other one missed.
             $needle = mb_strtolower($search);
             $loads = array_values(array_filter($loads, fn ($l) => str_contains(mb_strtolower(
                 $l->barcode . ' ' . $l->trucknumber . ' ' . $l->truckdriver . ' '
-                . $l->loader . ' ' . ($l->customername ?? '')
+                . $l->loader . ' ' . ($l->customername ?? '') . ' ' . ($l->orderids ?? '')
             ), $needle)));
             $loads = array_slice($loads, 0, $limit);
         }
@@ -132,6 +139,7 @@ class SalesLoadings
                          MAX(l.loader) as loader, MAX(l.cageroomcode) as cageroomcode,
                          MAX(l.transporterid) as transporterid, MAX(t.transportername) as transportername,
                          MAX(d.orderid) as orderid,
+                         GROUP_CONCAT(DISTINCT d.orderid ORDER BY d.orderid SEPARATOR " ") as orderids,
                          COUNT(*) as line_count, SUM(l.quantityloaded) as loaded,
                          MAX(l.status) as status, MAX(l.id) as last_id');
     }
