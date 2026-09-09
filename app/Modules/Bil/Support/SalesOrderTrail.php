@@ -2,7 +2,9 @@
 
 namespace Modules\Bil\Support;
 
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Support\Prefs;
 
 /**
  * Everything that ever happened to ONE sales order, line by line.
@@ -49,6 +51,33 @@ class SalesOrderTrail
     private static function db()
     {
         return DB::connection('bil');
+    }
+
+    /**
+     * A stored date in the format the reader chose (Appearance → Date format,
+     * default 03/Jul/2026).
+     *
+     * The trail carries its dates as the tables store them — 'Y/m/d' strings —
+     * and they are turned into the reader's format at the last moment, here, so
+     * the screen, the print-out and the spreadsheet all agree and the sort in
+     * trail() still works on values that sort correctly as text.
+     *
+     * Anything unparseable is handed back untouched: these are legacy varchars
+     * and a date nobody can read is still better than a blank cell.
+     */
+    public static function humanDate(?string $stored): string
+    {
+        $stored = trim((string) $stored);
+
+        if ($stored === '' || str_starts_with($stored, '0000')) {
+            return '';
+        }
+
+        try {
+            return Carbon::parse($stored)->format(Prefs::dateFormat());
+        } catch (\Throwable) {
+            return $stored;
+        }
     }
 
     /* ---------------- Finding the order ---------------- */

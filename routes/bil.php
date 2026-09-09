@@ -356,7 +356,7 @@ Route::middleware('auth')
                         $rows[] = [
                             $product,
                             $line->foc ? 'FOC' : 'Sold',
-                            $e['date'],
+                            \Modules\Bil\Support\SalesOrderTrail::humanDate($e['date']),
                             $e['label'],
                             $e['reference'],
                             $e['quantity'] === null ? '' : number_format($e['quantity']),
@@ -370,7 +370,7 @@ Route::middleware('auth')
                     'context' => array_values(array_filter([
                         ['Order', (string) $order->orderid],
                         ['Customer', (string) ($order->customername ?: '—')],
-                        ['Date of order', (string) $order->dateoforder],
+                        ['Date of order', \Modules\Bil\Support\SalesOrderTrail::humanDate($order->dateoforder)],
                         $order->warehouse ? ['Depot', (string) $order->warehouse] : null,
                         $productid ? ['Product', (string) (\Modules\Bil\Support\SalesOrderTrail::products($orderid)[$productid] ?? $productid)] : null,
                     ])),

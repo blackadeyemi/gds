@@ -42,7 +42,7 @@
                                 <div style="font-weight:600;font-family:monospace;">{{ $hit->orderid }}</div>
                                 <div class="text-sm text-muted">
                                     {{ $hit->customername ?: 'No customer on this order' }}
-                                    · {{ $hit->dateoforder }}
+                                    · {{ $this->date($hit->dateoforder) }}
                                 </div>
                             </button>
                         @empty
@@ -63,7 +63,7 @@
                         </div>
                         <div class="text-sm text-muted" style="margin-top:.2rem;">
                             @if ($order->customercode) {{ $order->customercode }} · @endif
-                            ordered {{ $order->dateoforder }}
+                            ordered {{ $this->date($order->dateoforder) }}
                             @if ($order->warehouse) · {{ $order->warehouse }} @endif
                             @if ($order->username) · entered by {{ $order->username }} @endif
                         </div>
@@ -237,7 +237,7 @@
                                  it still shows how it started. --}}
                             @foreach ($this->trail as $event)
                                 <tr wire:key="e-{{ $line->id }}-{{ $loop->index }}">
-                                    <td style="white-space:nowrap;">{{ $event['date'] }}</td>
+                                    <td style="white-space:nowrap;">{{ $this->date($event['date']) }}</td>
                                     <td>
                                         @include('bil::partials.trail-stage', ['stage' => $event['stage'], 'label' => $event['label']])
                                     </td>

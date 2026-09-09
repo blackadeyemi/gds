@@ -60,6 +60,15 @@ class OrderTrail extends Component
         return 'Every transaction on one order — ordered, loaded, delivered, waybilled, returned.';
     }
 
+    /**
+     * A stored 'Y/m/d' in the reader's chosen format (Appearance → Date
+     * format), the same way every other report renders a date.
+     */
+    public function date(?string $stored): string
+    {
+        return SalesOrderTrail::humanDate($stored);
+    }
+
     /* ---------------- Permissions ---------------- */
 
     public function mayDo(string $ability): bool
