@@ -23,7 +23,8 @@
         })();
     </script>
 
-    <link type="text/css" rel="stylesheet" href="{{ asset('css/gds-login.css') }}" />
+    {{-- Cache-bust by file mtime so edits show without a hard refresh --}}
+    <link type="text/css" rel="stylesheet" href="{{ asset('css/gds-login.css') }}?v={{ is_file($p = public_path('css/gds-login.css')) ? filemtime($p) : '1' }}" />
 </head>
 
 <body>
@@ -133,6 +134,6 @@
             sync('[data-theme-opt]', 'data-theme-opt', root.getAttribute('data-theme-mode') || 'system');
         })();
     </script>
-    <script type="text/javascript" src="{{ asset('js/show_hide_password.js') }}"></script>
+    <script type="text/javascript" src="{{ asset('js/show_hide_password.js') }}?v={{ is_file($p = public_path('js/show_hide_password.js')) ? filemtime($p) : '1' }}"></script>
 </body>
 </html>
