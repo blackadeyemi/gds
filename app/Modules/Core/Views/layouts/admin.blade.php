@@ -83,6 +83,8 @@
     @livewireStyles
 </head>
 <body>
+{{-- Top progress bar: feedback for page navigation, searches and saves --}}
+<div id="gds-progress" aria-hidden="true"></div>
 <div class="app"
      x-data="{
         collapsed: JSON.parse(localStorage.getItem('gds_sidebar_collapsed') ?? 'true'),
@@ -817,6 +819,64 @@
 <script src="{{ asset('js/datefield.js') }}"></script>
 <script src="{{ asset('js/searchable-select.js') }}"></script>
 <script src="{{ asset('js/settings.js') }}"></script>
+
+{{-- Global loading feedback: a top progress bar for full-page navigations,
+     Livewire requests (searches, filters) and entry saves. --}}
+<script>
+    (function () {
+        var bar = document.getElementById('gds-progress');
+        if (!bar) return;
+        var pending = 0, trickle = null, width = 0, root = document.documentElement;
+
+        function render(w) { width = w; bar.style.width = w + '%'; }
+        function start() {
+            pending++;
+            root.classList.add('gds-loading');
+            if (pending === 1) {
+                bar.classList.add('active');
+                render(8);
+                clearInterval(trickle);
+                trickle = setInterval(function () {
+                    if (width < 90) render(width + (90 - width) * 0.12);
+                }, 300);
+            }
+        }
+        function done(force) {
+            pending = force ? 0 : Math.max(0, pending - 1);
+            if (pending > 0) return;
+            clearInterval(trickle); trickle = null;
+            render(100);
+            root.classList.remove('gds-loading');
+            setTimeout(function () {
+                bar.classList.remove('active');
+                setTimeout(function () { render(0); }, 300);
+            }, 200);
+        }
+
+        // Livewire network round-trips: searches, filters, saves, any action.
+        document.addEventListener('livewire:init', function () {
+            if (!window.Livewire || !Livewire.hook) return;
+            Livewire.hook('request', function (opts) {
+                start();
+                var ended = false;
+                var end = function () { if (!ended) { ended = true; clearTimeout(wd); done(); } };
+                var wd = setTimeout(end, 20000); // watchdog so the bar never hangs
+                opts && opts.respond && opts.respond(end);
+                opts && opts.fail && opts.fail(end);
+            });
+        });
+
+        // SPA navigation (harmless if wire:navigate is not used).
+        document.addEventListener('livewire:navigate', function () { start(); });
+        document.addEventListener('livewire:navigated', function () { done(true); });
+
+        // Full-page navigation (plain links, form posts): show the bar on the
+        // current page while the next one loads — the missing "did my click
+        // register?" feedback.
+        window.addEventListener('beforeunload', function () { start(); });
+        window.addEventListener('pageshow', function () { done(true); });
+    })();
+</script>
 @stack('scripts')
 </body>
 </html>

@@ -67,6 +67,17 @@
 .topbar .icon-btn { background: transparent; border: 0; color: var(--muted); cursor: pointer; padding: 0.4rem; border-radius: 8px; display: inline-flex; }
 .topbar .icon-btn:hover { background: var(--surface-2); color: var(--ink); }
 
+/* Top progress bar — global loading feedback (nav, search, saves) */
+#gds-progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0;
+    z-index: 9999; pointer-events: none; opacity: 0;
+    background: linear-gradient(90deg, #2ea6ff, #12e0c8);
+    box-shadow: 0 0 8px rgba(46, 166, 255, .55);
+    transition: width .2s ease, opacity .3s ease;
+}
+#gds-progress.active { opacity: 1; }
+html.gds-loading { cursor: progress; }
+
 /* Connection status indicator (topbar) */
 .net-status { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 999px; }
 .net-status .net-dot { width: 9px; height: 9px; border-radius: 50%; background: #16a34a; box-shadow: 0 0 0 3px rgba(22, 163, 74, .15); flex: 0 0 auto; }
