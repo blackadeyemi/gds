@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Bpl\Livewire\JumboRolls\Grades;
 use Modules\Bpl\Livewire\JumboRolls\Products\Hardroll;
 use Modules\Bpl\Livewire\JumboRolls\Products\Softroll;
-use Modules\Bpl\Livewire\JumboRolls\Sales\Customers;
+use Modules\Bpl\Livewire\Sales\Customers;
 
 /*
 | BPL module routes — bpl_*, wp_* (waste paper), softroll production.
@@ -29,10 +29,15 @@ Route::middleware('auth')
             ->middleware('page:bpl.jumbo_rolls.products.hardroll')->name('products.hardroll');
         Route::get('/products/softroll', Softroll::class)
             ->middleware('page:bpl.jumbo_rolls.products.softroll')->name('products.softroll');
+    });
 
-        // Sales — customer-facing masters and, later, orders/invoices.
-        Route::prefix('sales')->name('sales.')->group(function () {
-            Route::get('/customers', Customers::class)
-                ->middleware('page:bpl.jumbo_rolls.sales.customers')->name('customers');
-        });
+/*
+| Sales — a BPL functional area in its own right (customer-facing masters and,
+| later, orders/invoices).
+*/
+Route::middleware('auth')
+    ->prefix('sales')->name('sales.')
+    ->group(function () {
+        Route::get('/customers', Customers::class)
+            ->middleware('page:bpl.sales.customers')->name('customers');
     });

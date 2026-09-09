@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\Bpl\Livewire\JumboRolls\Sales;
+namespace Modules\Bpl\Livewire\Sales;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +34,7 @@ class Customers extends DataGrid
     public string $fax = '';
     public string $email = '';
 
-    public function pageKey(): string { return 'bpl.jumbo-rolls.sales.customers'; }
+    public function pageKey(): string { return 'bpl.sales.customers'; }
     public function pageLabel(): string { return 'BPL Customers'; }
     public function pageSubtitle(): string { return 'Customer master — Local and Export buyers of jumbo rolls.'; }
     public function editable(): bool { return true; }

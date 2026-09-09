@@ -147,8 +147,8 @@ return [
         ['key' => 'bpl.jumbo_rolls.products.hardroll', 'label' => 'Products (Hardroll)', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.products.hardroll', 'abilities' => $crud],
         ['key' => 'bpl.jumbo_rolls.products.softroll', 'label' => 'Products (Softroll)', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.products.softroll', 'abilities' => $crud],
 
-        // BPL — Jumbo Rolls / Sales
-        ['key' => 'bpl.jumbo_rolls.sales.customers', 'label' => 'Customers', 'module' => 'BPL / Jumbo Rolls / Sales', 'route' => 'bpl.jumbo-rolls.sales.customers', 'abilities' => $crud],
+        // BPL — Sales
+        ['key' => 'bpl.sales.customers', 'label' => 'Customers', 'module' => 'BPL / Sales', 'route' => 'bpl.sales.customers', 'abilities' => $crud],
 
         /*
         | Admin and Settings LAST, deliberately.
