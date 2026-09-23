@@ -1,0 +1,18 @@
+Windows Registry Editor Version 5.00
+
+; GDS auto-install + run-at-login policy for Google Chrome (managed fleet).
+;
+; Applies to every user on the machine. Requires admin to import (or push the
+; same keys via Group Policy / Intune). After import, restart Chrome and check
+; chrome://policy — the two policies below should be listed and applied.
+;
+; IMPORTANT: replace https://gds.test/ with your PRODUCTION URL in BOTH values.
+; The manifest_id below MUST equal your app's manifest id: for this app's
+; manifest (id "/") that is the origin + "/", e.g. https://gds.belimpex.ng/
+;
+; WebAppInstallForceList  -> force-installs the PWA, windowed, desktop shortcut.
+; WebAppSettings          -> makes the installed app start at OS login.
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome]
+"WebAppInstallForceList"="[{\"url\":\"https://gds.test/\",\"default_launch_container\":\"window\",\"create_desktop_shortcut\":true}]"
+"WebAppSettings"="[{\"manifest_id\":\"https://gds.test/\",\"run_on_os_login\":\"run_windowed\"}]"
