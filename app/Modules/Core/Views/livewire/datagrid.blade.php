@@ -41,6 +41,29 @@
                 </div>
             </div>
 
+            {{-- Block form, NOT @php(...). Blade stores `@php … @endphp` pairs as
+                 raw blocks BEFORE compiling directives, so a parenthesised
+                 `@php(...)` in a file that also contains an `@endphp` later gets
+                 paired with it and everything between is swallowed as raw PHP.
+                 This file has one further down. --}}
+            @php
+                $filterDefs = $this->filterDefs();
+            @endphp
+            @if ($filterDefs)
+                {{-- Filters sit with the view switcher, before the search box:
+                     they narrow WHAT is listed, where search narrows within it. --}}
+                <div class="flex items-center gap-2" style="flex-wrap:wrap;">
+                    @foreach ($filterDefs as $filterName => $filterDef)
+                        @include('core::partials.filter-select', [
+                            'name' => $filterName,
+                            'label' => $filterDef['label'] ?? $filterName,
+                            'options' => $filterDef['options'] ?? [],
+                            'width' => $filterDef['width'] ?? null,
+                        ])
+                    @endforeach
+                </div>
+            @endif
+
             <div class="flex items-center gap-2 ml-auto">
                 <div class="search-box">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
@@ -146,6 +169,20 @@
                         <tr><td colspan="{{ count($columns) + ($this->rowActionsVisible() ? 2 : 1) }}" class="empty-row">No records found.</td></tr>
                     @endforelse
                 </tbody>
+                @if (! empty($totals) && $rows->total() > 0)
+                    {{-- Grand total of the whole filtered set, not just this page. --}}
+                    <tfoot>
+                        <tr class="totals-row">
+                            <td class="totals-label">Total</td>
+                            @foreach ($columns as $col)
+                                <td>@if (($col[1] ?? null) !== null && array_key_exists($col[1], $totals))<strong>{{ $totals[$col[1]] }}</strong>@endif</td>
+                            @endforeach
+                            @if ($this->rowActionsVisible() && ($gridView['type'] ?? 'table') === 'table')
+                                <td></td>
+                            @endif
+                        </tr>
+                    </tfoot>
+                @endif
             </table>
         </div>
 
@@ -169,7 +206,13 @@
                 </div>
                 <form wire:submit="save">
                     <div class="modal-body">
-                        @include($this->formView())
+                        {{-- Built only while the modal is open, so a large
+                             picker is not serialised into every render. Forms
+                             that @push assets opt out — see
+                             DataGrid::formPushesAssets(). --}}
+                        @if ($showModal || $this->formPushesAssets())
+                            @include($this->formView())
+                        @endif
                     </div>
                     <div class="modal-foot">
                         <button type="button" class="btn btn-ghost" wire:click="$set('showModal', false)">Cancel</button>

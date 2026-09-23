@@ -39,6 +39,18 @@ class Customers extends DataGrid
     public function pageSubtitle(): string { return 'Customer master — Local and Export buyers of jumbo rolls.'; }
     public function editable(): bool { return true; }
     public function formView(): ?string { return 'bpl::livewire.forms.customer'; }
+
+    /**
+     * The Alpine component behind the Address autocomplete.
+     *
+     * It is rendered at PAGE level rather than inside the form because `@push`
+     * only reaches the layout's script stack on a full page render, and the
+     * form is now built only while its modal is open. Keeping it here is what
+     * lets this page use the lazy form: its country, port and dial-code lists
+     * were being rebuilt on every render and made it the slowest page in the
+     * app at ~1.5 s.
+     */
+    public function extraView(): ?string { return 'bpl::partials.osm-address'; }
     public function defaultSort(): array { return ['customername', 'asc']; }
     public function modalSize(): string { return '760px'; }
 

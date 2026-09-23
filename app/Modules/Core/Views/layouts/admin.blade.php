@@ -29,6 +29,7 @@
     $onBpl = request()->is('bpl/*');
     $onJumboRolls = request()->is('bpl/jumbo-rolls/*');
     $onBplSales = request()->is('bpl/sales/*');
+    $onBplFinance = request()->is('bpl/finance/*');
 
     // Global "View Entries" link: on any BIL entry page whose route
     // (bil.<module>.<slug>) has a matching report route
@@ -105,11 +106,12 @@
         bplOpen: {{ $onBpl ? 'true' : 'false' }},
         jumboRollsOpen: {{ $onJumboRolls ? 'true' : 'false' }},
         bplSalesOpen: {{ $onBplSales ? 'true' : 'false' }},
+        bplFinanceOpen: {{ $onBplFinance ? 'true' : 'false' }},
         toggleSidebar() {
             if (window.innerWidth <= 900) { this.mobileOpen = !this.mobileOpen; return; }
             this.collapsed = !this.collapsed;
             localStorage.setItem('gds_sidebar_collapsed', JSON.stringify(this.collapsed));
-            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; this.bilJumboRollsOpen = false; this.bilJrReportsOpen = false; this.finishedGoodsOpen = false; this.fgReportsOpen = false; this.salesOpen = false; this.salesReportsOpen = false; this.machinesOpen = false; this.machineReportsOpen = false; this.bplOpen = false; this.jumboRollsOpen = false; this.bplSalesOpen = false; }
+            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; this.bilJumboRollsOpen = false; this.bilJrReportsOpen = false; this.finishedGoodsOpen = false; this.fgReportsOpen = false; this.salesOpen = false; this.salesReportsOpen = false; this.machinesOpen = false; this.machineReportsOpen = false; this.bplOpen = false; this.jumboRollsOpen = false; this.bplSalesOpen = false; this.bplFinanceOpen = false; }
         },
         openGroup(group) {
             if (this.collapsed) {
@@ -610,6 +612,48 @@
                                 <span class="label">Products</span>
                             </a>
                             @endcanPage
+                            @canPage('bpl.jumbo_rolls.weight_allowances')
+                            <a href="{{ route('bpl.jumbo-rolls.weight-allowances') }}" class="nav-link {{ $is('bpl/jumbo-rolls/weight-allowances*') }}" title="Weight Allowances">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7l-3 7h6l-3-7z"/><path d="M19 7l-3 7h6l-3-7z"/><path d="M8 21h8"/></svg>
+                                <span class="label">Weight Allowances</span>
+                            </a>
+                            @endcanPage
+                            @canPrefix('bpl.jumbo_rolls.production.')
+                            <a href="{{ route(auth()->user()?->canDo('bpl.jumbo_rolls.production.hardroll', 'view') ? 'bpl.jumbo-rolls.production.hardroll' : 'bpl.jumbo-rolls.production.softroll') }}" class="nav-link {{ $is('bpl/jumbo-rolls/production*') }}" title="Production">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h20"/><path d="M4 20V9l5 3V9l5 3V9l5 3v8"/><path d="M7 20v-3M12 20v-3M17 20v-3"/></svg>
+                                <span class="label">Production</span>
+                            </a>
+                            @endcanPrefix
+                            @canPage('bpl.jumbo_rolls.factory_exit')
+                            <a href="{{ route('bpl.jumbo-rolls.factory-exit') }}" class="nav-link {{ $is('bpl/jumbo-rolls/factory-exit*') }}" title="Factory Exit">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+                                <span class="label">Factory Exit</span>
+                            </a>
+                            @endcanPage
+                            @canPage('bpl.jumbo_rolls.warehouse_entry')
+                            <a href="{{ route('bpl.jumbo-rolls.warehouse-entry') }}" class="nav-link {{ $is('bpl/jumbo-rolls/warehouse-entry*') }}" title="Warehouse Entry">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-6 9 6v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M8 13h8"/><path d="M12 9v8"/><path d="M9 14l3 3 3-3"/></svg>
+                                <span class="label">Warehouse Entry</span>
+                            </a>
+                            @endcanPage
+                            @canPage('bpl.jumbo_rolls.warehouse_exit')
+                            <a href="{{ route('bpl.jumbo-rolls.warehouse-exit') }}" class="nav-link {{ $is('bpl/jumbo-rolls/warehouse-exit*') }}" title="Warehouse Exit">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-6 9 6v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M8 15h8"/><path d="M12 17V9"/><path d="M9 12l3-3 3 3"/></svg>
+                                <span class="label">Warehouse Exit</span>
+                            </a>
+                            @endcanPage
+                            @canPage('bpl.jumbo_rolls.warehouse_transfer')
+                            <a href="{{ route('bpl.jumbo-rolls.warehouse-transfer') }}" class="nav-link {{ $is('bpl/jumbo-rolls/warehouse-transfer*') }}" title="Warehouse Transfer">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h13l-3-3"/><path d="M21 17H8l3 3"/></svg>
+                                <span class="label">Warehouse Transfer</span>
+                            </a>
+                            @endcanPage
+                            @canPage('bpl.jumbo_rolls.warehouse_stock')
+                            <a href="{{ route('bpl.jumbo-rolls.warehouse-stock') }}" class="nav-link {{ $is('bpl/jumbo-rolls/warehouse-stock*') }}" title="Warehouse Stock">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-6 9 6v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><rect x="8" y="12" width="8" height="7"/><path d="M8 15h8"/></svg>
+                                <span class="label">Warehouse Stock</span>
+                            </a>
+                            @endcanPage
                         </div>
                     </div>
 
@@ -621,10 +665,46 @@
                             <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
                         </button>
                         <div class="nav-sub" x-show="bplSalesOpen">
+                            @canPage('bpl.sales.orders')
+                            <a href="{{ route('bpl.sales.orders') }}" class="nav-link {{ $is('bpl/sales/orders*') }}" title="Orders">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>
+                                <span class="label">Orders</span>
+                            </a>
+                            @endcanPage
                             @canPage('bpl.sales.customers')
                             <a href="{{ route('bpl.sales.customers') }}" class="nav-link {{ $is('bpl/sales/customers*') }}" title="Customers">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                                 <span class="label">Customers</span>
+                            </a>
+                            @endcanPage
+                            @canPage('bpl.sales.transporters')
+                            <a href="{{ route('bpl.sales.transporters') }}" class="nav-link {{ $is('bpl/sales/transporters*') }}" title="Transporters">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                                <span class="label">Transporters</span>
+                            </a>
+                            @endcanPage
+                        </div>
+                    </div>
+                    @endcanPrefix
+
+                    @canPrefix('bpl.finance.')
+                    <div class="nav-group" :class="{ open: bplFinanceOpen }">
+                        <button type="button" class="nav-link" :class="{ active: {{ $onBplFinance ? 'true' : 'false' }} && collapsed }" @click="openGroup('bplFinanceOpen')" title="Finance">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"/></svg>
+                            <span class="label">Finance</span>
+                            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                        </button>
+                        <div class="nav-sub" x-show="bplFinanceOpen">
+                            @canPage('bpl.finance.banks')
+                            <a href="{{ route('bpl.finance.banks') }}" class="nav-link {{ $is('bpl/finance/banks*') }}" title="Banks">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11"/></svg>
+                                <span class="label">Banks</span>
+                            </a>
+                            @endcanPage
+                            @canPage('bpl.finance.accounts')
+                            <a href="{{ route('bpl.finance.accounts') }}" class="nav-link {{ $is('bpl/finance/accounts*') }}" title="Accounts">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
+                                <span class="label">Accounts</span>
                             </a>
                             @endcanPage
                         </div>

@@ -112,7 +112,7 @@ class JumboRollStockPageTest extends TestCase
             ->count();
         $this->assertSame($atMachine, $byPlace[Stock::AT_BPL_FACTORY] ?? 0);
 
-        $inStore = $bil->table('bpl_storeentrance as se')
+        $inStore = $bil->table('bpl_warehouse_entry as se')
             ->join('bpl_production as prod', 'prod.barcode', '=', 'se.barcode')
             ->whereNull('se.status')->whereNull('se.deleted_at')
             ->where('prod.customer_id', $customer)->whereNull('prod.deleted_at')
@@ -139,7 +139,7 @@ class JumboRollStockPageTest extends TestCase
 
         // Every store it reports must be a real BPL store location.
         $stores = DB::connection('bpl')->table('bpl_stock_locations')->where('type', 1)->pluck('id');
-        $held = DB::connection('bil')->table('bpl_storeentrance')
+        $held = DB::connection('bil')->table('bpl_warehouse_entry')
             ->whereNull('status')->whereNull('deleted_at')
             ->whereIn('location_id', $stores)->count();
 
@@ -409,5 +409,24 @@ class JumboRollStockPageTest extends TestCase
         $this->assertNotNull($page, 'page not declared in config/pages.php');
         $this->assertSame(['view', 'export'], $page['abilities']);
         $this->assertSame('bil.jumbo-rolls.stock', $page['route']);
+    }
+
+    /**
+     * Ages are never totalled. `days` and `oldest` are numeric, and the report
+     * base auto-totals numeric columns — so until 2026-09-18 the footer printed
+     * the sum of every reel's age, a number that means nothing.
+     */
+    public function test_the_footer_never_totals_an_age(): void
+    {
+        \Livewire\Livewire::actingAs(\Modules\Core\Models\User::whereHas('roles', fn ($q) => $q->where('legacy_level', 1))->first());
+
+        foreach (array_keys((new \Modules\Bil\Livewire\JumboRolls\Stock)->views()) as $view) {
+            $totals = \Livewire\Livewire::test(\Modules\Bil\Livewire\JumboRolls\Stock::class)
+                ->set('view', $view)->viewData('totals');
+
+            $this->assertArrayNotHasKey('days', $totals, "{$view} totalled days");
+            $this->assertArrayNotHasKey('oldest', $totals, "{$view} totalled oldest");
+            $this->assertArrayHasKey('weight', $totals, "{$view} lost its weight total");
+        }
     }
 }

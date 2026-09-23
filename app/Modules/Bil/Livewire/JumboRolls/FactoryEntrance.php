@@ -8,6 +8,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Modules\Bil\Models\JumboRollFactoryEntrance;
+use Modules\Bpl\Support\RollBarcode;
 use Modules\Core\Concerns\EnforcesShift;
 use Modules\Core\Models\FactoryGate;
 use Modules\Core\Support\GateAccess;
@@ -126,6 +127,17 @@ class FactoryEntrance extends Component
         if ($entrance) {
             $this->scanError = 'Entry already made for ' . $barcode
                 . ' on ' . date('d/m/Y', (int) $entrance->timestamp) . '.';
+
+            return;
+        }
+
+        // A softroll label at a BIL gate is a mis-scan, not an unknown reel.
+        // Before the barcode carried its stream, that label matched a hardroll
+        // of the same date and ordinal and was accepted against the wrong reel
+        // — it happened at Gambini on 2024/07/25. Say what it is instead of
+        // "not found", which sends the operator looking for a data problem.
+        if (RollBarcode::stream($barcode) === 'softroll') {
+            $this->scanError = 'That is a softroll label — softrolls do not come to this factory.';
 
             return;
         }

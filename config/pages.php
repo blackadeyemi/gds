@@ -147,9 +147,43 @@ return [
         ['key' => 'bpl.jumbo_rolls.grades',            'label' => 'Grades',              'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.grades',            'abilities' => $crud],
         ['key' => 'bpl.jumbo_rolls.products.hardroll', 'label' => 'Products (Hardroll)', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.products.hardroll', 'abilities' => $crud],
         ['key' => 'bpl.jumbo_rolls.products.softroll', 'label' => 'Products (Softroll)', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.products.softroll', 'abilities' => $crud],
+        // The weight allowance is a RULE, edited rarely and audited — it sits
+        // with the masters, above the screen that consumes it.
+        ['key' => 'bpl.jumbo_rolls.weight_allowances', 'label' => 'Weight Allowances', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.weight-allowances', 'abilities' => $crud],
+        // Recording a roll off the paper machine. CRUD (rows are corrected here
+        // until Factory Exit takes ownership) plus backdate, because a shift
+        // that ran past midnight is entered the next morning. The label routes
+        // ride on these same keys — a reprint needs the entry right.
+        ['key' => 'bpl.jumbo_rolls.production.hardroll', 'label' => 'Production (Hardroll)', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.production.hardroll', 'abilities' => [...$crud, 'backdate']],
+        ['key' => 'bpl.jumbo_rolls.production.softroll', 'label' => 'Production (Softroll)', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.production.softroll', 'abilities' => [...$crud, 'backdate']],
+
+        // Rolls leaving the paper machine floor. An entry form: access IS the
+        // action. `gates` fills its dropdown from the outbound gates on the
+        // Belpapyrus paper machines.
+        ['key' => 'bpl.jumbo_rolls.factory_exit', 'label' => 'Factory Exit', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.factory-exit', 'abilities' => $entry, 'gates' => 'factory'],
+
+        // Receiving into a BPL store. `gates` fills its dropdown from the
+        // inbound gates on the jumbo-roll warehouses.
+        ['key' => 'bpl.jumbo_rolls.warehouse_entry', 'label' => 'Warehouse Entry', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.warehouse-entry', 'abilities' => $entry, 'gates' => 'warehouse'],
+
+        // Releasing from a BPL store. `gates` fills its dropdown from the
+        // outbound gates on the jumbo-roll warehouses.
+        ['key' => 'bpl.jumbo_rolls.warehouse_exit', 'label' => 'Warehouse Exit', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.warehouse-exit', 'abilities' => $entry, 'gates' => 'warehouse'],
+
+        // A live position derived from the two movement screens; nothing to
+        // edit here, so view + export only.
+        ['key' => 'bpl.jumbo_rolls.warehouse_stock', 'label' => 'Warehouse Stock', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.warehouse-stock', 'abilities' => $snapshot],
+
+        // Moving stock between warehouses. `gates` fills the destination from
+        // the inbound gates on the jumbo-roll warehouses.
+        ['key' => 'bpl.jumbo_rolls.warehouse_transfer', 'label' => 'Warehouse Transfer', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.warehouse-transfer', 'abilities' => $entry, 'gates' => 'warehouse'],
 
         // BPL — Sales
+        ['key' => 'bpl.sales.orders', 'label' => 'Orders', 'module' => 'BPL / Sales', 'route' => 'bpl.sales.orders', 'abilities' => ['view', 'delete', 'backdate']],
         ['key' => 'bpl.sales.customers', 'label' => 'Customers', 'module' => 'BPL / Sales', 'route' => 'bpl.sales.customers', 'abilities' => $crud],
+        ['key' => 'bpl.sales.transporters', 'label' => 'Transporters', 'module' => 'BPL / Sales', 'route' => 'bpl.sales.transporters', 'abilities' => $crud],
+        ['key' => 'bpl.finance.banks', 'label' => 'Banks', 'module' => 'BPL / Finance', 'route' => 'bpl.finance.banks', 'abilities' => $crud],
+        ['key' => 'bpl.finance.accounts', 'label' => 'Accounts', 'module' => 'BPL / Finance', 'route' => 'bpl.finance.accounts', 'abilities' => $crud],
 
         /*
         | Admin and Settings LAST, deliberately.

@@ -77,6 +77,23 @@ class JumboRollFactoryEntrancePageTest extends TestCase
             ->assertSet('items', []);
     }
 
+    /**
+     * A softroll label is refused by name. Softrolls carry an `S{machine}`
+     * barcode now (see Modules\Bpl\Support\RollBarcode); before that, the
+     * label matched a hardroll of the same date and ordinal and this screen
+     * accepted it against the wrong reel.
+     */
+    public function test_a_softroll_label_is_named_rather_than_reported_missing(): void
+    {
+        Livewire::actingAs($this->admin());
+
+        Livewire::test(FactoryEntrance::class)
+            ->set('scan', '26-09-09-S3-001')
+            ->call('addScan')
+            ->assertSet('scanError', 'That is a softroll label — softrolls do not come to this factory.')
+            ->assertSet('items', []);
+    }
+
     /** A reel already on a factory floor cannot be entered a second time. */
     public function test_a_reel_already_entered_is_rejected(): void
     {

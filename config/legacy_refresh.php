@@ -80,17 +80,19 @@ return [
         'bpl_softroll_production'         => 'bpl.bpl_softroll_production',
         'bpl_factoryexit'                 => 'bpl.bpl_factoryexit',
         'bpl_softroll_factoryexit'        => 'bpl.bpl_softroll_factoryexit',
-        'bpl_storeentrance'               => 'bpl.bpl_storeentrance',
-        'bpl_storeexit'                   => 'bpl.bpl_storeexit',
-        'softroll_storeentrance'          => 'bpl.softroll_storeentrance',
-        'softroll_storeexit'              => 'bpl.softroll_storeexit',
+        // Renamed 2026-09-16 (store -> warehouse); the legacy dump still
+        // carries the old names, which are now writable compat views.
+        'bpl_storeentrance'               => 'bpl.bpl_warehouse_entry',
+        'bpl_storeexit'                   => 'bpl.bpl_warehouse_exit',
+        'softroll_storeentrance'          => 'bpl.bpl_softroll_warehouse_entry',
+        'softroll_storeexit'              => 'bpl.bpl_softroll_warehouse_exit',
         'bpl_store_count'                 => 'bpl.bpl_store_count',
         'bpl_storeentrance_trash'         => 'bpl.bpl_storeentrance_trash',
         'bpl_storeentrance_trash_details' => 'bpl.bpl_storeentrance_trash_details',
         'bpl_delivery'                    => 'bpl.bpl_delivery',
         'bpl_delivery_barcode'            => 'bpl.bpl_delivery_barcode',
         'bpl_delivery_details'            => 'bpl.bpl_delivery_details',
-        'bpl_stock'                       => 'bpl.bpl_stock',
+        'bpl_stock'                       => 'bpl.bpl_hardroll_stock',
         'bpl_sales'                       => 'bpl.bpl_sales',
         'bpl_sales_items'                 => 'bpl.bpl_sales_items',
         'bpl_packing_list'                => 'bpl.bpl_packing_list',
@@ -100,7 +102,7 @@ return [
         'bpl_invoice_payments'            => 'bpl.bpl_invoice_payments',
         'bpl_quarantine'                  => 'bpl.bpl_quarantine',
         'bpl_quarantine_storeexit'        => 'bpl.bpl_quarantine_storeexit',
-        'softroll_stock'                  => 'bpl.softroll_stock',
+        'softroll_stock'                  => 'bpl.bpl_softroll_stock',
     ],
 
     /*

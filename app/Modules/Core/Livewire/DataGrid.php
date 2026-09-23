@@ -2,6 +2,8 @@
 
 namespace Modules\Core\Livewire;
 
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\Attributes\Layout;
@@ -25,6 +27,9 @@ abstract class DataGrid extends Component
 
     public string $view = '';
     public string $search = '';
+
+    /** Dropdown filter values, keyed by filter name. See filterDefs(). */
+    public array $filters = [];
     public string $sortField = '';
     public string $sortDir = 'asc';
     public int $perPage = 10;
@@ -50,6 +55,8 @@ abstract class DataGrid extends Component
      *   'query'      => fn() => Builder,     // base query, no search/sort/paginate
      *   'searchable' => [col, …],            // optional
      *   'sortable'   => [col, …],            // optional (table only)
+     *   'count'      => fn() => Builder,     // optional, see paginateView()
+     *   'totals'     => [field, …],          // optional footer, see totalsFor()
      * ]
      *
      * A column may supply a closure to render its cell as HTML. A column whose
@@ -58,8 +65,46 @@ abstract class DataGrid extends Component
      */
     abstract public function views(): array;
 
+    /**
+     * Dropdown filters above the grid: name => ['label' => string,
+     * 'options' => [value => label], 'width' => ?int].
+     *
+     * Same contract and the same control as the BIL reports
+     * (`core::partials.filter-select`), so a grid and a report filter alike.
+     * The chosen value is applied to a column by the grid's own queries —
+     * applyFilters() is the helper for that.
+     *
+     * Options should come from the DATA, not from a master table: offering a
+     * value that matches nothing is the commonest way a filter wastes someone's
+     * time.
+     */
+    public function filterDefs(): array { return []; }
+
     public function editable(): bool { return false; }
     public function formView(): ?string { return null; }
+
+    /**
+     * Whether the form's markup must be present on every render, rather than
+     * only while the modal is open.
+     *
+     * The default is false, so a form's option lists are built and shipped only
+     * when someone actually opens it. That matters once a picker gets large:
+     * BPL Hardroll Production offers 4,387 products, which the searchable-select
+     * partial snapshots as JSON — 405 KB of it, previously re-sent on every
+     * page load, sort, page change and search keystroke, for a modal that was
+     * hidden the whole time.
+     *
+     * A form that `@push`es scripts or styles cannot be built lazily: those land
+     * in the layout's stack, which is only assembled on a full page render, so a
+     * form first included during a Livewire update pushes into a stack that has
+     * already been output and the asset never loads.
+     *
+     * PREFER moving the push to a page-level partial returned by extraView() —
+     * that renders with the page, keeps the form lazy, and is what
+     * Bpl\Livewire\Sales\Customers does with its address autocomplete. Reach
+     * for this override only when the markup genuinely cannot be lifted out.
+     */
+    public function formPushesAssets(): bool { return false; }
     public function defaultSort(): array { return []; }   // [field, dir]
     public function modalSize(): string { return '480px'; }
 
@@ -103,6 +148,10 @@ abstract class DataGrid extends Component
         [$f, $d] = $this->defaultSort() + [null, 'asc'];
         $this->sortField = $f ?? '';
         $this->sortDir = $d ?? 'asc';
+
+        foreach (array_keys($this->filterDefs()) as $filter) {
+            $this->filters[$filter] ??= '';
+        }
     }
 
     protected function config(): array
@@ -147,6 +196,26 @@ abstract class DataGrid extends Component
 
     public function updatedSearch(): void { $this->resetPage(); }
     public function updatedPerPage(): void { $this->resetPage(); }
+
+    /**
+     * A filter changed. Grids with a cascade override this to clear the filters
+     * the changed one narrows — leaving an impossible pair selected shows an
+     * empty table with nothing explaining why.
+     */
+    public function updatedFilters($value = null, $key = null): void { $this->resetPage(); }
+
+    /** Apply the chosen dropdown filters. `$map` = filter name => column. */
+    protected function applyFilters($q, array $map)
+    {
+        foreach ($map as $name => $column) {
+            $value = $this->filters[$name] ?? '';
+            if ($value !== '' && $value !== 'all') {
+                $q->where($column, $value);
+            }
+        }
+
+        return $q;
+    }
 
     public function sortBy(string $field): void
     {
@@ -260,6 +329,101 @@ abstract class DataGrid extends Component
         $this->confirmingDelete = null;
     }
 
+    /**
+     * Page a view, counting the cheap way when the view offers one.
+     *
+     * `paginate()` runs `COUNT(*)` over the same builder it selects with —
+     * joins and all. A grid that LEFT JOINs only to show a name pays for that
+     * on every render: BPL Hardroll Production's 12-month listing counted
+     * 27,317 rows while doing two eq_ref probes per row into products and
+     * customers, none of which the count reads. 17 ms became 110 ms.
+     *
+     * A view may therefore supply a `count` builder — the same rows, without
+     * the joins. It is used ONLY when no search is active, because the search
+     * clause is built from `searchable`, which usually names joined columns;
+     * counting without them would report a different set than the page shows.
+     */
+    protected function paginateView(array $view)
+    {
+        $query = $this->buildQuery($view);
+
+        if (! isset($view['count']) || $this->search !== '') {
+            return $query->paginate($this->perPage);
+        }
+
+        $total = ($view['count'])()->count();
+        $page = Paginator::resolveCurrentPage();
+        $items = $total > 0
+            ? $query->forPage($page, $this->perPage)->get()
+            : collect();
+
+        return new LengthAwarePaginator($items, $total, $this->perPage, $page, [
+            'path' => Paginator::resolveCurrentPath(),
+            'pageName' => 'page',
+        ]);
+    }
+
+    /* ---------------- Footer totals ---------------- */
+
+    /**
+     * Footer totals for the fields a view lists under `'totals'`, summed over
+     * the WHOLE filtered and searched set — not just the page on screen.
+     *
+     * Opt-in by name, deliberately. The BIL report base auto-detects numeric
+     * columns instead, and that is how it came to add up a Days column: an
+     * age is numeric, and summing ages means nothing. Listing the fields
+     * makes that mistake impossible here rather than merely excluded.
+     */
+    protected function totalsFor(array $view): array
+    {
+        $fields = array_values(array_filter((array) ($view['totals'] ?? [])));
+        if ($fields === []) {
+            return [];
+        }
+
+        $q = $this->buildQuery($view)->reorder();
+        $selects = [];
+        foreach ($fields as $i => $f) {
+            $selects[] = 'SUM(`' . str_replace('`', '', $f) . '`) as `t' . $i . '`';
+        }
+
+        $agg = $q->getConnection()->query()->fromSub($q, 't')
+            ->selectRaw(implode(', ', $selects))->first();
+
+        $out = [];
+        foreach ($fields as $i => $f) {
+            $v = $agg->{'t' . $i} ?? null;
+            if ($v !== null && is_numeric($v)) {
+                $out[$f] = $this->formatTotal($view, $f, (float) $v);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * A footer total, through the column's own cell closure where that closure
+     * works from a bare {field: value} — so a "kg" or 2-decimal column reads
+     * the same in the footer as in the rows.
+     */
+    protected function formatTotal(array $view, string $field, float $value): string
+    {
+        foreach ($view['columns'] as $col) {
+            if (($col[1] ?? null) === $field && isset($col[2]) && is_callable($col[2])) {
+                try {
+                    $s = trim(strip_tags((string) $col[2]((object) [$field => $value])));
+                    if ($s !== '') {
+                        return $s;
+                    }
+                } catch (\Throwable $e) {
+                    // needs more than this one field — plain number below
+                }
+            }
+        }
+
+        return number_format($value, ($value == floor($value)) ? 0 : 2);
+    }
+
     /* ---------------- Export / print ---------------- */
 
     /**
@@ -332,6 +496,13 @@ abstract class DataGrid extends Component
             $out[] = ['View', $this->currentView()['label'] ?? ''];
         }
 
+        foreach ($this->filterDefs() as $name => $def) {
+            $value = $this->filters[$name] ?? '';
+            if ($value !== '' && $value !== 'all') {
+                $out[] = [$def['label'] ?? $name, (string) ($def['options'][$value] ?? $value)];
+            }
+        }
+
         if ($this->search !== '') {
             $out[] = ['Search', $this->search];
         }
@@ -384,7 +555,7 @@ abstract class DataGrid extends Component
     public function render()
     {
         $view = $this->currentView();
-        $rows = $this->buildQuery($view)->paginate($this->perPage);
+        $rows = $this->paginateView($view);
 
         return view('core::livewire.datagrid', [
             'gridView' => $view,
@@ -396,6 +567,7 @@ abstract class DataGrid extends Component
             'columns' => $view['columns'],
             // Every grid view paginates, so the total is already to hand — no
             // extra count needed to decide whether PDF is offered.
+            'totals' => $this->totalsFor($view),
             'pdfBlocked' => $rows->total() > self::PDF_MAX_ROWS,
             'pdfMaxRows' => self::PDF_MAX_ROWS,
         ]);

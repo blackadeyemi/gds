@@ -196,9 +196,10 @@ class Stock extends RawMaterialReport
         // finished reels for BIL — this is the largest position after the BIL
         // factory floors, not a rounding error.
         //
-        // `bpl_storeentrance` is the LIVE store table. `jumboreel_storeentrance`
-        // is the dead 2018-19 route and must not be used here.
-        $inStore = $conn->table('bpl_storeentrance as se')
+        // `bpl_warehouse_entry` (renamed from `bpl_storeentrance` 2026-09-16)
+        // is the LIVE table. `jumboreel_storeentrance` is the dead 2018-19
+        // route and must not be used here.
+        $inStore = $conn->table('bpl_warehouse_entry as se')
             ->join('bpl_production as prod', 'prod.barcode', '=', 'se.barcode')
             ->leftJoin('bpl_products as pr', 'pr.id', '=', 'prod.product_id')
             ->leftJoin('bpl_stock_locations as store', 'store.id', '=', 'se.location_id')

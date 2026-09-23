@@ -9,7 +9,8 @@
 |
 |   raw-materials   -> bil.rawmaterials_products   -> raw_materials_warehouse_stock
 |   finished-goods  -> bil.products                -> finished_goods_warehouse_stock
-|   jumbo-rolls     -> bpl.bpl_products            -> (not built yet)
+|   jumbo-rolls     -> bpl.bpl_products_hardroll   -> bpl.bpl_stock
+|                      bpl.bpl_products_softroll   -> bpl.bpl_softroll_stock
 |   waste-paper     -> (not built yet)             -> (not built yet)
 |
 | It lives in config rather than a lookup table for exactly that reason: adding
@@ -40,6 +41,13 @@ return [
     'implemented' => [
         'raw-materials',
         'finished-goods',
+        // BPL Warehouse Entry receives into the three paper-machine stores. Its
+        // stock lives in the LEGACY aggregates (`bpl_hardroll_stock` keyed by product,
+        // `bpl_softroll_stock` keyed by grade) rather than a gds table, because the
+        // legacy BPL stock reports read them and the legacy Store Exit
+        // subtracts from them — the same reason BIL keeps `jumboreel_stock` in
+        // step. See Modules\Bpl\Support\JumboRollStock.
+        'jumbo-rolls',
     ],
 
     /*

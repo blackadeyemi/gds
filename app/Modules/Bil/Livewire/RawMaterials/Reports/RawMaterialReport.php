@@ -1161,7 +1161,13 @@ abstract class RawMaterialReport extends Component
      * Figure columns to total in the footer. An explicit `'totals' => [field,…]`
      * on the view wins (and an empty array opts out); otherwise auto-detect —
      * a column whose sampled values are all numeric and whose field is not an
-     * identifier or date. Text, id/barcode/number and date columns are skipped.
+     * identifier, a date or an AGE. Text, id/barcode/number, date and age
+     * columns are skipped.
+     *
+     * Ages (`days`, `oldest`, `age`) are numeric but summing them is nonsense —
+     * 269 reels that have each stood 40 days have not stood 10,760 days. The
+     * Jumbo Rolls Stock and Factory Floor Stock reports were printing exactly
+     * that in their footers until 2026-09-18.
      */
     protected function totalFields(array $view, $sample): array
     {
@@ -1172,7 +1178,7 @@ abstract class RawMaterialReport extends Component
         if ($sample->isEmpty()) {
             return [];
         }
-        $skip = '/(?:id|barcode|number|code|ref|year|phone|date|_at)$|^(?:id|no)$/i';
+        $skip = '/(?:id|barcode|number|code|ref|year|phone|date|_at)$|^(?:id|no|days|oldest|age)$/i';
         $out = [];
         foreach ($view['columns'] as $col) {
             $f = $col[1] ?? null;
