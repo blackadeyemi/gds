@@ -100,8 +100,10 @@ return [
         'bpl_proforma'                    => 'bpl.bpl_proforma',
         'bpl_proforma_items'              => 'bpl.bpl_proforma_items',
         'bpl_invoice_payments'            => 'bpl.bpl_invoice_payments',
-        'bpl_quarantine'                  => 'bpl.bpl_quarantine',
-        'bpl_quarantine_storeexit'        => 'bpl.bpl_quarantine_storeexit',
+        // Renamed (quarantine -> waiting area); the legacy dump still carries
+        // the old names, now writable compat views over these base tables.
+        'bpl_quarantine'                  => 'bpl.bpl_waiting_area_entry',
+        'bpl_quarantine_storeexit'        => 'bpl.bpl_waiting_area_exit',
         'softroll_stock'                  => 'bpl.bpl_softroll_stock',
     ],
 
