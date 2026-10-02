@@ -66,11 +66,16 @@ app/Modules/{Core,Bil,Bpl}/     PSR-4 "Modules\", wired by ModuleServiceProvider
 routes/{core,bil,bpl}.php       one file per module
 config/pages.php                the page + ability registry (access control)
 config/datagrid.php             every DataGrid, for the data-views sync
+docs/modules/                   what each module does, screen by screen
 docs/DEPLOYMENT.md              release runbooks, newest first
+deploy/pwa-autostart/           launch the installed PWA at Windows login
 scripts/verify_*.php            standalone checks a release is verified with
 ```
 
-Currently 52 registered pages and 17 data grids.
+Currently 127 registered pages and 20 data grids across BIL, BPL and Core.
+**For what each module actually does and how its screens work, see
+[docs/modules/](docs/modules/README.md).** This README is the architecture;
+that is the feature guide.
 
 ### Two base classes do most of the work
 
