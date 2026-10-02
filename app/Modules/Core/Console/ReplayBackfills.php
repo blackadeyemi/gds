@@ -36,6 +36,10 @@ use Illuminate\Support\Facades\Schema;
  * A generated column (factory_usage_reel.reel_barcode, factory_event.reel_barcode)
  * is deliberately absent: MySQL recomputes those on insert, so a reload heals
  * them by itself.
+ *
+ * One repair ('fg-receipts') replays missing ROWS rather than a column, because
+ * the failure is the same one: a refresh brings in legacy receipts that gds's
+ * own receipt table never hears about. See its note below.
  */
 class ReplayBackfills extends Command
 {
@@ -228,6 +232,35 @@ class ReplayBackfills extends Command
                             ->update(['gate_id' => $gate->id]);
                     }
                 },
+            ],
+
+            /* ROWS, not a column -- the only one of its kind here, and it
+               earns the exception. gds has its own finished-goods receipt
+               table; the legacy `store_entrance` is what the production app
+               still writes, and `bil:backfill-fg-receipts` copies the one into
+               the other. A refresh reloads `store_entrance` with everything
+               that happened since the last dump, and nothing re-ran the import
+               -- so the gds table silently fell behind. On 2026-10-02 it held
+               arrivals to 07 Aug while the legacy table ran to 30 Sep: 16,714
+               receipts missing, and every arrival figure on the Finished Goods
+               statistics, plus the tail of the Warehouse Entrance report, read
+               as though nothing had been received for seven weeks.
+
+               Counted by id rather than by an anti-join: the import walks
+               `store_entrance` in id order, so anything above the highest id
+               already imported is what a refresh brought in. One index range
+               scan instead of an anti-join over 1.18M rows. */
+            'fg-receipts' => [
+                'column' => 'bil.finished_goods_warehouse_receipts (rows)',
+                'available' => fn () => Schema::connection('bil')
+                    ->hasTable('finished_goods_warehouse_receipts'),
+                'missing' => function () use ($bil) {
+                    $highest = (int) $bil()->table('finished_goods_warehouse_receipts')
+                        ->max('legacy_id');
+
+                    return $bil()->table('store_entrance')->where('id', '>', $highest)->count();
+                },
+                'repair' => fn () => $this->call('bil:backfill-fg-receipts', ['--apply' => true]),
             ],
         ];
     }

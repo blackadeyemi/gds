@@ -32,8 +32,6 @@ class BackfillFinishedGoodsReceipts extends Command
     {
         $core = DB::connection('core');
         $bil = DB::connection('bil');
-        $bil = DB::connection('bil');
-        $bil = DB::connection('bil');
 
         // Legacy gate name -> [gate id, warehouse id]. Only gates attached to a
         // warehouse can take receipts; the rest are reported and skipped.

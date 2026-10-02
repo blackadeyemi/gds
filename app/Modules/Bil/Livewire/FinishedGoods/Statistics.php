@@ -198,8 +198,16 @@ class Statistics extends StatisticsPage
         $bundles = $this->sumOver('factory_conversion', 'dateofproduction', '/', 'bundles');
         $exited = $this->countOver('factory_exit', 'dateofexit', '/');
 
-        $received = $this->dateCount('finished_goods_warehouse_receipts', 'date_of_entrance',
-            fn ($q) => $q->where('is_historic', false));
+        // EVERY receipt, imported ones included. `is_historic` is a STOCK flag,
+        // not a reporting one: it exists so nine years of arrivals are not
+        // counted as stock on hand. An arrival in a date window is a reporting
+        // figure, and filtering it to live rows made this zero -- all 1,165,543
+        // receipts are imported, and a dump refresh re-imports them as such, so
+        // the tile and the flow chart's third line read empty against real
+        // production and exit figures. Double counting is not a risk: `barcode`
+        // is unique on the table and the backfill skips a barcode that already
+        // has a live receipt.
+        $received = $this->dateCount('finished_goods_warehouse_receipts', 'date_of_entrance');
 
         // Snapshots — "right now", not "over the range".
         $onFloor = (int) $this->db()->table('factory_conversion')->whereNull('status')->count();
@@ -215,8 +223,7 @@ class Statistics extends StatisticsPage
         // The flow, end to end: made → left the factory → booked into a store.
         $made = $this->series('factory_conversion', 'dateofproduction', '/', 'SUM(bundles)');
         $out = $this->series('factory_exit', 'dateofexit', '/', 'SUM(bundles)');
-        $in = $this->dateSeries('finished_goods_warehouse_receipts', 'date_of_entrance', 'SUM(bundles)',
-            fn ($q) => $q->where('is_historic', false));
+        $in = $this->dateSeries('finished_goods_warehouse_receipts', 'date_of_entrance', 'SUM(bundles)');
 
         $byLine = $this->db()->table('factory_conversion')
             ->when($this->bounds('/')[0], fn ($q) => $q->whereBetween('dateofproduction', $this->bounds('/')))
@@ -318,16 +325,27 @@ class Statistics extends StatisticsPage
 
     protected function warehouseSection(): array
     {
-        $live = fn ($q) => $q->where('is_historic', false);
+        // Arrivals, not stock -- so imported receipts count. See the note in
+        // overviewSection(): `is_historic` keeps history out of the STOCK
+        // ledger, and reusing it here emptied every arrival figure on the page.
+        $receipts = $this->dateCount('finished_goods_warehouse_receipts', 'date_of_entrance');
+        $bundlesIn = $this->dateSum('finished_goods_warehouse_receipts', 'date_of_entrance', 'bundles');
 
-        $receipts = $this->dateCount('finished_goods_warehouse_receipts', 'date_of_entrance', $live);
-        $bundlesIn = $this->dateSum('finished_goods_warehouse_receipts', 'date_of_entrance', 'bundles', $live);
+        // THE TOTAL IS THE WHOLE LEDGER, negative rows included -- the same
+        // figure the Overview's In Stock tile shows. Summing only the positive
+        // rows made one page carry two different numbers under one label:
+        // 7,493,328 here against 7,137,547 there, the 355,781 difference being
+        // products the ledger has gone below zero on (more loaded than
+        // received). Hiding that overstates the holding; it belongs in a
+        // reconcile, not in a filter.
+        $inStock = (float) $this->db()->table('finished_goods_warehouse_stock')->sum('bundles');
 
+        // The BREAKDOWNS keep `bundles > 0`, and should: a product the ledger
+        // owes is not a product in stock, and a negative slice cannot be drawn.
         $stockRows = $this->db()->table('finished_goods_warehouse_stock')->where('bundles', '>', 0);
-        $inStock = (float) (clone $stockRows)->sum('bundles');
         $distinct = (int) (clone $stockRows)->distinct()->count('productid');
 
-        $in = $this->dateSeries('finished_goods_warehouse_receipts', 'date_of_entrance', 'SUM(bundles)', $live);
+        $in = $this->dateSeries('finished_goods_warehouse_receipts', 'date_of_entrance', 'SUM(bundles)');
 
         $byWarehouse = $this->db()->table('finished_goods_warehouse_stock as s')
             ->leftJoin('core.warehouses as w', 's.warehouse_id', '=', 'w.id')
@@ -343,7 +361,6 @@ class Statistics extends StatisticsPage
 
         $byGate = $this->db()->table('finished_goods_warehouse_receipts as r')
             ->leftJoin('core.warehouse_gates as g', 'r.entrance_id', '=', 'g.id')
-            ->where('r.is_historic', false)
             ->when($this->coreBounds()[0], fn ($q) => $q->whereBetween('r.date_of_entrance', $this->coreBounds()))
             ->selectRaw("COALESCE(g.name,'Unknown') as name, SUM(r.bundles) as val")
             ->groupBy('name')->orderByDesc('val')->limit(8)->get();

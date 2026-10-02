@@ -165,6 +165,9 @@ class RefreshLegacy extends Command
         if (! $dry) {
             $this->newLine();
             $this->comment('Downstream derived tables are now stale — re-derive as needed:');
+            // First, because the rest read what it fills in: a refresh leaves
+            // gds-derived columns empty AND the imported receipts behind.
+            $this->line('   php artisan gds:replay-backfills --apply    (derived columns + new receipts)');
             $this->line('   php artisan bil:reconcile-warehouse-stock   (rebuild rawmaterials_stock)');
             $this->line('   php artisan bil:reconcile-rm-stock          (verify raw-materials stock)');
             $this->line('   php artisan bil:reconcile-fg-stock          (verify finished-goods stock)');
