@@ -39,10 +39,18 @@ that *populate* columns) — but leaves them **marked as run** in the migrations
 table. So after a refresh the columns are empty yet Laravel thinks the work is
 done. Re-apply them with **`php artisan gds:replay-backfills`**.
 
-Four feature tests fail specifically because of this (empty backfilled data after
-a dump), **not** because of a regression — see
-[the memory note](../../README.md) / `dump-refresh-undoes-backfills`. Run
-`gds:replay-backfills` after every refresh.
+**It is not only columns.** `fg-receipts` replays missing ROWS: the production
+app still writes the legacy `bil.store_entrance`, and only
+`bil:backfill-fg-receipts` copies those into gds's own receipt table, so a
+refresh brings in arrivals gds never hears about. Same failure, same fix.
+
+Feature tests fail for this rather than for any regression — after the
+2026-10-02 refresh, nine of them: four BPL Proforma cases (a NULL
+`bpl_sales.orderno` reaches a typed `string` property and Livewire unsets it),
+the BPL Order Trail's nine ways, the BPL invoice-payment dates, and the jumbo
+roll fixtures. All pass once the backfills are replayed. See
+`dump-refresh-undoes-backfills` in memory. Run `gds:replay-backfills` after
+every refresh.
 
 ---
 

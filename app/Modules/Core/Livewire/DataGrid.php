@@ -393,7 +393,27 @@ abstract class DataGrid extends Component
         $out = [];
         foreach ($fields as $i => $f) {
             $v = $agg->{'t' . $i} ?? null;
-            if ($v !== null && is_numeric($v)) {
+
+            // SUM() over NO ROWS is NULL, and the total of nothing is zero
+            // -- not "no total". Dropping the field made an EMPTY view report
+            // that it totals nothing at all, which is a different claim: the
+            // shape of this array changed with the data, so exports and
+            // anything reading it could not rely on the fields a view
+            // declares actually being there. BPL Warehouse Stock showed it --
+            // once the stock reconciled, Mismatches held no rows and reported
+            // no totals.
+            //
+            // The rendered footer ROW is unaffected: the blade hides it when
+            // there are no rows, which is right. This is about the figures
+            // being well-defined, not about showing a Total line for nothing.
+            //
+            // A non-numeric SUM is still skipped: that means the field is not
+            // a number, which is a different thing from having none.
+            if ($v === null) {
+                $v = 0;
+            }
+
+            if (is_numeric($v)) {
                 $out[$f] = $this->formatTotal($view, $f, (float) $v);
             }
         }

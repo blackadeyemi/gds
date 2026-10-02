@@ -49,6 +49,15 @@ class ReplayBackfills extends Command
 
     protected $description = 'Re-fill gds-computed columns that a production dump refresh leaves empty';
 
+    /**
+     * The two d/m/y invoice-payment dates, id => [as stored, what it means].
+     * From migration 2026_09_25_160000 -- see the repair's note.
+     */
+    private const PAYMENT_DATES = [
+        136 => ['12/12/21', '2021/12/12'],
+        137 => ['17/12/21', '2021/12/17'],
+    ];
+
     /** Legacy spellings of a factory gate, from the 2026_08_12_100000 migration. */
     private const GATE_ALIASES = [
         'Bil-1 Elevator' => 'BIL1-Elevator',
@@ -232,6 +241,76 @@ class ReplayBackfills extends Command
                             ->update(['gate_id' => $gate->id]);
                     }
                 },
+            ],
+
+            /* Two invoice payments stored d/m/y in a varchar column where
+               every other row holds Y/m/d (ids 136 and 137, December 2021).
+               Because the column is only ever compared AS TEXT, '12/12/21'
+               sorts before '2020/05/17' -- those two led every chronological
+               list and a December 2021 range excluded them. Repaired by
+               migration 2026_09_25_160000; the 2026-10-02 refresh brought both
+               back, and BplFinanceReportsPageTest caught it.
+
+               Guarded on the id AND the old value, exactly as the migration
+               is, so a row already corrected by hand -- or replaced -- is left
+               alone, and no future row in some other wrong shape is silently
+               reinterpreted. */
+            'bpl-payment-dates' => [
+                'column' => 'bpl.bpl_invoice_payments.date',
+                'available' => fn () => Schema::connection('bpl')->hasTable('bpl_invoice_payments'),
+                'missing' => fn () => DB::connection('bpl')->table('bpl_invoice_payments')
+                    ->where(function ($q) {
+                        foreach (self::PAYMENT_DATES as $id => [$was]) {
+                            $q->orWhere(fn ($w) => $w->where('id', $id)->where('date', $was));
+                        }
+                    })->count(),
+                'repair' => function () {
+                    foreach (self::PAYMENT_DATES as $id => [$was, $now]) {
+                        DB::connection('bpl')->table('bpl_invoice_payments')
+                            ->where('id', $id)->where('date', $was)->update(['date' => $now]);
+                    }
+                },
+            ],
+
+            /* The BPL sales order NUMBER, e.g. BPL/GH/ACIPAC/063.
+
+               gds generates it once when the order is placed and stores it,
+               because every legacy screen recomputed it from the customer's
+               CURRENT label and country -- so renaming a label silently
+               renumbered every order that customer ever placed, including ones
+               whose proforma had been printed and sent. Migration
+               2026_09_18_110000 backfilled it with exactly what the legacy
+               formula gives, so nothing already printed disagrees.
+
+               The 2026-10-02 refresh left all 414 rows NULL (the column, its
+               unique index and the bil compat view all survived -- only the
+               values went). Four BplProformaPageTest cases then ERRORED rather
+               than failed: the grid's search box is a typed `string`, and
+               `set('search', null)` makes Livewire unset the property, so the
+               next render threw "Property [$search] not found on component".
+               A fifth, BplSalesReportsPageTest's nine ways of finding an
+               order, failed on the number it could no longer look up.
+
+               One order stays NULL and should: id 464 names customer 165,
+               which does not exist, so it has no label or country. NULLs do
+               not collide under the unique index. */
+            'bpl-orderno' => [
+                'column' => 'bpl.bpl_sales.orderno',
+                'available' => fn () => Schema::connection('bpl')->hasColumn('bpl_sales', 'orderno'),
+                'missing' => fn () => DB::connection('bpl')->table('bpl_sales as s')
+                    ->join('bpl_customers as c', 'c.id', '=', 's.customerid')
+                    ->join('countries as co', 'co.name', '=', 'c.customercountry')
+                    ->whereNull('s.orderno')
+                    ->whereNotNull('c.customerlabel')->where('c.customerlabel', '<>', '')
+                    ->count(),
+                'repair' => fn () => DB::connection('bpl')->statement(
+                    'UPDATE `bpl_sales` s'
+                    . ' JOIN `bpl_customers` c ON c.`id` = s.`customerid`'
+                    . ' JOIN `countries` co ON co.`name` = c.`customercountry`'
+                    . "   SET s.`orderno` = REPLACE(CONCAT('BPL/', co.`iso`, '/', c.`customerlabel`, '/', s.`ref`), ' ', '')"
+                    . ' WHERE s.`orderno` IS NULL'
+                    . "   AND c.`customerlabel` IS NOT NULL AND c.`customerlabel` <> ''"
+                ),
             ],
 
             /* ROWS, not a column -- the only one of its kind here, and it

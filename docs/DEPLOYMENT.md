@@ -5,6 +5,84 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-10-02 - Finished Goods arrivals; three more refresh repairs
+
+No migration. Two code fixes and three new repairs on `gds:replay-backfills`.
+
+### Run this first
+
+```
+php artisan gds:replay-backfills            # dry run - what is missing
+php artisan gds:replay-backfills --apply    # fill it
+```
+
+Three repairs are new, and all three were found by things being silently empty
+rather than by anything failing:
+
+| repair | what a refresh leaves behind |
+|---|---|
+| `fg-receipts` | **rows**, not a column: 16,714 legacy receipts never imported |
+| `bpl-orderno` | all 414 `bpl_sales.orderno` NULL |
+| `bpl-payment-dates` | 2 invoice payments back to `d/m/y` |
+
+`fg-receipts` is the odd one out - it replays ROWS. The production app still
+writes the legacy `bil.store_entrance`; `bil:backfill-fg-receipts` copies those
+across into gds's own receipt table. A refresh reloads `store_entrance` with
+everything since the last dump and nothing re-ran the import, so gds held
+arrivals to 07 Aug while the legacy table ran to 30 Sep. It takes a couple of
+minutes - it walks all 1.18M rows - and is idempotent.
+
+`gds:refresh-legacy` now names the replay first in its post-refresh steps,
+before the stock reconciles, because they read what it fills in.
+
+### Finished Goods -> Statistics: arrival figures were zero
+
+`is_historic` on `finished_goods_warehouse_receipts` is a **stock** flag - it
+keeps nine years of imported arrivals out of the stock ledger. The statistics
+reused it as a reporting filter, and since every receipt is imported, six
+figures could only ever read zero: Received and the flow chart's third line on
+Overview; Receipts, Bundles Received, Received Into Warehouse and Receipts by
+Gate on Warehouse. **Never filter a report or a statistic by `is_historic`.**
+
+Also on that page: the Warehouse section's In Stock tile summed only rows with
+`bundles > 0`, so it disagreed with the Overview's by 355,781 bundles (products
+the ledger has gone below zero on). Both now total the whole ledger.
+
+### A grid's totals keep their shape when nothing matches
+
+`DataGrid::totalsFor()` dropped any field whose `SUM()` came back NULL - and
+SUM over no rows IS NULL - so an empty view reported that it totals nothing at
+all. The total of nothing is 0. Affects every grid; visible on BPL Warehouse
+Stock, whose Mismatches view reported no totals once the stock data reconciled
+and left it empty.
+
+The rendered footer row is unchanged - the blade hides it when there are no
+rows, which is right. This is about the figures being well-defined for exports
+and anything else reading them.
+
+### BPL Order Trail: the customer CODE now outranks the customer NAME
+
+`SalesOrderTrail::WAYS` declares its ways most-specific first, but had
+`customer` (a substring of a long name) before `label` (anchored, on a short
+deliberate code). 60 of BPL's 131 customers have a label that is a substring of
+their own name - EVERPACK / "Everpack Ltd" - so for nearly half the customer
+base, typing the code was reported as "Customer" and "Customer code" could not
+be the reason for anything. Swapped. This changes the order hits are GROUPED in
+on the Order Trail page.
+
+### What to check afterwards
+
+* `php artisan gds:replay-backfills` reports "Nothing to replay".
+* Finished Goods -> Statistics -> Overview: the flow chart has three lines, all
+  carrying data, and Received is within a per cent or two of Made.
+* Finished Goods -> Reports -> Warehouse Entrance over last month is not empty.
+* BPL -> Jumbo Rolls -> Warehouse Stock -> Mismatches opens with no rows and
+  no footer (correct), and its export carries four zero totals rather than
+  none.
+* The feature suite passes in full.
+
+---
+
 ## 2026-09-09 - Order Trail report; gds:replay-backfills
 
 No migration. One new report page and one new console command.
@@ -69,9 +147,9 @@ name instead silently fills 5 rows out of 90,066.
 
 * `php artisan gds:replay-backfills` reports "Nothing to replay".
 * Finished Goods -> Reports -> Factory Exit shows a factory on every row.
-* The feature suite: replaying fixes two of the four jumbo-roll failures a
-  refresh causes. The other two pick a fixture reel that the refreshed data has
-  since consumed - a test problem, not a code one.
+* The feature suite. (Historic note: at the time, replaying fixed two of four
+  jumbo-roll failures and the other two picked a fixture reel the refreshed data
+  had since consumed. All four pass now.)
 
 ---
 
