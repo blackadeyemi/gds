@@ -46,7 +46,8 @@
 <head>
     <meta charset="UTF-8">
     <title>{{ $roll['barcode'] }} — {{ ucfirst($stream) }} Label</title>
-    <link rel="icon" href="{{ asset('images/bilicon.ico') }}" />
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/pwa/favicon-32.png') }}" />
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/pwa/favicon-16.png') }}" />
     <script src="{{ asset('js/jquery.min.js') }}"></script>
     <style type="text/css">
         body { margin: 0; padding: 0; background: #fff; }

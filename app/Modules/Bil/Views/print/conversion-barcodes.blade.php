@@ -9,7 +9,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Finished Goods — Pallet Labels</title>
-    <link rel="icon" href="{{ asset('images/bilicon.ico') }}" />
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/pwa/favicon-32.png') }}" />
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/pwa/favicon-16.png') }}" />
     <script src="{{ asset('js/jquery.min.js') }}"></script>
     <style type="text/css">
         body { background:#FDFDFD; padding:0; margin:0; }

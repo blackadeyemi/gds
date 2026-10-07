@@ -4,7 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Dashboard — Consumer Tissue Data System</title>
-    <link type="image/x-icon" rel="icon" href="{{ asset('images/bilicon.ico') }}" />
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/pwa/favicon-32.png') }}" />
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/pwa/favicon-16.png') }}" />
     <style>
         body { font-family: system-ui, Arial, sans-serif; margin: 0; background: #f4f4f6; color: #222; }
         header { background: #060606; color: #fff; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }

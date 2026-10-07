@@ -124,6 +124,13 @@ abstract class DataGrid extends Component
      */
     public function deleteGuard($row): ?string { return null; }
 
+    /**
+     * What to say after a delete. Override where deleting does more than
+     * remove the row — BPL Weighbridge also puts the load's rolls back on the
+     * loading bay, and "Record deleted." does not tell the clerk that.
+     */
+    public function deletedMessage($row): string { return 'Record deleted.'; }
+
     /** Reload a row (with any counts deleteGuard needs) for the server-side re-check. */
     protected function findRow(int $id) { return null; }
 
@@ -143,7 +150,10 @@ abstract class DataGrid extends Component
         $default = $cfg['default_view'] && in_array($cfg['default_view'], $enabled)
             ? $cfg['default_view']
             : ($enabled[0] ?? array_key_first($this->views()));
-        $this->view = $default;
+        // ?view=<key> opens a named (enabled) view — how the dashboard's
+        // "needs attention" cards land on the list they counted.
+        $asked = (string) request()->query('view', '');
+        $this->view = $asked !== '' && in_array($asked, $enabled, true) ? $asked : $default;
 
         [$f, $d] = $this->defaultSort() + [null, 'asc'];
         $this->sortField = $f ?? '';
@@ -323,7 +333,7 @@ abstract class DataGrid extends Component
                 session()->flash('err', $reason);
             } else {
                 $this->performDelete($this->confirmingDelete);
-                session()->flash('ok', 'Record deleted.');
+                session()->flash('ok', $this->deletedMessage($row));
             }
         }
         $this->confirmingDelete = null;

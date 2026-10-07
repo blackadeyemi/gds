@@ -52,6 +52,31 @@ abstract class RawMaterialReport extends Component
     public array $edit = [];
     public ?int $confirmingDelete = null;
 
+    /* ---------------- Which database, which company ---------------- */
+
+    /**
+     * The connection the framework's own queries run on — the capped count and
+     * the footer totals, both of which wrap a report's query in a subquery.
+     *
+     * Raw Materials, Jumbo Rolls, Finished Goods, Sales and Machines all read
+     * the `bil` schema. BPL's reports sit on the same framework but read `bpl`,
+     * and a subquery wrapped on the wrong connection is a different database.
+     */
+    protected function connection(): string
+    {
+        return 'bil';
+    }
+
+    /**
+     * Prefix for export filenames — and the hint that picks the logo on the
+     * printout and the PDF (see Modules\Core\Support\Branding: anything
+     * starting `bpl` is Belpapyrus, everything else Belimpex).
+     */
+    protected function exportPrefix(): string
+    {
+        return 'rm-';
+    }
+
     /* ---------------- Child contract ---------------- */
 
     abstract public function title(): string;
@@ -533,7 +558,10 @@ abstract class RawMaterialReport extends Component
         foreach (array_keys($this->filterDefs()) as $name) {
             $this->filters[$name] = $this->filters[$name] ?? '';
         }
-        $this->view = array_key_first($this->views());
+        // ?view=<key> opens a named view — how the dashboard's "needs
+        // attention" cards land on the list they counted.
+        $asked = (string) request()->query('view', '');
+        $this->view = array_key_exists($asked, $this->views()) ? $asked : array_key_first($this->views());
         $this->initFilters();
     }
 
@@ -915,7 +943,7 @@ abstract class RawMaterialReport extends Component
                 'rows' => $q
                     ? $q->limit(self::PRINT_ROW_CAP)->get()->map(fn ($r) => $this->mapRow($r, ['columns' => $columns]))->all()
                     : [],
-                'logo' => \Modules\Core\Support\Branding::logo('bil'),
+                'logo' => \Modules\Core\Support\Branding::logo($this->exportPrefix()),
             ];
         }
 
@@ -926,7 +954,7 @@ abstract class RawMaterialReport extends Component
             'context' => $this->reportContext(),
             'headings' => array_map(fn ($c) => $c[0], $view['columns']),
             'rows' => $this->reportRows($view, self::PRINT_ROW_CAP),
-            'logo' => \Modules\Core\Support\Branding::logo('bil'),
+            'logo' => \Modules\Core\Support\Branding::logo($this->exportPrefix()),
         ];
     }
 
@@ -943,7 +971,7 @@ abstract class RawMaterialReport extends Component
 
         $view = $this->currentView();
         $headings = array_map(fn ($c) => $c[0], $view['columns']);
-        $base = 'rm-' . $this->printKey();
+        $base = $this->exportPrefix() . $this->printKey();
         $context = $this->reportContext();
 
         if (strtolower($format) === 'pdf') {
@@ -967,7 +995,7 @@ abstract class RawMaterialReport extends Component
     {
         $columns = $this->detailColumns();
         $headings = array_map(fn ($c) => $c[0], $columns);
-        $base = 'rm-' . $this->printKey() . '-detail';
+        $base = $this->exportPrefix() . $this->printKey() . '-detail';
         $context = $this->detailExportContext();
         $label = $this->title() . ' — ' . $this->detailTitle((string) $this->detailKey);
         $q = $this->detailFiltered((string) $this->detailKey);
@@ -1152,7 +1180,7 @@ abstract class RawMaterialReport extends Component
     {
         $sub = $this->runQuery($view)->reorder()->limit($cap);
 
-        return DB::connection('bil')->query()->fromSub($sub, 't')->count();
+        return DB::connection($this->connection())->query()->fromSub($sub, 't')->count();
     }
 
     /* ---------------- Footer totals ---------------- */
@@ -1227,7 +1255,7 @@ abstract class RawMaterialReport extends Component
         foreach ($fields as $i => $f) {
             $selects[] = 'SUM(`' . $f . '`) as `t' . $i . '`';
         }
-        $agg = DB::connection('bil')->query()
+        $agg = DB::connection($this->connection())->query()
             ->fromSub($this->runQuery($view)->reorder(), 't')
             ->selectRaw(implode(', ', $selects))->first();
 

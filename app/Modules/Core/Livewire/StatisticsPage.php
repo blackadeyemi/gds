@@ -304,6 +304,69 @@ abstract class StatisticsPage extends Component
         return GridExporter::download($format, $base, $headings, $rows, $context);
     }
 
+    /* ---------------- Dashboard ---------------- */
+
+    /** The standard range keys, shortest window first. */
+    public const RANGE_ORDER = ['7d', '30d', '90d', '12m', 'all'];
+
+    /**
+     * Point this page at the range the dashboard asked for, or the closest one
+     * it offers — pages differ on purpose (Raw Materials stops at 12 months
+     * for speed, BPL Sales starts at 90 days), so "Last 7 days" on BPL Sales
+     * means its shortest window, 90 days. A tie goes to the longer window.
+     * Null keeps the page's own default. Returns the range key now in force.
+     */
+    public function useDashboardRange(?string $want): string
+    {
+        $this->mount();
+
+        $offered = array_keys($this->rangeOptions());
+        $at = $want === null ? false : array_search($want, self::RANGE_ORDER, true);
+
+        if ($at !== false && ! in_array($want, $offered, true)) {
+            $best = null;
+            foreach ($offered as $key) {
+                $i = array_search($key, self::RANGE_ORDER, true);
+                if ($i === false) {
+                    continue;
+                }
+                $bestAt = $best === null ? null : array_search($best, self::RANGE_ORDER, true);
+                if ($best === null || abs($i - $at) < abs($bestAt - $at)
+                    || (abs($i - $at) === abs($bestAt - $at) && $i > $bestAt)) {
+                    $best = $key;
+                }
+            }
+            $want = $best;
+        }
+
+        if ($at !== false && $want !== null) {
+            $this->range = $want;
+        }
+
+        return $this->range;
+    }
+
+    /**
+     * The headline of this page for the home dashboard: the first section's
+     * tiles plus its first chart, over the requested range (see
+     * useDashboardRange). Built by the page itself, so the dashboard can never
+     * disagree with what the Statistics screen shows when opened.
+     */
+    public function dashboardSummary(?string $range = null): array
+    {
+        $this->useDashboardRange($range);
+        $data = $this->section($this->section);
+
+        return [
+            'title' => $this->pageTitle(),
+            'section' => $this->sections()[$this->section] ?? '',
+            'range' => $this->rangeLabel(),
+            'rangeKey' => $this->range,
+            'tiles' => $data['tiles'] ?? [],
+            'chart' => $data['charts'][0] ?? null,
+        ];
+    }
+
     /* ---------------- Render ---------------- */
 
     public function render()
