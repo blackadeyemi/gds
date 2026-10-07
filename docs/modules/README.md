@@ -76,6 +76,7 @@ you will meet in every module doc.
 | [Shifts](framework-shifts.md) | Dynamic per-area Day/Night windows that gate entry screens; bypass-shift |
 | [Warehouses & gates](framework-warehouses-and-gates.md) | The core warehouse/gate model, per-user gate grants, and why stock is derived from movements |
 | [Building blocks](framework-building-blocks.md) | The `DataGrid` and `RawMaterialReport` base classes and the Statistics dashboard — what you get for free |
+| [Activity & notifications](framework-activity.md) | The activity log every page writes to automatically, the bell, who is notified of what, record History |
 | [Legacy refresh](framework-legacy-refresh.md) | The monthly production-dump pipeline that refreshes the legacy + GDS data tables |
 | [Installed app (PWA)](framework-pwa.md) | Install, offline behaviour, the service worker, version, and launch-at-login deployment |
 

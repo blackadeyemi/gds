@@ -130,9 +130,9 @@ class SupplierDeliveries extends Component
 
         // The daily sequence is a global counter read-then-written, so two
         // stations generating at once could grab the same number. Serialize
-        // the whole read+insert batch behind a MySQL named lock (the table is
-        // MyISAM, so DB transactions aren't available). Lock is connection-
-        // scoped and released in finally.
+        // the whole read+insert batch behind a MySQL named lock: a transaction
+        // alone would not stop two stations reading the same last barcode.
+        // Lock is connection-scoped and released in finally.
         $conn = DB::connection('bil');
         $got = (int) ($conn->selectOne("SELECT GET_LOCK('rm_delivery_seq', 10) AS l")->l ?? 0);
         if ($got !== 1) {
@@ -141,6 +141,9 @@ class SupplierDeliveries extends Component
             return;
         }
 
+        // InnoDB since 2026_10_07_100000: the lock keeps two stations apart,
+        // the transaction keeps a failed batch from leaving half its rows.
+        $conn->beginTransaction();
         try {
             // Global daily sequence, continued from the last barcode of the day.
             $last = RawMaterialDelivery::where('dateofcreation', $this->date)->orderByDesc('id')->value('barcode');
@@ -168,6 +171,11 @@ class SupplierDeliveries extends Component
                 ]);
                 $ids[] = $row->id;
             }
+            $conn->commit();
+        } catch (\Throwable $e) {
+            $conn->rollBack();
+
+            throw $e;
         } finally {
             $conn->select("SELECT RELEASE_LOCK('rm_delivery_seq')");
         }

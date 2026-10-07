@@ -150,6 +150,11 @@
                 <span class="label">Dashboard</span>
             </a>
 
+            <a href="{{ route('activity') }}" class="nav-link {{ $is('activity*') }}" title="Activity">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span class="label">Activity</span>
+            </a>
+
             @canPrefix('bil.')
             <div class="nav-group" :class="{ open: bilOpen }">
                 <button type="button" class="nav-link" :class="{ active: {{ $onBil ? 'true' : 'false' }} && collapsed }" @click="openGroup('bilOpen')" title="BIL">
@@ -993,6 +998,13 @@
                         <span class="label">Waste Settings</span>
                     </a>
                     @endcanPage
+                    {{-- Admin only, not a registry page: see routes/core.php. --}}
+                    @if (auth()->user()?->isAdmin())
+                    <a href="{{ route('settings.activity-log') }}" class="nav-link {{ $is('settings/activity-log*') }}" title="Activity Log">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                        <span class="label">Activity Log</span>
+                    </a>
+                    @endif
                 </div>
             </div>
         </nav>
@@ -1033,9 +1045,7 @@
                     <span class="net-label" x-text="online ? 'Online' : 'Offline'"></span>
                 </div>
 
-                <button class="icon-btn" title="Notifications">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                </button>
+                @livewire(\Modules\Core\Livewire\NotificationBell::class, [], key('notification-bell'))
 
                 {{-- User menu --}}
                 <div class="dropdown" x-data="{ open: false }" @click.outside="open = false">

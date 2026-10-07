@@ -339,6 +339,60 @@ abstract class DataGrid extends Component
         $this->confirmingDelete = null;
     }
 
+    /* ---------------- Record history ---------------- */
+
+    /**
+     * "database.table" of the records this grid edits, for the History panel
+     * in the edit modal — read off the first view's query. Null hides the
+     * panel; override where the first view is not the edited table.
+     */
+    public function historySubject(): ?string
+    {
+        $views = $this->views();
+        $first = reset($views);
+
+        try {
+            $q = ($first['query'])();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if ($q instanceof \Illuminate\Database\Eloquent\Builder) {
+            $model = $q->getModel();
+            $table = $model->getTable();
+
+            return str_contains($table, '.') ? $table : $model->getConnection()->getDatabaseName() . '.' . $table;
+        }
+
+        return null;
+    }
+
+    /**
+     * What the activity log holds for the record being edited, newest first.
+     *
+     * @return \Illuminate\Support\Collection<int,\Modules\Core\Models\ActivityItem>
+     */
+    public function recordHistory(int $limit = 15)
+    {
+        $type = $this->editingId ? $this->historySubject() : null;
+        if ($type === null) {
+            return collect();
+        }
+
+        $user = auth()->user();
+
+        // Same rule as the Activity page: a change made on a page this user
+        // cannot open is not theirs to see, even on a record they can edit.
+        return \Modules\Core\Models\ActivityItem::with('activity')
+            ->where('subject_type', $type)
+            ->where('subject_id', (string) $this->editingId)
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get()
+            ->filter(fn ($i) => $user && $i->activity?->isVisibleTo($user))
+            ->values();
+    }
+
     /**
      * Page a view, counting the cheap way when the view offers one.
      *

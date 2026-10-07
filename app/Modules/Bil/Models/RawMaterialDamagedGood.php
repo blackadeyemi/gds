@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
  *           rows are treated as already-final).
  *
  * No Eloquent timestamps (the legacy table has none). Shared with the legacy
- * app (MyISAM, non-transactional).
+ * app. InnoDB since 2026_10_07_100000 (it was MyISAM).
  */
 class RawMaterialDamagedGood extends Model
 {

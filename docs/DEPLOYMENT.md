@@ -5,6 +5,80 @@ in, what to check afterwards, and how to get back if it goes wrong.
 
 ---
 
+## 2026-10-07 - Every table InnoDB; Activity log + notifications
+
+Two migrations, one new scheduled command. See
+[framework-activity.md](modules/framework-activity.md).
+
+### ⚠️ Run outside working hours
+
+`2026_10_07_100000_convert_myisam_tables_to_innodb` rebuilds every MyISAM table
+in core / bil / bpl as InnoDB: 19 tables on dev, ~95 MB, **37 seconds**. Each
+table is copied, and writes to it wait while that happens. That includes the raw-materials
+movement tables the legacy app still writes. Do it when the stores are closed.
+
+It finds the tables by query, not from a list, so production's set may differ.
+`bilfg` (the legacy's own database) is not touched.
+
+### Deploy order
+
+```
+# 1. back up the tables it will convert (it is not reversible by migration)
+php artisan gds:replay-backfills --only=innodb-engine     # lists how many
+# 2. migrate (both migrations)
+php artisan migrate --force
+# 3. confirm
+php artisan gds:replay-backfills --only=innodb-engine     # must say 0 / already filled
+```
+
+⚠️ On dev, `2026_09_25_200000_complete_legacy_mojibake_repair` was still
+**pending** when this shipped, and a plain `migrate` runs it too. Check
+`php artisan migrate:status --pending` first, and decide about that one
+separately. On dev, these two migrations were run with `--path`.
+
+### What changes for users
+
+- **Activity** in the sidebar, and a working bell in the top bar.
+- A **History** panel at the foot of every editable grid's Edit modal.
+- The raw-materials screens (Supplier Deliveries, Warehouse Entry/Exit,
+  Stock Transfer, Factory Entrance, Consumption, Factory Returns, Damaged
+  Goods) now do their writes in a real transaction as well as under their
+  `GET_LOCK`. A failed batch no longer leaves half its rows behind.
+
+### Scheduler
+
+`gds:prune-activity --apply` runs daily at 03:00. It keeps the number of days
+set by an Admin at **Settings → Activity Log**, or 730 days
+(`ACTIVITY_RETENTION_DAYS`) if none is set. Like the nightly FG reconcile, it
+does nothing unless `schedule:run` is wired up on the server. See the production
+deploy notes.
+
+Settings → Activity Log is **Admin only and not grantable**. It uses the new
+`admin` route middleware rather than a page-registry entry, so there is nothing
+to sync and nothing for the Role matrix to show.
+
+### After a hand restore
+
+A restore from a production dump re-creates tables with `ENGINE=MyISAM`.
+`gds:replay-backfills` now includes the `innodb-engine` repair. Run it as usual.
+`gds:refresh-legacy` does not have this problem: it TRUNCATEs and INSERTs into
+the existing table, so the engine survives.
+
+### Verify afterwards
+
+- Save something on any gds screen, then open **Activity**. It should be at the top, with your
+  name and the page.
+- `SELECT engine, COUNT(*) FROM information_schema.tables WHERE table_schema IN
+  ('core','bil','bpl') AND table_type='BASE TABLE' GROUP BY engine;` returns InnoDB only.
+
+### Rollback
+
+Drop the four `activity*` tables (`migrate:rollback --step=1` does it). Do **not**
+convert tables back to MyISAM: the raw-materials screens now rely on
+transactions, and the migration's `down()` deliberately does nothing.
+
+---
+
 ## 2026-10-02 - Finished Goods arrivals; three more refresh repairs
 
 No migration. Two code fixes and three new repairs on `gds:replay-backfills`.
@@ -1457,8 +1531,9 @@ Chosen by measurement: every column added has a worst-case bucket under 1% of
 its table. The categorical filters beside them (`factory`, `shift`, `linename`,
 `exitlocation`, the RM `status` columns) measured 30–100% and are **deliberately
 left alone** — MySQL would ignore such an index and the writes would still pay.
-The MyISAM raw-materials tables are untouched: `ADD INDEX` locks them for the
-rebuild, which is not worth a maybe on a live shared database.
+The raw-materials tables (MyISAM at the time) were left untouched: `ADD INDEX`
+locked them for the rebuild, which was not worth a maybe on a live shared
+database. They are InnoDB since 2026_10_07_100000.
 
 ### Two query-shape fixes that came with it
 
@@ -1581,16 +1656,15 @@ Entrance). It narrows to movements booked through gds — historic rows have no
 gate, deliberately — so the existing **Location** filter remains the one that
 covers all of history.
 
-### ⚠️ The raw-materials tables are MyISAM
+### The raw-materials tables were MyISAM
 
 `rawmaterials_warehouse_entry`, `rawmaterials_warehouse_exit`,
-`factory_entrance_rawmaterials` and `return_approval` are all MyISAM, which has
-**no transactions**. A `DB::transaction()` around them is a lie — a failure
-part-way through leaves the rows written. This is why those screens serialise on
-`GET_LOCK` rather than pretending to be atomic.
-
-It is also why deriving stock from the barcodes matters: if a batch
-half-completes, the totals can be put right.
+`factory_entrance_rawmaterials` and `return_approval` were MyISAM, which has
+**no transactions**, until migration `2026_10_07_100000` converted them (and
+every other MyISAM table in core / bil / bpl). The screens now hold their
+`GET_LOCK` **and** a transaction. Rows written before that can still be half a
+batch, which is why deriving stock from the barcodes matters: the totals can
+be put right.
 
 ```
 php artisan bil:reconcile-rm-stock            # report

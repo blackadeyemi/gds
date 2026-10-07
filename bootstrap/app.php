@@ -15,6 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Per-page access gate: ->middleware('page:{page.key}')
         $middleware->alias([
             'page' => \Modules\Core\Http\Middleware\EnsurePageAccess::class,
+            // Admin-only, never delegable: ->middleware('admin')
+            'admin' => \Modules\Core\Http\Middleware\EnsureAdmin::class,
         ]);
 
         // Display-only date-format preference is set client-side (settings.js)

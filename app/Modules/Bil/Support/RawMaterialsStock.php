@@ -22,17 +22,17 @@ use Modules\Core\Models\WarehouseGate;
  * gds no longer writes `rawmaterials_stock`. The legacy app still owns it, and
  * the two diverge from the 2026-08-12 cut-over.
  *
- * ⚠️ **The raw-materials movement tables are MyISAM** — `rawmaterials_warehouse_entry`,
- * `rawmaterials_warehouse_exit`, `factory_entrance_rawmaterials` and
- * `return_approval` all are. MyISAM has no transactions, so a `DB::transaction()`
- * around them is a lie: a failure part-way through leaves the rows written. That
- * is why the RM screens serialise on `GET_LOCK` rather than pretending to be
- * atomic, and why it matters that stock derives from those rows — if a batch
- * half-completes, `bil:reconcile-rm-stock` puts the totals right from the
- * barcodes rather than leaving permanent drift.
+ * The raw-materials movement tables were MyISAM until 2026_10_07_100000, so a
+ * `DB::transaction()` around them committed statement by statement. They are
+ * InnoDB now: each RM screen holds its `GET_LOCK` (which keeps two stations
+ * from reading the same sequence or barcode state) AND a `bil` transaction
+ * (which keeps a failed batch from leaving half its rows). Rows written before
+ * the conversion can still be half a batch — `bil:reconcile-rm-stock` puts the
+ * totals right from the barcodes either way.
  *
- * It also means a test cannot verify these screens by wrapping them in a
- * transaction and rolling back: the bil-side rows survive. Clean up explicitly.
+ * ⚠️ A test still cannot rely on rolling back: the feature tests run against
+ * the live databases and the screens commit their own transaction. Clean up
+ * explicitly, by id.
  */
 class RawMaterialsStock
 {

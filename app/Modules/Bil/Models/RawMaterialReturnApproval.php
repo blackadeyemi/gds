@@ -14,7 +14,8 @@ use Illuminate\Database\Eloquent\Model;
  *           (leftover of a consumed item comes back as a new child barcode)
  *
  * `timestamp` is a DB-managed CURRENT_TIMESTAMP column, so no Eloquent
- * timestamps. Shared with the legacy app (MyISAM, non-transactional).
+ * timestamps. Shared with the legacy app. InnoDB since 2026_10_07_100000
+ * (it was MyISAM).
  */
 class RawMaterialReturnApproval extends Model
 {

@@ -178,6 +178,9 @@ class StockTransfer extends Component
         }
 
         $transferred = 0;
+        // InnoDB since 2026_10_07_100000: the lock keeps two stations apart,
+        // the transaction keeps a failed batch from leaving half its rows.
+        $conn->beginTransaction();
         try {
             foreach ($this->items as $item) {
                 $barcode = $item['barcode'];
@@ -231,6 +234,11 @@ class StockTransfer extends Component
 
                 $transferred++;
             }
+            $conn->commit();
+        } catch (\Throwable $e) {
+            $conn->rollBack();
+
+            throw $e;
         } finally {
             $conn->select("SELECT RELEASE_LOCK('rm_stock_transfer')");
         }
