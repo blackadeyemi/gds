@@ -82,6 +82,25 @@ return [
             'engine' => null,
         ],
 
+        // BHN (Abuja) — a SEPARATE schema, not part of the bilfg split, modelled
+        // from BHN's own legacy dump. BHN_DB_HOST/PORT default to the local
+        // server for dev; in production BHN is homed to the Abuja server, so
+        // these point there (see the planned db_routing / routing page).
+        'bhn' => [
+            'driver' => 'mysql',
+            'host' => env('BHN_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('BHN_DB_PORT', env('DB_PORT', '3306')),
+            'database' => env('BHN_DB_DATABASE', 'bhn'),
+            'username' => env('BHN_DB_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('BHN_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+        ],
+
         'sqlite' => [
             'driver' => 'sqlite',
             'url' => env('DB_URL'),
