@@ -51,6 +51,7 @@ Run after the data load (they populate `core`, then rebuild the resolver maps):
 ```
 mysql core < database/bhn/seed_core_hierarchy.sql   # 1 factory + 14 lines
 mysql core < database/bhn/seed_core_users.sql        # 30 BHN-specific staff
+mysql core < database/bhn/seed_core_warehouses.sql   # 3 warehouses + gates
 php artisan gds:rebuild-machine-maps                 # bil + bhn (config/machine_maps.php)
 # then re-derive ids on the loaded rows (fires the BEFORE UPDATE triggers):
 #   UPDATE bhn.factory_conversion        SET linename = linename;
@@ -65,10 +66,14 @@ php artisan gds:rebuild-machine-maps                 # bil + bhn (config/machine
 - **Users** — DONE. 30 BHN-only staff added (company 4). 10 usernames already
   existed in core.user (shared admin/management, mostly company NULL) and were
   left untouched — reconcile individually if any is a different BHN person.
+- **Warehouses + gates** — DONE. 3 warehouses (FG/sales '01', dispatch '03',
+  raw-materials loc 1) + gates (FG in gate, cageroom out gates CGR04-10/CGR20,
+  RM in/out, factory entrance/exit). Per-user gate GRANTS
+  (warehouse_gate_user / factory_gate_user) are NOT seeded — assign them in the
+  gds admin UI per staff member, or no one can operate the gates yet.
 
 ## Still outstanding
 
-- **Warehouses + gates** for company 4 (sales/store/FG screens group by them).
 - **Stock reconcile + mojibake** for the bhn connection.
 - **Module wiring**: the Bil module serves `/bhn` with the connection swapped to
   `bhn` per company context (reuse, not duplication).
