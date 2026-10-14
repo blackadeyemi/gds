@@ -19,14 +19,18 @@ use Modules\Bil\Support\RawMaterialsStock;
  */
 class ReconcileRawMaterialsStock extends Command
 {
+    use \Modules\Core\Console\Concerns\RunsForModule;
+
     protected $signature = 'bil:reconcile-rm-stock
                             {--fix : Write the corrections instead of only reporting}
-                            {--warehouse= : Limit to one warehouse id}';
+                            {--warehouse= : Limit to one warehouse id}
+                            {--module=bil : Company module to reconcile (bil|bhn)}';
 
     protected $description = 'Check raw_materials_warehouse_stock against the in-store barcodes';
 
     public function handle(): int
     {
+        $this->applyModuleConnection();
         $warehouseId = $this->option('warehouse') ? (int) $this->option('warehouse') : null;
         $drift = RawMaterialsStock::drift($warehouseId);
 

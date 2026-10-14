@@ -26,12 +26,17 @@ use Illuminate\Support\Facades\DB;
  */
 class ReconcileWarehouseStock extends Command
 {
-    protected $signature = 'bil:reconcile-warehouse-stock {--dry-run : Show the plan without writing anything}';
+    use \Modules\Core\Console\Concerns\RunsForModule;
+
+    protected $signature = 'bil:reconcile-warehouse-stock
+                            {--dry-run : Show the plan without writing anything}
+                            {--module=bil : Company module to reconcile (bil|bhn)}';
 
     protected $description = 'Rebuild rawmaterials_stock (quantity + weight) from in-store barcodes';
 
     public function handle(): int
     {
+        $this->applyModuleConnection();
         $bil = DB::connection('bil');
         $dry = (bool) $this->option('dry-run');
 
