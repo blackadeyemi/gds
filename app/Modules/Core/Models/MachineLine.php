@@ -30,6 +30,28 @@ class MachineLine extends Model
         'sort_order' => 'integer',
     ];
 
+    /**
+     * Scope to the current module's company. The factory hierarchy is shared in
+     * `core` across companies (BIL, BHN…), but each company module (incl. BHN
+     * reusing the Bil screens) must only see its own lines. Keyed to
+     * config('bil.company_code'), which ResolveCompanyModule rebinds per request.
+     * Unassigned lines (no factory) stay visible to all. MachineMaps rebuilds via
+     * the query builder, not this model, so the name→id maps stay complete.
+     */
+    protected static function booted(): void
+    {
+        static::addGlobalScope('companyModule', function (Builder $q): void {
+            $code = config('bil.company_code');
+            if (! $code) {
+                return;
+            }
+            $q->where(function (Builder $w) use ($code): void {
+                $w->whereNull('factory_id')
+                    ->orWhereHas('factory', fn (Builder $f) => $f->whereHas('company', fn (Builder $c) => $c->where('code', $code)));
+            });
+        });
+    }
+
     public function factory(): BelongsTo
     {
         return $this->belongsTo(Factory::class);

@@ -51,4 +51,26 @@ class ModuleContext
     {
         return config(static::$key.'.'.$suffix, $default);
     }
+
+    /**
+     * Rewrite a page/permission key to the active module. BHN reuses the Bil
+     * screens, which carry literal `bil.*` page keys (routes required from
+     * routes/bil.php, in-component canDo checks) — under a BHN request those must
+     * resolve to `bhn.*`. Keys for other prefixes (settings.*, bpl.*, core) are
+     * left alone.
+     */
+    public static function normalizeKey(string $key): string
+    {
+        $dot = strpos($key, '.');
+        if ($dot === false) {
+            return $key;
+        }
+
+        $first = substr($key, 0, $dot);
+        if ($first !== static::$key && in_array($first, self::MODULES, true)) {
+            return static::$key.substr($key, $dot);
+        }
+
+        return $key;
+    }
 }

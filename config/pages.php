@@ -31,8 +31,7 @@ $entryPlain = ['view'];
 // Read-only reports / dashboards: viewable and exportable, nothing to edit.
 $snapshot = ['view', 'export'];
 
-return [
-    'pages' => [
+$pages = [
         // BIL — Machines (Company > Factory > Line > Project)
         ['key' => 'bil.machines.statistics', 'label' => 'Statistics', 'module' => 'BIL / Machines', 'route' => 'bil.machines.statistics', 'abilities' => $snapshot],
         ['key' => 'bil.machines.lines',    'label' => 'Lines',    'module' => 'BIL / Machines', 'route' => 'bil.machines.lines',    'abilities' => $crud],
@@ -274,20 +273,24 @@ return [
         // One page holding two lists (causes + origins), edited inline — so
         // 'edit' is the whole write ability; there is no separate create/delete.
         ['key' => 'settings.waste',      'label' => 'Waste Settings', 'module' => 'Settings', 'route' => 'settings.waste',      'abilities' => ['view', 'edit']],
+];
 
-        // BHN (Abuja) — reuses the BIL screens on the bhn connection, with its
-        // own page keys/routes so access + nav are per-company. First slice:
-        // the Sales chain + FG/Jumbo stock (see routes/bhn.php).
-        ['key' => 'bhn.sales.customers',    'label' => 'Customers',    'module' => 'BHN / Sales', 'route' => 'bhn.sales.customers',    'abilities' => $crud],
-        ['key' => 'bhn.sales.orders',       'label' => 'Orders',       'module' => 'BHN / Sales', 'route' => 'bhn.sales.orders',       'abilities' => ['view', 'delete', 'backdate']],
-        ['key' => 'bhn.sales.loading',      'label' => 'Loading',      'module' => 'BHN / Sales', 'route' => 'bhn.sales.loading',      'abilities' => ['view', 'create', 'modify', 'return', 'backdate'], 'gates' => 'warehouse'],
-        ['key' => 'bhn.sales.delivery',     'label' => 'Delivery',     'module' => 'BHN / Sales', 'route' => 'bhn.sales.delivery',     'abilities' => ['view', 'confirm', 'delete'], 'gates' => 'warehouse'],
-        ['key' => 'bhn.sales.returns',      'label' => 'Returns',      'module' => 'BHN / Sales', 'route' => 'bhn.sales.returns',      'abilities' => ['view', 'create', 'modify', 'delete']],
-        ['key' => 'bhn.sales.waybill',      'label' => 'Waybill',      'module' => 'BHN / Sales', 'route' => 'bhn.sales.waybill',      'abilities' => ['view', 'create', 'modify', 'delete']],
-        ['key' => 'bhn.sales.transporters', 'label' => 'Transporters', 'module' => 'BHN / Sales', 'route' => 'bhn.sales.transporters', 'abilities' => $crud],
-        ['key' => 'bhn.finished_goods.warehouse_stock', 'label' => 'Warehouse Stock', 'module' => 'BHN / Finished Goods', 'route' => 'bhn.finished-goods.warehouse-stock', 'abilities' => ['view', 'edit', 'export']],
-        ['key' => 'bhn.jumbo_rolls.stock',  'label' => 'Stock',        'module' => 'BHN / Jumbo Rolls', 'route' => 'bhn.jumbo-rolls.stock',  'abilities' => $snapshot],
-    ],
+// Mirror every BIL page as a BHN page — BHN reuses the Bil module on the bhn
+// connection, so the screens are identical; only the key/route prefix and the
+// module label differ. Keeps BHN's pages in lock-step with BIL automatically.
+$bhnPages = [];
+foreach ($pages as $p) {
+    if (! str_starts_with($p['key'], 'bil.')) {
+        continue;
+    }
+    $p['key'] = 'bhn.'.substr($p['key'], 4);
+    $p['route'] = 'bhn.'.substr($p['route'], 4);
+    $p['module'] = 'BHN / '.preg_replace('#^BIL / #', '', $p['module']);
+    $bhnPages[] = $p;
+}
+
+return [
+    'pages' => array_merge($pages, $bhnPages),
 
     // Display labels for ability columns in the Role matrix (order matters).
     'abilities' => [

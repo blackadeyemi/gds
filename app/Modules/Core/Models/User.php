@@ -58,6 +58,10 @@ class User extends Authenticatable
     /** Can the user perform an ability on a page? "{key}:{ability}" (Admin = all). */
     public function canDo(string $pageKey, string $ability): bool
     {
+        // The reused Bil screens carry literal `bil.*` keys; under a BHN request
+        // those resolve to `bhn.*` (see ModuleContext).
+        $pageKey = \Modules\Core\Support\ModuleContext::normalizeKey($pageKey);
+
         return $this->isAdmin() || in_array("$pageKey:$ability", $this->permissionNames(), true);
     }
 

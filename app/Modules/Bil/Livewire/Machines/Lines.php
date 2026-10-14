@@ -94,7 +94,9 @@ class Lines extends DataGrid
     #[Computed]
     public function factories()
     {
-        return Factory::with('company')->orderBy('name')->get();
+        return Factory::with('company')
+            ->whereHas('company', fn ($c) => $c->where('code', config('bil.company_code')))
+            ->orderBy('name')->get();
     }
 
     /** Candidate parents — only top-level lines, and never the row being edited. */
