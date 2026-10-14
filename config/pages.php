@@ -274,6 +274,19 @@ return [
         // One page holding two lists (causes + origins), edited inline — so
         // 'edit' is the whole write ability; there is no separate create/delete.
         ['key' => 'settings.waste',      'label' => 'Waste Settings', 'module' => 'Settings', 'route' => 'settings.waste',      'abilities' => ['view', 'edit']],
+
+        // BHN (Abuja) — reuses the BIL screens on the bhn connection, with its
+        // own page keys/routes so access + nav are per-company. First slice:
+        // the Sales chain + FG/Jumbo stock (see routes/bhn.php).
+        ['key' => 'bhn.sales.customers',    'label' => 'Customers',    'module' => 'BHN / Sales', 'route' => 'bhn.sales.customers',    'abilities' => $crud],
+        ['key' => 'bhn.sales.orders',       'label' => 'Orders',       'module' => 'BHN / Sales', 'route' => 'bhn.sales.orders',       'abilities' => ['view', 'delete', 'backdate']],
+        ['key' => 'bhn.sales.loading',      'label' => 'Loading',      'module' => 'BHN / Sales', 'route' => 'bhn.sales.loading',      'abilities' => ['view', 'create', 'modify', 'return', 'backdate'], 'gates' => 'warehouse'],
+        ['key' => 'bhn.sales.delivery',     'label' => 'Delivery',     'module' => 'BHN / Sales', 'route' => 'bhn.sales.delivery',     'abilities' => ['view', 'confirm', 'delete'], 'gates' => 'warehouse'],
+        ['key' => 'bhn.sales.returns',      'label' => 'Returns',      'module' => 'BHN / Sales', 'route' => 'bhn.sales.returns',      'abilities' => ['view', 'create', 'modify', 'delete']],
+        ['key' => 'bhn.sales.waybill',      'label' => 'Waybill',      'module' => 'BHN / Sales', 'route' => 'bhn.sales.waybill',      'abilities' => ['view', 'create', 'modify', 'delete']],
+        ['key' => 'bhn.sales.transporters', 'label' => 'Transporters', 'module' => 'BHN / Sales', 'route' => 'bhn.sales.transporters', 'abilities' => $crud],
+        ['key' => 'bhn.finished_goods.warehouse_stock', 'label' => 'Warehouse Stock', 'module' => 'BHN / Finished Goods', 'route' => 'bhn.finished-goods.warehouse-stock', 'abilities' => ['view', 'edit', 'export']],
+        ['key' => 'bhn.jumbo_rolls.stock',  'label' => 'Stock',        'module' => 'BHN / Jumbo Rolls', 'route' => 'bhn.jumbo-rolls.stock',  'abilities' => $snapshot],
     ],
 
     // Display labels for ability columns in the Role matrix (order matters).

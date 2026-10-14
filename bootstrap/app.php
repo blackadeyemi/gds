@@ -12,6 +12,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Resolve the company module (BIL default, BHN reuses the Bil module on
+        // the bhn connection) and rebind for it — on every web request, since
+        // Livewire updates don't carry the /bhn URL prefix. Runs first so the
+        // connection is in place before any component or query.
+        $middleware->web(prepend: [
+            \Modules\Core\Http\Middleware\ResolveCompanyModule::class,
+        ]);
+
         // Per-page access gate: ->middleware('page:{page.key}')
         $middleware->alias([
             'page' => \Modules\Core\Http\Middleware\EnsurePageAccess::class,
