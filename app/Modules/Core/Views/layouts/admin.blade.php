@@ -26,6 +26,18 @@
     $onMachines = request()->is('bil/machines/*');
     $onFgReports = request()->is('bil/finished-goods/reports/*');
     $onMachineReports = request()->is('bil/machines/reports/*');
+    // BHN (Abuja) — reuses the BIL screens under /bhn (separate nav section).
+    $onBhn = request()->is('bhn/*');
+    $onBhnRawMaterials = request()->is('bhn/raw-materials/*');
+    $onBhnRmReports = request()->is('bhn/raw-materials/reports/*');
+    $onBhnJumboRolls = request()->is('bhn/jumbo-rolls/*');
+    $onBhnJrReports = request()->is('bhn/jumbo-rolls/reports/*');
+    $onBhnFinishedGoods = request()->is('bhn/finished-goods/*');
+    $onBhnSales = request()->is('bhn/sales/*');
+    $onBhnSalesReports = request()->is('bhn/sales/reports/*');
+    $onBhnMachines = request()->is('bhn/machines/*');
+    $onBhnFgReports = request()->is('bhn/finished-goods/reports/*');
+    $onBhnMachineReports = request()->is('bhn/machines/reports/*');
     $onBpl = request()->is('bpl/*');
     $onJumboRolls = request()->is('bpl/jumbo-rolls/*');
     $onBplJrReports = request()->is('bpl/jumbo-rolls/reports/*');
@@ -117,11 +129,22 @@
         bplFinanceReportsOpen: {{ $onBplFinanceReports ? 'true' : 'false' }},
         bplLogisticsOpen: {{ $onBplLogistics ? 'true' : 'false' }},
         bplLogisticsReportsOpen: {{ $onBplLogisticsReports ? 'true' : 'false' }},
+        bhnOpen: {{ $onBhn ? 'true' : 'false' }},
+        bhnRawMaterialsOpen: {{ $onBhnRawMaterials ? 'true' : 'false' }},
+        bhnRmReportsOpen: {{ $onBhnRmReports ? 'true' : 'false' }},
+        bhnJumboRollsOpen: {{ $onBhnJumboRolls ? 'true' : 'false' }},
+        bhnJrReportsOpen: {{ $onBhnJrReports ? 'true' : 'false' }},
+        bhnFinishedGoodsOpen: {{ $onBhnFinishedGoods ? 'true' : 'false' }},
+        bhnFgReportsOpen: {{ $onBhnFgReports ? 'true' : 'false' }},
+        bhnSalesOpen: {{ $onBhnSales ? 'true' : 'false' }},
+        bhnSalesReportsOpen: {{ $onBhnSalesReports ? 'true' : 'false' }},
+        bhnMachinesOpen: {{ $onBhnMachines ? 'true' : 'false' }},
+        bhnMachineReportsOpen: {{ $onBhnMachineReports ? 'true' : 'false' }},
         toggleSidebar() {
             if (window.innerWidth <= 900) { this.mobileOpen = !this.mobileOpen; return; }
             this.collapsed = !this.collapsed;
             localStorage.setItem('gds_sidebar_collapsed', JSON.stringify(this.collapsed));
-            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; this.bilJumboRollsOpen = false; this.bilJrReportsOpen = false; this.finishedGoodsOpen = false; this.fgReportsOpen = false; this.salesOpen = false; this.salesReportsOpen = false; this.machinesOpen = false; this.machineReportsOpen = false; this.bplOpen = false; this.jumboRollsOpen = false; this.bplJrReportsOpen = false; this.bplSalesOpen = false; this.bplSalesReportsOpen = false; this.bplFinanceOpen = false; this.bplFinanceReportsOpen = false; this.bplLogisticsOpen = false; this.bplLogisticsReportsOpen = false; }
+            if (this.collapsed) { this.adminOpen = false; this.settingsOpen = false; this.bilOpen = false; this.rawMaterialsOpen = false; this.rmReportsOpen = false; this.bilJumboRollsOpen = false; this.bilJrReportsOpen = false; this.finishedGoodsOpen = false; this.fgReportsOpen = false; this.salesOpen = false; this.salesReportsOpen = false; this.machinesOpen = false; this.machineReportsOpen = false; this.bplOpen = false; this.jumboRollsOpen = false; this.bplJrReportsOpen = false; this.bplSalesOpen = false; this.bplSalesReportsOpen = false; this.bplFinanceOpen = false; this.bplFinanceReportsOpen = false; this.bplLogisticsOpen = false; this.bplLogisticsReportsOpen = false; this.bhnOpen = false; this.bhnRawMaterialsOpen = false; this.bhnRmReportsOpen = false; this.bhnJumboRollsOpen = false; this.bhnJrReportsOpen = false; this.bhnFinishedGoodsOpen = false; this.bhnFgReportsOpen = false; this.bhnSalesOpen = false; this.bhnSalesReportsOpen = false; this.bhnMachinesOpen = false; this.bhnMachineReportsOpen = false; }
         },
         openGroup(group) {
             if (this.collapsed) {
@@ -599,6 +622,8 @@
                 </div>
             </div>
             @endcanPrefix
+
+            @include('core::partials.bhn-nav')
 
             @canPrefix('bpl.')
             <div class="nav-group" :class="{ open: bplOpen }">
