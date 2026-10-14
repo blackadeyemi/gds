@@ -44,10 +44,31 @@ Drop a fresh `bhn.sql` at the configured `dump_file` and re-run step 4's
 — tracked as TODO for BHN; the BIL reconcile commands are bil-connection-bound
 and need a BHN equivalent / `--connection` option.
 
-## Still outstanding (not schema)
+## Core entities (shared `core` schema, company 4)
 
-- **core entities for BHN** (company 4): machine hierarchy (so the factory/line
-  triggers can derive `factory_id`/`line_id` — currently left NULL), warehouses
-  + gates, and migrating the 40 legacy `user` rows into `core.users`.
+Run after the data load (they populate `core`, then rebuild the resolver maps):
+
+```
+mysql core < database/bhn/seed_core_hierarchy.sql   # 1 factory + 14 lines
+mysql core < database/bhn/seed_core_users.sql        # 30 BHN-specific staff
+php artisan gds:rebuild-machine-maps                 # bil + bhn (config/machine_maps.php)
+# then re-derive ids on the loaded rows (fires the BEFORE UPDATE triggers):
+#   UPDATE bhn.factory_conversion        SET linename = linename;
+#   UPDATE bhn.factory_usage_rawmaterials SET linename = linename;
+#   UPDATE bhn.factory_usage_reel        SET linename = linename;
+```
+
+- **Hierarchy** — DONE. factory_id/line_id now resolve on all conversion/usage
+  rows. Machine-level **projects** are NOT seeded (3 BHN machine names collide
+  with core.machine_projects' globally-unique name); so `project_id` on
+  factory_usage_rawmaterials stays NULL until that's disambiguated.
+- **Users** — DONE. 30 BHN-only staff added (company 4). 10 usernames already
+  existed in core.user (shared admin/management, mostly company NULL) and were
+  left untouched — reconcile individually if any is a different BHN person.
+
+## Still outstanding
+
+- **Warehouses + gates** for company 4 (sales/store/FG screens group by them).
+- **Stock reconcile + mojibake** for the bhn connection.
 - **Module wiring**: the Bil module serves `/bhn` with the connection swapped to
   `bhn` per company context (reuse, not duplication).
