@@ -45,6 +45,18 @@ class MachineMaps
         return DB::connection('bil');
     }
 
+    /**
+     * The operational schemas that carry the machine_map_* tables + legacy
+     * triggers. Each is built independently from the shared `core` hierarchy
+     * (BIL, the BHN Abuja clone, and any future company schema).
+     *
+     * @return string[]
+     */
+    protected static function connections(): array
+    {
+        return config('machine_maps.connections', ['bil']);
+    }
+
     public static function table(string $kind): string
     {
         return 'machine_map_' . $kind;
@@ -90,24 +102,31 @@ class MachineMaps
 
     protected static function rebuildOne(string $kind): int
     {
-        $bil = self::bil();
         $live = self::table($kind);
         $next = $live . '_next';
         $old = $live . '_old';
+        $count = 0;
 
-        $bil->statement("DROP TABLE IF EXISTS `{$next}`");
-        $bil->statement(self::createSql($kind, $next));
+        // Build the map independently in each operational schema. Content is the
+        // same (the global core hierarchy), but each schema's triggers read their
+        // own copy, so each gets its own atomically-swapped table.
+        foreach (self::connections() as $conn) {
+            $db = DB::connection($conn);
 
-        foreach (self::fillSql($kind, $next) as $sql) {
-            $bil->statement($sql);
+            $db->statement("DROP TABLE IF EXISTS `{$next}`");
+            $db->statement(self::createSql($kind, $next));
+
+            foreach (self::fillSql($kind, $next) as $sql) {
+                $db->statement($sql);
+            }
+
+            $count = (int) $db->table($next)->count();
+
+            // Atomic: no writer ever observes a missing map.
+            $db->statement("DROP TABLE IF EXISTS `{$old}`");
+            $db->statement("RENAME TABLE `{$live}` TO `{$old}`, `{$next}` TO `{$live}`");
+            $db->statement("DROP TABLE IF EXISTS `{$old}`");
         }
-
-        $count = (int) $bil->table($next)->count();
-
-        // Atomic: no writer ever observes a missing map.
-        $bil->statement("DROP TABLE IF EXISTS `{$old}`");
-        $bil->statement("RENAME TABLE `{$live}` TO `{$old}`, `{$next}` TO `{$live}`");
-        $bil->statement("DROP TABLE IF EXISTS `{$old}`");
 
         return $count;
     }
