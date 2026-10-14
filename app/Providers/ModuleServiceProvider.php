@@ -13,6 +13,7 @@ use Modules\Bil\Console\ReconcileRawMaterialsStock;
 use Modules\Bil\Console\ReconcileWarehouseStock;
 use Modules\Core\Console\CheckMachineMaps;
 use Modules\Core\Console\MigrateLegacyAuth;
+use Modules\Core\Console\ProvisionBhnRbac;
 use Modules\Core\Console\PruneActivity;
 use Modules\Core\Console\RebuildMachineMaps;
 use Modules\Core\Console\RefreshLegacy;
@@ -38,7 +39,7 @@ class ModuleServiceProvider extends ServiceProvider
     public function boot(): void
     {
         if ($this->app->runningInConsole()) {
-            $this->commands([SyncDataViews::class, MigrateLegacyAuth::class, CheckMachineMaps::class, RebuildMachineMaps::class, ReconcileWarehouseStock::class, ReconcileFinishedGoodsStock::class, BackfillFinishedGoodsReceipts::class, SeedFinishedGoodsStock::class, RefreshFinishedGoodsOrderFrequency::class, ReconcileRawMaterialsStock::class, CloseStaleLoadings::class, SyncShiftContexts::class, SyncPages::class, RefreshLegacy::class, ReplayBackfills::class, PruneActivity::class]);
+            $this->commands([SyncDataViews::class, MigrateLegacyAuth::class, CheckMachineMaps::class, RebuildMachineMaps::class, ReconcileWarehouseStock::class, ReconcileFinishedGoodsStock::class, BackfillFinishedGoodsReceipts::class, SeedFinishedGoodsStock::class, RefreshFinishedGoodsOrderFrequency::class, ReconcileRawMaterialsStock::class, CloseStaleLoadings::class, SyncShiftContexts::class, SyncPages::class, RefreshLegacy::class, ReplayBackfills::class, PruneActivity::class, ProvisionBhnRbac::class]);
         }
 
         // Every change a signed-in user makes is logged, from any page. See
