@@ -19,14 +19,18 @@ use Modules\Bil\Support\FinishedGoodsStock;
  */
 class ReconcileFinishedGoodsStock extends Command
 {
+    use \Modules\Core\Console\Concerns\RunsForModule;
+
     protected $signature = 'bil:reconcile-fg-stock
                             {--fix : Write the corrections instead of only reporting}
-                            {--warehouse= : Limit to one warehouse id}';
+                            {--warehouse= : Limit to one warehouse id}
+                            {--module=bil : Company module to reconcile (bil|bhn)}';
 
     protected $description = 'Check finished_goods_warehouse_stock against the receipts it derives from';
 
     public function handle(): int
     {
+        $this->applyModuleConnection();
         $warehouseId = $this->option('warehouse') ? (int) $this->option('warehouse') : null;
         $drift = FinishedGoodsStock::drift($warehouseId);
 

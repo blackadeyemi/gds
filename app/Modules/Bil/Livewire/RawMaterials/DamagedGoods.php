@@ -146,6 +146,9 @@ class DamagedGoods extends Component
         }
 
         $submitted = 0;
+        // InnoDB since 2026_10_07_100000: the lock keeps two stations apart,
+        // the transaction keeps a failed batch from leaving half its rows.
+        $conn->beginTransaction();
         try {
             foreach ($this->items as $item) {
                 $barcode = $item['barcode'];
@@ -168,6 +171,11 @@ class DamagedGoods extends Component
                 ]);
                 $submitted++;
             }
+            $conn->commit();
+        } catch (\Throwable $e) {
+            $conn->rollBack();
+
+            throw $e;
         } finally {
             $conn->select("SELECT RELEASE_LOCK('rm_damaged_goods')");
         }
@@ -208,6 +216,9 @@ class DamagedGoods extends Component
             return;
         }
 
+        // InnoDB since 2026_10_07_100000: the lock keeps two stations apart,
+        // the transaction keeps a failed batch from leaving half its rows.
+        $conn->beginTransaction();
         try {
             RawMaterialItem::where('barcode', $req->barcode)->update(['status' => 'Exited']);
 
@@ -219,6 +230,11 @@ class DamagedGoods extends Component
             }
 
             $req->update(['status' => 'approved']);
+            $conn->commit();
+        } catch (\Throwable $e) {
+            $conn->rollBack();
+
+            throw $e;
         } finally {
             $conn->select("SELECT RELEASE_LOCK('rm_damaged_goods')");
         }

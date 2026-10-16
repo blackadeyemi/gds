@@ -17,27 +17,48 @@ use Symfony\Component\Process\Process;
 class RefreshLegacy extends Command
 {
     protected $signature = 'gds:refresh-legacy
-        {--path= : Dump directory (default: config legacy_refresh.dump_path)}
+        {--profile=legacy_refresh : Config profile to drive the run (e.g. legacy_refresh_bhn)}
+        {--path= : Dump directory (per_file) or dump file (single_dump); overrides config}
         {--only= : Comma-separated subset of legacy table names}
         {--dry-run : Show the plan + column mapping; change nothing}
         {--no-archive : Skip the pre-truncate mysqldump of each target}
         {--keep-staging : Keep the staging DB after the run}
         {--force : Required to actually modify data}';
 
-    protected $description = 'Refresh operational data tables from the monthly legacy bilfg dump';
+    protected $description = 'Refresh operational data tables from a legacy dump (bilfg per-file, or a single-dump profile like BHN)';
 
     public function handle(): int
     {
-        $cfg = config('legacy_refresh');
-        $path = rtrim((string) ($this->option('path') ?: $cfg['dump_path']), "/\\");
+        $profile = (string) ($this->option('profile') ?: 'legacy_refresh');
+        $cfg = config($profile);
+        if (! $cfg) {
+            $this->error("Unknown refresh profile: {$profile}");
+
+            return self::FAILURE;
+        }
+        $single = ($cfg['source'] ?? 'per_file') === 'single_dump';
+        $stageConn = $cfg['staging_conn'] ?? 'bil';
         $stage = $cfg['staging_db'];
         $dry = (bool) $this->option('dry-run');
         $archive = ! $this->option('no-archive');
 
-        if (! is_dir($path)) {
-            $this->error("Dump directory not found: {$path}");
+        // Source: a dump directory (per-file) or a single monolithic dump file.
+        $dumpFile = null;
+        if ($single) {
+            $dumpFile = (string) ($this->option('path') ?: ($cfg['dump_file'] ?? ''));
+            $path = $dumpFile;
+            if (! is_file($dumpFile)) {
+                $this->error("Dump file not found: {$dumpFile}");
 
-            return self::FAILURE;
+                return self::FAILURE;
+            }
+        } else {
+            $path = rtrim((string) ($this->option('path') ?: $cfg['dump_path']), "/\\");
+            if (! is_dir($path)) {
+                $this->error("Dump directory not found: {$path}");
+
+                return self::FAILURE;
+            }
         }
         if (! $dry && ! $this->option('force')) {
             $this->error('Refusing to modify data without --force. Rehearse with --dry-run first.');
@@ -60,7 +81,24 @@ class RefreshLegacy extends Command
 
         $backupDir = null;
         if (! $dry) {
-            DB::connection('bil')->statement("CREATE DATABASE IF NOT EXISTS `{$stage}`");
+            DB::connection($stageConn)->statement("CREATE DATABASE IF NOT EXISTS `{$stage}`");
+            // single_dump: load the whole dump into staging once, up front.
+            if ($single) {
+                $this->info("Loading dump into staging `{$stage}` …");
+                $this->loadWholeDump($cfg, $stage, $dumpFile);
+                // Optional preprocessing against staging (e.g. prune to one
+                // company) before the column-intersection refresh reads it.
+                if ($sql = ($cfg['post_stage_sql'] ?? null)) {
+                    $file = base_path($sql);
+                    if (! is_file($file)) {
+                        $this->error("post_stage_sql not found: {$file}");
+
+                        return self::FAILURE;
+                    }
+                    $this->info('Preprocessing staging: '.$sql);
+                    $this->runSqlFile($cfg, $stage, $file);
+                }
+            }
             if ($archive) {
                 $backupDir = base_path('database/backups/refresh_'.date('Ymd_His'));
                 @mkdir($backupDir, 0777, true);
@@ -72,18 +110,28 @@ class RefreshLegacy extends Command
 
         foreach ($map as $legacy => $target) {
             [$conn, $tbl] = explode('.', $target, 2);
-            $file = "{$path}/table-{$legacy}.sql";
+            $file = $single ? null : "{$path}/table-{$legacy}.sql";
             $row = ['legacy' => $legacy, 'target' => $target, 'rows' => '—', 'nulled' => '', 'status' => ''];
 
-            if (! is_file($file)) {
-                $row['status'] = 'MISSING FILE';
-                $problems[] = "{$legacy}: dump file not found";
-                $summary[] = $row;
+            if ($single) {
+                if (! $this->stageHasTable($stageConn, $stage, $legacy)) {
+                    $row['status'] = 'NOT IN DUMP';
+                    $problems[] = "{$legacy}: not present in staging {$stage}";
+                    $summary[] = $row;
 
-                continue;
+                    continue;
+                }
+                $dumpCols = $this->stageColumns($stageConn, $stage, $legacy);
+            } else {
+                if (! is_file($file)) {
+                    $row['status'] = 'MISSING FILE';
+                    $problems[] = "{$legacy}: dump file not found";
+                    $summary[] = $row;
+
+                    continue;
+                }
+                $dumpCols = $this->dumpColumns($file);
             }
-
-            $dumpCols = $this->dumpColumns($file);
             $targetCols = $this->targetColumns($conn, $tbl);
             if (! $targetCols) {
                 $row['status'] = 'TARGET MISSING';
@@ -108,18 +156,23 @@ class RefreshLegacy extends Command
             if ($dry) {
                 $cur = (int) DB::connection($conn)->table($tbl)->count();
                 $row['rows'] = "have {$cur}";
-                $row['status'] = $this->dumpHasRows($file) ? 'ready ('.count($common).' cols)' : 'DUMP EMPTY';
+                $hasRows = $single
+                    ? (int) DB::connection($stageConn)->table("{$stage}.{$legacy}")->count() > 0
+                    : $this->dumpHasRows($file);
+                $row['status'] = $hasRows ? 'ready ('.count($common).' cols)' : 'DUMP EMPTY';
                 $summary[] = $row;
 
                 continue;
             }
 
             try {
-                $this->loadStage($cfg, $stage, $legacy, $file);
+                if (! $single) {
+                    $this->loadStage($cfg, $stage, $legacy, $file);
+                }
                 if ($archive) {
                     $this->archive($cfg, $conn, $tbl, $backupDir);
                 }
-                $this->refresh($conn, $tbl, $stage, $legacy, $common, $cfg['defaults'][$target] ?? []);
+                $this->refresh($conn, $tbl, $stage, $legacy, $common, $cfg['defaults'][$target] ?? [], $cfg['transforms'][$target] ?? []);
 
                 $count = (int) DB::connection($conn)->table($tbl)->count();
                 $row['rows'] = (string) $count;
@@ -137,7 +190,7 @@ class RefreshLegacy extends Command
         }
 
         if (! $dry && ! $this->option('keep-staging')) {
-            DB::connection('bil')->statement("DROP DATABASE IF EXISTS `{$stage}`");
+            DB::connection($stageConn)->statement("DROP DATABASE IF EXISTS `{$stage}`");
         }
 
         $this->newLine();
@@ -149,7 +202,7 @@ class RefreshLegacy extends Command
             $this->comment('Columns listed under "Left NULL" are gds-added. Hierarchy ids self-heal via');
             $this->comment('BEFORE INSERT triggers; the rest stay NULL unless configured in "defaults".');
             $this->comment('Review candidates (config nullable_review):');
-            foreach ((config('legacy_refresh.nullable_review') ?? []) as $t => $cols) {
+            foreach (($cfg['nullable_review'] ?? []) as $t => $cols) {
                 $this->line("   {$t}: ".implode(', ', $cols));
             }
         }
@@ -235,6 +288,50 @@ class RefreshLegacy extends Command
         return array_map(fn ($r) => $r->COLUMN_NAME, $rows);
     }
 
+    /** single_dump: load the whole monolithic dump into the staging schema once. */
+    private function loadWholeDump(array $cfg, string $stage, string $file): void
+    {
+        $p = new Process([$cfg['mysql_bin'], '-h', '127.0.0.1', '-u', 'root', $stage]);
+        $p->setTimeout(null);
+        $p->setInput(fopen($file, 'r'));
+        $p->run();
+        if (! $p->isSuccessful()) {
+            throw new \RuntimeException('dump load failed: '.trim($p->getErrorOutput()));
+        }
+    }
+
+    /** Run a .sql file against the staging schema (mysql client). */
+    private function runSqlFile(array $cfg, string $stage, string $file): void
+    {
+        $p = new Process([$cfg['mysql_bin'], '-h', '127.0.0.1', '-u', 'root', $stage]);
+        $p->setTimeout(null);
+        $p->setInput(fopen($file, 'r'));
+        $p->run();
+        if (! $p->isSuccessful()) {
+            throw new \RuntimeException('post_stage_sql failed: '.trim($p->getErrorOutput()));
+        }
+    }
+
+    /** True if the staging schema holds this legacy table. */
+    private function stageHasTable(string $conn, string $stage, string $legacy): bool
+    {
+        return (bool) DB::connection($conn)->selectOne(
+            'SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? LIMIT 1',
+            [$stage, $legacy]
+        );
+    }
+
+    /** Column names of a staging table (single_dump equivalent of dumpColumns). */
+    private function stageColumns(string $conn, string $stage, string $legacy): array
+    {
+        $rows = DB::connection($conn)->select(
+            'SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION',
+            [$stage, $legacy]
+        );
+
+        return array_map(fn ($r) => $r->COLUMN_NAME, $rows);
+    }
+
     private function loadStage(array $cfg, string $stage, string $legacy, string $file): void
     {
         DB::connection('bil')->statement("DROP TABLE IF EXISTS `{$stage}`.`{$legacy}`");
@@ -262,16 +359,32 @@ class RefreshLegacy extends Command
         fclose($fh);
     }
 
-    private function refresh(string $conn, string $tbl, string $stage, string $legacy, array $common, array $defaults): void
+    private function refresh(string $conn, string $tbl, string $stage, string $legacy, array $common, array $defaults, array $transforms = []): void
     {
         $db = DB::connection($conn);
         $schema = $db->getDatabaseName();
-        $cl = '`'.implode('`,`', $common).'`';
+        // SELECT list: a column is copied verbatim unless the profile gives it a
+        // transform expression (e.g. legacy datetime -> modern unix int, or a
+        // NOT-NULL coercion). Expressions reference the staging column by name.
+        $selParts = array_map(
+            fn ($c) => isset($transforms[$c]) ? "({$transforms[$c]}) AS `{$c}`" : "`{$c}`",
+            $common
+        );
+        $insertCols = $common;
+        // Default columns are written at INSERT time (as constants) rather than a
+        // post-UPDATE, so NOT-NULL gds-added columns absent from the legacy dump
+        // still get a value. Skip any that are already copied from the dump.
+        foreach ($defaults as $col => $val) {
+            if (in_array($col, $common, true)) {
+                continue;
+            }
+            $insertCols[] = $col;
+            $selParts[] = $db->getPdo()->quote((string) $val).' AS `'.$col.'`';
+        }
+        $cl = '`'.implode('`,`', $insertCols).'`';
+        $sel = implode(',', $selParts);
         $db->statement('SET FOREIGN_KEY_CHECKS=0');
         $db->statement("TRUNCATE `{$schema}`.`{$tbl}`");
-        $db->statement("INSERT INTO `{$schema}`.`{$tbl}` ({$cl}) SELECT {$cl} FROM `{$stage}`.`{$legacy}`");
-        foreach ($defaults as $col => $val) {
-            $db->update("UPDATE `{$schema}`.`{$tbl}` SET `{$col}` = ?", [$val]);
-        }
+        $db->statement("INSERT INTO `{$schema}`.`{$tbl}` ({$cl}) SELECT {$sel} FROM `{$stage}`.`{$legacy}`");
     }
 }

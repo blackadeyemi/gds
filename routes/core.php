@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\Core\Controllers\AuthController;
+use Modules\Core\Livewire\ActivityLog;
 use Modules\Core\Livewire\Admin\Companies;
 use Modules\Core\Livewire\Admin\Departments;
 use Modules\Core\Livewire\Admin\Factories;
@@ -12,6 +13,7 @@ use Modules\Core\Livewire\Admin\Staffs;
 use Modules\Core\Livewire\Admin\Users;
 use Modules\Core\Livewire\Admin\WarehouseGates;
 use Modules\Core\Livewire\Admin\Warehouses;
+use Modules\Core\Livewire\Settings\ActivitySettings;
 use Modules\Core\Livewire\Settings\Appearance;
 use Modules\Core\Livewire\Settings\DataViews;
 use Modules\Core\Livewire\Settings\ServiceTypes;
@@ -67,6 +69,10 @@ Route::middleware('auth')->group(function () {
         })->name('admin.grid.print');
     });
 
+    // Activity + notifications — every signed-in user. What each person sees
+    // follows page access (Activity::scopeVisibleTo), so no page: gate here.
+    Route::get('/activity', ActivityLog::class)->name('activity');
+
     // Appearance is a personal preference — any authenticated user. Data Views
     // is admin configuration — gated.
     Route::get('/settings/appearance', Appearance::class)->name('settings.appearance');
@@ -74,6 +80,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/data-views', DataViews::class)->middleware('page:settings.data_views')->name('settings.data-views');
 
     Route::get('/settings/service-types', ServiceTypes::class)->middleware('page:settings.service_types')->name('settings.service-types');
+    // Admin only and NOT in the page registry, so no role can be granted it:
+    // how long the audit trail is kept is not a per-role decision.
+    Route::get('/settings/activity-log', ActivitySettings::class)->middleware('admin')->name('settings.activity-log');
     Route::get('/settings/waste', WasteSettings::class)->middleware('page:settings.waste')->name('settings.waste');
 
     // Shift windows — access granted per page (settings.shifts). Give the

@@ -360,8 +360,11 @@ class WarehouseStock extends DataGrid
      * demand and lists every row where the two differ — 3 of 2,631 today.
      * Without that view this shortcut would be the sort of quiet approximation
      * that makes a stock figure stop meaning anything.
+     *
+     * Public because the Jumbo Roll Statistics dashboard totals this exact
+     * query — the two can then never disagree about what BPL is holding.
      */
-    protected function positionQuery()
+    public function positionQuery()
     {
         $conn = DB::connection('bpl');
 
@@ -414,22 +417,13 @@ class WarehouseStock extends DataGrid
 
     /**
      * The warehouse's name from the core master, falling back to the legacy
-     * location name.
-     *
-     * A scalar subquery rather than a join so it cannot multiply rows, and
-     * scoped by company: `legacy_location_id` is only unique WITHIN a company —
-     * the BIL raw-material stores use the same small integers — so the scoping
-     * is load-bearing.
+     * location name. Shared with the Jumbo Rolls reports — see
+     * Modules\Bpl\Support\StockLocations for why it is a scalar subquery and
+     * why the company scoping is load-bearing.
      */
     protected function warehouseName(string $legacyIdExpr): string
     {
-        $companyId = (int) DB::connection('core')->table('companies')->where('code', 'BPL')->value('id');
-
-        return 'COALESCE('
-            . "(SELECT `name` FROM `core`.`warehouses` WHERE `legacy_location_id` = {$legacyIdExpr}"
-            . " AND `company_id` = {$companyId} AND `deleted_at` IS NULL LIMIT 1),"
-            . "(SELECT `location` FROM `bpl_stock_locations` WHERE `id` = {$legacyIdExpr} LIMIT 1),"
-            . "CONCAT('Location #', {$legacyIdExpr}))";
+        return \Modules\Bpl\Support\StockLocations::nameExpr($legacyIdExpr);
     }
 
     /* ---------------- Cells ---------------- */

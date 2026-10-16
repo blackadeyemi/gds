@@ -206,6 +206,9 @@ class FactoryEntrance extends Component
         }
 
         $entered = 0;
+        // InnoDB since 2026_10_07_100000: the lock keeps two stations apart,
+        // the transaction keeps a failed batch from leaving half its rows.
+        $conn->beginTransaction();
         try {
             foreach ($this->items as $item) {
                 $barcode = $item['barcode'];
@@ -231,6 +234,11 @@ class FactoryEntrance extends Component
 
                 $entered++;
             }
+            $conn->commit();
+        } catch (\Throwable $e) {
+            $conn->rollBack();
+
+            throw $e;
         } finally {
             $conn->select("SELECT RELEASE_LOCK('rm_factory_entrance')");
         }

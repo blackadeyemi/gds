@@ -57,6 +57,23 @@ the schema.
 | [Finance](bpl-finance.md) | Banks, accounts, payment terms; invoice & waybill payments; receivables and export-payment reports |
 | [Logistics](bpl-logistics.md) | Delivery, weighbridge, bills of lading, transporters; deliveries + BoL reports — how paper leaves the gate |
 
+## BHN — Abuja (converting, reuses the BIL screens)
+
+BHN runs the **same screens as BIL**, served under `/bhn` on the `bhn`
+connection — the Bil module is reused, not duplicated (the root README's
+*Serving BHN* explains the mechanism). So the five BIL modules above describe
+BHN too; only the data, company scoping, access (`bhn.*` keys) and nav differ.
+Like BIL, BHN **converts** hardroll into finished goods and buys its jumbo rolls
+from BPL as a customer.
+
+- **Schema** — `bhn` mirrors BIL's modern structure, loaded from BHN's own Abuja
+  legacy dump via `gds:refresh-legacy --profile=legacy_refresh_bhn`; provisioning
+  and per-company caveats: [database/bhn/README.md](../../database/bhn/README.md).
+- **Access** — `gds:provision-bhn-rbac` mirrors each BIL role into a "… (BHN)"
+  role granting `bhn.*`, and assigns BHN staff by their legacy level.
+- **Multi-server** — BHN is homed to the Abuja server in production; the
+  two-server design is in memory `gds-abuja-multiserver` (planned, not built).
+
 ## Core — the platform
 
 | Area | What it covers |
@@ -76,6 +93,7 @@ you will meet in every module doc.
 | [Shifts](framework-shifts.md) | Dynamic per-area Day/Night windows that gate entry screens; bypass-shift |
 | [Warehouses & gates](framework-warehouses-and-gates.md) | The core warehouse/gate model, per-user gate grants, and why stock is derived from movements |
 | [Building blocks](framework-building-blocks.md) | The `DataGrid` and `RawMaterialReport` base classes and the Statistics dashboard — what you get for free |
+| [Activity & notifications](framework-activity.md) | The activity log every page writes to automatically, the bell, who is notified of what, record History |
 | [Legacy refresh](framework-legacy-refresh.md) | The monthly production-dump pipeline that refreshes the legacy + GDS data tables |
 | [Installed app (PWA)](framework-pwa.md) | Install, offline behaviour, the service worker, version, and launch-at-login deployment |
 
@@ -86,7 +104,8 @@ you will meet in every module doc.
 - **Page** — a gated screen. Listed as **Label** (`route.name`) with its key
   abilities (view/create/edit/delete/export plus specials like backdate,
   approve, confirm, bypass-shift).
-- **Connection** — which database a table lives on: `core`, `bil` or `bpl`.
+- **Connection** — which database a table lives on: `core`, `bil`, `bpl` or
+  `bhn` (BHN's mirror of the BIL schema).
 - **Trap** — a non-obvious rule or legacy quirk that has bitten before; worth
   reading before you change code near it.
 - **Reports** extend `RawMaterialReport`; **grids** extend `DataGrid`; both are

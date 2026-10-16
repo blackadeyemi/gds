@@ -5,6 +5,7 @@ namespace Modules\Core\Console;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Support\TableEngines;
 
 /**
  * Re-fill the columns gds computes that a production dump does not carry.
@@ -340,6 +341,19 @@ class ReplayBackfills extends Command
                     return $bil()->table('store_entrance')->where('id', '>', $highest)->count();
                 },
                 'repair' => fn () => $this->call('bil:backfill-fg-receipts', ['--apply' => true]),
+            ],
+
+            /* Not a column: the table ENGINE. A hand restore re-creates a table
+               from the dump's `ENGINE=MyISAM`, and a MyISAM table silently
+               ignores every transaction gds wraps around it. Counted in tables,
+               not rows. See migration 2026_10_07_100000. */
+            'innodb-engine' => [
+                'column' => 'core/bil/bpl tables (engine)',
+                'available' => fn () => true,
+                'missing' => fn () => count(TableEngines::nonInnoDb()),
+                'repair' => fn () => TableEngines::convertAll(
+                    fn ($table, $secs) => $this->line(sprintf('  %s → InnoDB (%.1fs)', $table, $secs))
+                ),
             ],
         ];
     }

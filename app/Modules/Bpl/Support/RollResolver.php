@@ -91,6 +91,219 @@ class RollResolver
     }
 
     /**
+     * Rolls matching this barcode that may go INTO a waiting area.
+     *
+     * The legacy rule, kept: the roll must already be in the store-exit table
+     * ("Barcode not found in store exit") and must not be standing in a
+     * waiting area already. A roll reaches a waiting area by coming BACK — it
+     * left a store and returned, and is held before going out again.
+     *
+     * @return array<int, array>
+     */
+    public static function awaitingWaitingArea(string $barcode): array
+    {
+        if (self::heldRow($barcode)) {
+            return [];
+        }
+
+        return self::candidates($barcode, [self::class, 'hardrollLeftStore'], [self::class, 'softrollLeftStore']);
+    }
+
+    /**
+     * Rolls matching this barcode that are IN a waiting area — what the
+     * release side may let go.
+     *
+     * Each candidate carries the `location_id` it is held at, so the screen can
+     * say where the roll actually is rather than simply refusing.
+     *
+     * @return array<int, array>
+     */
+    public static function inWaitingArea(string $barcode): array
+    {
+        $held = self::heldRow($barcode);
+
+        if (! $held) {
+            return [];
+        }
+
+        // The waiting-area tables know only a barcode, so the stream is
+        // whatever production says — the usual two-candidate rule, narrowed to
+        // the one roll that is actually held.
+        $candidates = self::candidates($barcode, [self::class, 'hardrollAny'], [self::class, 'softrollAny']);
+
+        return array_map(function (array $candidate) use ($held) {
+            $candidate['location_id'] = (int) $held->location_id;
+            $candidate['held_since'] = (string) $held->date;
+
+            return $candidate;
+        }, $candidates);
+    }
+
+    /**
+     * Why a barcode cannot go into a waiting area, or come out of one.
+     *
+     * @return array{reason:string,stream:?string,date:?string}
+     *         reason: 'already_held' | 'not_held' | 'not_out_of_store' | 'unknown'
+     */
+    public static function explainWaitingAreaMiss(string $barcode, bool $releasing = false): array
+    {
+        $barcode = strtoupper(trim($barcode));
+
+        if ($releasing) {
+            return self::heldRow($barcode)
+                ? ['reason' => 'unknown', 'stream' => null, 'date' => null]
+                : ['reason' => 'not_held', 'stream' => null, 'date' => null];
+        }
+
+        if ($held = self::heldRow($barcode)) {
+            return ['reason' => 'already_held', 'stream' => null, 'date' => (string) $held->date];
+        }
+
+        foreach (self::STREAMS as $stream => [$production]) {
+            $known = DB::connection('bpl')->table($production)
+                ->where('barcode', $barcode)->whereNull('deleted_at')->exists();
+
+            if ($known) {
+                return ['reason' => 'not_out_of_store', 'stream' => $stream, 'date' => null];
+            }
+        }
+
+        return ['reason' => 'unknown', 'stream' => null, 'date' => null];
+    }
+
+    /** The open waiting-area row for a barcode, if it is standing in one. */
+    private static function heldRow(string $barcode)
+    {
+        $barcode = strtoupper(trim($barcode));
+
+        return DB::connection('bpl')->table('bpl_waiting_area_entry as w')
+            ->where('w.barcode', $barcode)
+            ->whereNull('w.deleted_at')
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('bpl_waiting_area_exit as x')
+                ->whereColumn('x.barcode', 'w.barcode')->whereNull('x.deleted_at'))
+            ->first(['w.location_id', 'w.date']);
+    }
+
+    /** A roll that has left a store — the waiting area's own entry rule. */
+    private static function hardrollLeftStore(string $barcode): ?array
+    {
+        $row = self::hardrollQuery($barcode)
+            ->whereExists(fn ($q) => $q->selectRaw('1')->from('bpl_warehouse_exit as sx')
+                ->whereColumn('sx.barcode', 'r.barcode')->whereNull('sx.deleted_at'))
+            ->first(self::HARDROLL_COLUMNS);
+
+        return $row ? self::hardrollRow($row) : null;
+    }
+
+    private static function softrollLeftStore(string $barcode): ?array
+    {
+        $row = self::softrollQuery($barcode)
+            ->whereExists(fn ($q) => $q->selectRaw('1')->from('bpl_softroll_warehouse_exit as sx')
+                ->whereColumn('sx.barcode', 'r.barcode')->whereNull('sx.deleted_at'))
+            ->first(self::SOFTROLL_COLUMNS);
+
+        return $row ? self::softrollRow($row) : null;
+    }
+
+    /** The roll behind a barcode, wherever it is — used once its place is known. */
+    private static function hardrollAny(string $barcode): ?array
+    {
+        $row = self::hardrollQuery($barcode)->first(self::HARDROLL_COLUMNS);
+
+        return $row ? self::hardrollRow($row) : null;
+    }
+
+    private static function softrollAny(string $barcode): ?array
+    {
+        $row = self::softrollQuery($barcode)->first(self::SOFTROLL_COLUMNS);
+
+        return $row ? self::softrollRow($row) : null;
+    }
+
+    /**
+     * Rolls matching this barcode that have LEFT the store and are waiting on
+     * the loading bay — what BPL Delivery may put on a truck.
+     *
+     * HARDROLL ONLY, deliberately. The legacy delivery form read
+     * `bpl_storeexit` (hardroll) alone, `bpl_delivery_details.product_id` is a
+     * hardroll product, and no softroll release has ever been stamped as
+     * delivered (0 of 1,641, measured 2026-09-23). A softroll scanned here is
+     * refused in words rather than written into a shape nothing downstream can
+     * read — see explainDeliveryMiss().
+     *
+     * @return array<int, array>
+     */
+    public static function awaitingDelivery(string $barcode): array
+    {
+        $barcode = strtoupper(trim($barcode));
+
+        if ($barcode === '' || RollBarcode::stream($barcode) === self::SOFTROLL) {
+            return [];
+        }
+
+        $row = self::hardrollQuery($barcode)
+            ->join('bpl_warehouse_exit as sx', function ($j) {
+                $j->on('sx.barcode', '=', 'r.barcode')->whereNull('sx.deleted_at');
+            })
+            ->whereNull('sx.status')
+            ->first(array_merge(self::HARDROLL_COLUMNS, ['sx.location_id', 'sx.date as released_on']));
+
+        if (! $row) {
+            return [];
+        }
+
+        $candidate = self::hardrollRow($row);
+        $candidate['location_id'] = (int) $row->location_id;
+        $candidate['released_on'] = (string) $row->released_on;
+
+        return [$candidate];
+    }
+
+    /**
+     * Why a barcode cannot be put on a truck.
+     *
+     * @return array{reason:string,stream:?string,date:?string}
+     *         reason: 'delivered' | 'in_store' | 'not_exited' | 'softroll' | 'unknown'
+     */
+    public static function explainDeliveryMiss(string $barcode): array
+    {
+        $barcode = strtoupper(trim($barcode));
+
+        // A softroll never goes out on this screen, whichever state it is in.
+        $isSoft = RollBarcode::stream($barcode) === self::SOFTROLL
+            || DB::connection('bpl')->table('bpl_softroll_production')
+                ->where('barcode', $barcode)->whereNull('deleted_at')->exists();
+
+        if ($isSoft) {
+            return ['reason' => 'softroll', 'stream' => self::SOFTROLL, 'date' => null];
+        }
+
+        $exit = DB::connection('bpl')->table('bpl_warehouse_exit')
+            ->where('barcode', $barcode)->whereNull('deleted_at')->first(['status', 'date']);
+
+        if ($exit && $exit->status !== null) {
+            $waybill = DB::connection('bpl')->table('bpl_delivery_details')
+                ->where('barcode', $barcode)->orderByDesc('id')->value('delivery_barcode');
+
+            return ['reason' => 'delivered', 'stream' => self::HARDROLL, 'date' => $waybill ?: $exit->date];
+        }
+
+        $known = DB::connection('bpl')->table('bpl_production')
+            ->where('barcode', $barcode)->whereNull('deleted_at')->exists();
+
+        if (! $known) {
+            return ['reason' => 'unknown', 'stream' => null, 'date' => null];
+        }
+
+        $inStore = DB::connection('bpl')->table('bpl_warehouse_entry')
+            ->where('barcode', $barcode)->whereNull('deleted_at')->exists();
+
+        return $inStore
+            ? ['reason' => 'in_store', 'stream' => self::HARDROLL, 'date' => null]
+            : ['reason' => 'not_exited', 'stream' => self::HARDROLL, 'date' => null];
+    }
+
+    /**
      * Why a barcode cannot be released from a store.
      *
      * @return array{reason:string,stream:?string,date:?string}

@@ -235,6 +235,9 @@ class FactoryReturns extends Component
         }
 
         $submitted = 0;
+        // InnoDB since 2026_10_07_100000: the lock keeps two stations apart,
+        // the transaction keeps a failed batch from leaving half its rows.
+        $conn->beginTransaction();
         try {
             foreach ($this->items as $item) {
                 $barcode = $item['barcode'];
@@ -263,6 +266,11 @@ class FactoryReturns extends Component
                 ]);
                 $submitted++;
             }
+            $conn->commit();
+        } catch (\Throwable $e) {
+            $conn->rollBack();
+
+            throw $e;
         } finally {
             $conn->select("SELECT RELEASE_LOCK('rm_return')");
         }
@@ -317,6 +325,9 @@ class FactoryReturns extends Component
         }
 
         $childBarcode = null;
+        // InnoDB since 2026_10_07_100000: the lock keeps two stations apart,
+        // the transaction keeps a failed batch from leaving half its rows.
+        $conn->beginTransaction();
         try {
             $barcode = $req->barcode;
             $parent = RawMaterialItem::where('barcode', $barcode)->first();
@@ -359,6 +370,11 @@ class FactoryReturns extends Component
             // A partial return makes a brand-new child barcode that needs a
             // physical label; a whole-item return reuses its own. Offer a reprint.
             $this->printBarcode = $childBarcode ?? $barcode;
+            $conn->commit();
+        } catch (\Throwable $e) {
+            $conn->rollBack();
+
+            throw $e;
         } finally {
             $conn->select("SELECT RELEASE_LOCK('rm_return')");
         }

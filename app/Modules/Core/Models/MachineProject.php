@@ -25,6 +25,21 @@ class MachineProject extends Model
         'sort_order' => 'integer',
     ];
 
+    /**
+     * Scope to the current module's company via the parent line (MachineLine is
+     * itself company-scoped). Keeps each company module — including BHN reusing
+     * the Bil screens — to its own projects. See MachineLine::booted().
+     */
+    protected static function booted(): void
+    {
+        static::addGlobalScope('companyModule', function (\Illuminate\Database\Eloquent\Builder $q): void {
+            if (! config('bil.company_code')) {
+                return;
+            }
+            $q->whereHas('line');
+        });
+    }
+
     public function line(): BelongsTo
     {
         return $this->belongsTo(MachineLine::class, 'line_id');

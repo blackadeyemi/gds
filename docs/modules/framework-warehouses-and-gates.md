@@ -36,10 +36,9 @@ scratch with `bil:reconcile-warehouse-stock`.
 
 ### Traps
 
-- **MyISAM has no transactions.** Some legacy tables are MyISAM, so a multi-row
-  movement is **not** atomic there — a half-written movement can't be rolled back
-  by the engine. Write defensively and verify, don't assume a transaction saved
-  you.
+- **Every table is InnoDB** since `2026_10_07_100000` — the legacy MyISAM ones
+  silently ignored transactions. A hand restore from a production dump brings
+  `ENGINE=MyISAM` back; `gds:replay-backfills` (repair `innodb-engine`) catches it.
 - **A gate implies a warehouse + direction.** Don't store the warehouse
   separately from the gate and let them drift; the gate is the source of truth.
 - **Factory gates ≠ warehouse gates.** They are separate registries

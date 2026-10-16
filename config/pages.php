@@ -31,8 +31,7 @@ $entryPlain = ['view'];
 // Read-only reports / dashboards: viewable and exportable, nothing to edit.
 $snapshot = ['view', 'export'];
 
-return [
-    'pages' => [
+$pages = [
         // BIL — Machines (Company > Factory > Line > Project)
         ['key' => 'bil.machines.statistics', 'label' => 'Statistics', 'module' => 'BIL / Machines', 'route' => 'bil.machines.statistics', 'abilities' => $snapshot],
         ['key' => 'bil.machines.lines',    'label' => 'Lines',    'module' => 'BIL / Machines', 'route' => 'bil.machines.lines',    'abilities' => $crud],
@@ -168,6 +167,7 @@ return [
 
         // Releasing from a BPL store. `gates` fills its dropdown from the
         // outbound gates on the jumbo-roll warehouses.
+        ['key' => 'bpl.jumbo_rolls.waiting_area', 'label' => 'Waiting Area', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.waiting-area', 'abilities' => ['view', 'backdate'], 'gates' => 'warehouse'],
         ['key' => 'bpl.jumbo_rolls.warehouse_exit', 'label' => 'Warehouse Exit', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.warehouse-exit', 'abilities' => $entry, 'gates' => 'warehouse'],
 
         // A live position derived from the two movement screens; nothing to
@@ -178,12 +178,69 @@ return [
         // the inbound gates on the jumbo-roll warehouses.
         ['key' => 'bpl.jumbo_rolls.warehouse_transfer', 'label' => 'Warehouse Transfer', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.warehouse-transfer', 'abilities' => $entry, 'gates' => 'warehouse'],
 
+        // BPL — Jumbo Rolls Statistics + Reports. Read-outs: the screens that
+        // write these rows own the corrections (a mis-scan is fixed by
+        // re-scanning, and a delete has to reverse stock), so view + export
+        // only, never edit or delete.
+        ['key' => 'bpl.jumbo_rolls.statistics', 'label' => 'Statistics', 'module' => 'BPL / Jumbo Rolls', 'route' => 'bpl.jumbo-rolls.statistics', 'abilities' => $snapshot],
+
+        ['key' => 'bpl.jumbo_rolls.reports.production',         'label' => 'Production',         'module' => 'BPL / Jumbo Rolls Reports', 'route' => 'bpl.jumbo-rolls.reports.production',         'abilities' => $snapshot],
+        ['key' => 'bpl.jumbo_rolls.reports.factory_exit',       'label' => 'Factory Exit',       'module' => 'BPL / Jumbo Rolls Reports', 'route' => 'bpl.jumbo-rolls.reports.factory-exit',       'abilities' => $snapshot],
+        ['key' => 'bpl.jumbo_rolls.reports.warehouse_entry',    'label' => 'Warehouse Entry',    'module' => 'BPL / Jumbo Rolls Reports', 'route' => 'bpl.jumbo-rolls.reports.warehouse-entry',    'abilities' => $snapshot],
+        ['key' => 'bpl.jumbo_rolls.reports.warehouse_exit',     'label' => 'Warehouse Exit',     'module' => 'BPL / Jumbo Rolls Reports', 'route' => 'bpl.jumbo-rolls.reports.warehouse-exit',     'abilities' => $snapshot],
+        ['key' => 'bpl.jumbo_rolls.reports.warehouse_transfer', 'label' => 'Warehouse Transfer', 'module' => 'BPL / Jumbo Rolls Reports', 'route' => 'bpl.jumbo-rolls.reports.warehouse-transfer', 'abilities' => $snapshot],
+        ['key' => 'bpl.jumbo_rolls.reports.waiting_area',       'label' => 'Waiting Area',       'module' => 'BPL / Jumbo Rolls Reports', 'route' => 'bpl.jumbo-rolls.reports.waiting-area',       'abilities' => $snapshot],
+        // One row per roll, with every date in its life and the breaks in the
+        // chain — the legacy `report_hardroll_movement`, generalised.
+        ['key' => 'bpl.jumbo_rolls.reports.roll_trail',         'label' => 'Roll Trail',         'module' => 'BPL / Jumbo Rolls Reports', 'route' => 'bpl.jumbo-rolls.reports.roll-trail',         'abilities' => $snapshot],
+
         // BPL — Sales
         ['key' => 'bpl.sales.orders', 'label' => 'Orders', 'module' => 'BPL / Sales', 'route' => 'bpl.sales.orders', 'abilities' => ['view', 'delete', 'backdate']],
+        ['key' => 'bpl.sales.proformas', 'label' => 'Proforma Invoices', 'module' => 'BPL / Sales', 'route' => 'bpl.sales.proformas', 'abilities' => $crud],
+        ['key' => 'bpl.sales.packing_lists', 'label' => 'Packing Lists', 'module' => 'BPL / Sales', 'route' => 'bpl.sales.packing-lists', 'abilities' => $crud],
         ['key' => 'bpl.sales.customers', 'label' => 'Customers', 'module' => 'BPL / Sales', 'route' => 'bpl.sales.customers', 'abilities' => $crud],
-        ['key' => 'bpl.sales.transporters', 'label' => 'Transporters', 'module' => 'BPL / Sales', 'route' => 'bpl.sales.transporters', 'abilities' => $crud],
+        // BPL — Sales Statistics + Reports. Read-outs: the Orders, Proforma
+        // Invoices and Packing Lists screens own the corrections, so view +
+        // export only.
+        ['key' => 'bpl.sales.statistics', 'label' => 'Statistics', 'module' => 'BPL / Sales', 'route' => 'bpl.sales.statistics', 'abilities' => $snapshot],
+
+        ['key' => 'bpl.sales.reports.orders',     'label' => 'Orders',            'module' => 'BPL / Sales Reports', 'route' => 'bpl.sales.reports.orders',     'abilities' => $snapshot],
+        ['key' => 'bpl.sales.reports.proformas',  'label' => 'Proforma Invoices', 'module' => 'BPL / Sales Reports', 'route' => 'bpl.sales.reports.proformas',  'abilities' => $snapshot],
+        ['key' => 'bpl.sales.reports.shipments',  'label' => 'Shipments',         'module' => 'BPL / Sales Reports', 'route' => 'bpl.sales.reports.shipments',  'abilities' => $snapshot],
+        // One order end to end, found by any of the nine numbers it carries.
+        ['key' => 'bpl.sales.reports.order_trail', 'label' => 'Order Trail',      'module' => 'BPL / Sales Reports', 'route' => 'bpl.sales.reports.order-trail', 'abilities' => $snapshot],
+
         ['key' => 'bpl.finance.banks', 'label' => 'Banks', 'module' => 'BPL / Finance', 'route' => 'bpl.finance.banks', 'abilities' => $crud],
         ['key' => 'bpl.finance.accounts', 'label' => 'Accounts', 'module' => 'BPL / Finance', 'route' => 'bpl.finance.accounts', 'abilities' => $crud],
+        ['key' => 'bpl.finance.payment_terms', 'label' => 'Payment Terms', 'module' => 'BPL / Finance', 'route' => 'bpl.finance.payment-terms', 'abilities' => $crud],
+        ['key' => 'bpl.finance.waybill_payments', 'label' => 'Waybill Payments', 'module' => 'BPL / Finance', 'route' => 'bpl.finance.waybill-payments', 'abilities' => $crud],
+        ['key' => 'bpl.finance.invoice_payments', 'label' => 'Invoice Payments', 'module' => 'BPL / Finance', 'route' => 'bpl.finance.invoice-payments', 'abilities' => ['view', 'edit', 'delete', 'export']],
+        // BPL — Finance Statistics + Reports. Read-outs: receipts are entered
+        // on the Invoice Payments and Waybill Payments screens, which
+        // recalculate balances as they write, so view + export only.
+        ['key' => 'bpl.finance.statistics', 'label' => 'Statistics', 'module' => 'BPL / Finance', 'route' => 'bpl.finance.statistics', 'abilities' => $snapshot],
+
+        // The ledger, aged — what customers owe and how far past due.
+        ['key' => 'bpl.finance.reports.receivables',      'label' => 'Receivables',      'module' => 'BPL / Finance Reports', 'route' => 'bpl.finance.reports.receivables',      'abilities' => $snapshot],
+        ['key' => 'bpl.finance.reports.invoice_payments', 'label' => 'Invoice Payments', 'module' => 'BPL / Finance Reports', 'route' => 'bpl.finance.reports.invoice-payments', 'abilities' => $snapshot],
+        ['key' => 'bpl.finance.reports.waybill_payments', 'label' => 'Waybill Payments', 'module' => 'BPL / Finance Reports', 'route' => 'bpl.finance.reports.waybill-payments', 'abilities' => $snapshot],
+        // The legacy `bpl_export_payments` page: every shipment by its NXP
+        // number and bank. A trade-finance lens, not a debt-chasing one.
+        ['key' => 'bpl.finance.reports.export_payments',  'label' => 'Export Payments',  'module' => 'BPL / Finance Reports', 'route' => 'bpl.finance.reports.export-payments', 'abilities' => $snapshot],
+        ['key' => 'bpl.finance.reports.accounts',         'label' => 'Bank Accounts',    'module' => 'BPL / Finance Reports', 'route' => 'bpl.finance.reports.accounts',         'abilities' => $snapshot],
+
+        // BPL — Logistics Statistics + Reports. Read-outs: a waybill is raised
+        // by Delivery (which takes the rolls off the bay in the same
+        // transaction) and completed by the Weighbridge, so no edit here.
+        ['key' => 'bpl.logistics.statistics', 'label' => 'Statistics', 'module' => 'BPL / Logistics', 'route' => 'bpl.logistics.statistics', 'abilities' => $snapshot],
+
+        ['key' => 'bpl.logistics.reports.deliveries',      'label' => 'Deliveries',      'module' => 'BPL / Logistics Reports', 'route' => 'bpl.logistics.reports.deliveries',      'abilities' => $snapshot],
+        ['key' => 'bpl.logistics.reports.bills_of_lading', 'label' => 'Bills of Lading', 'module' => 'BPL / Logistics Reports', 'route' => 'bpl.logistics.reports.bills-of-lading', 'abilities' => $snapshot],
+
+        ['key' => 'bpl.logistics.delivery', 'label' => 'Delivery', 'module' => 'BPL / Logistics', 'route' => 'bpl.logistics.delivery', 'abilities' => ['view', 'backdate']],
+        ['key' => 'bpl.logistics.weighbridge', 'label' => 'Weighbridge', 'module' => 'BPL / Logistics', 'route' => 'bpl.logistics.weighbridge', 'abilities' => ['view', 'edit', 'delete', 'export']],
+        ['key' => 'bpl.logistics.bills_of_lading', 'label' => 'Bills of Lading', 'module' => 'BPL / Logistics', 'route' => 'bpl.logistics.bills-of-lading', 'abilities' => $crud],
+        ['key' => 'bpl.logistics.transporters', 'label' => 'Transporters', 'module' => 'BPL / Logistics', 'route' => 'bpl.logistics.transporters', 'abilities' => $crud],
 
         /*
         | Admin and Settings LAST, deliberately.
@@ -216,7 +273,24 @@ return [
         // One page holding two lists (causes + origins), edited inline — so
         // 'edit' is the whole write ability; there is no separate create/delete.
         ['key' => 'settings.waste',      'label' => 'Waste Settings', 'module' => 'Settings', 'route' => 'settings.waste',      'abilities' => ['view', 'edit']],
-    ],
+];
+
+// Mirror every BIL page as a BHN page — BHN reuses the Bil module on the bhn
+// connection, so the screens are identical; only the key/route prefix and the
+// module label differ. Keeps BHN's pages in lock-step with BIL automatically.
+$bhnPages = [];
+foreach ($pages as $p) {
+    if (! str_starts_with($p['key'], 'bil.')) {
+        continue;
+    }
+    $p['key'] = 'bhn.'.substr($p['key'], 4);
+    $p['route'] = 'bhn.'.substr($p['route'], 4);
+    $p['module'] = 'BHN / '.preg_replace('#^BIL / #', '', $p['module']);
+    $bhnPages[] = $p;
+}
+
+return [
+    'pages' => array_merge($pages, $bhnPages),
 
     // Display labels for ability columns in the Role matrix (order matters).
     'abilities' => [

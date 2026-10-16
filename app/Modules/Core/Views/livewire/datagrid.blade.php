@@ -213,6 +213,11 @@
                         @if ($showModal || $this->formPushesAssets())
                             @include($this->formView())
                         @endif
+
+                        {{-- Who changed this record, from the activity log. --}}
+                        @if ($showModal && $editingId && $this->historySubject())
+                            @include('core::partials.record-history', ['history' => $this->recordHistory()])
+                        @endif
                     </div>
                     <div class="modal-foot">
                         <button type="button" class="btn btn-ghost" wire:click="$set('showModal', false)">Cancel</button>

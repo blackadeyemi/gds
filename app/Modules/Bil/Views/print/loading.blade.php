@@ -18,7 +18,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Loading Print Out{{ count($loads) === 1 ? ' — ' . $loads[0]->barcode : '' }}</title>
-    <link rel="icon" href="{{ asset('images/bilicon.ico') }}" />
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/pwa/favicon-32.png') }}" />
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/pwa/favicon-16.png') }}" />
     <style type="text/css">
         * { box-sizing:border-box; }
         body { font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#000; background:#f4f4f4; margin:0; padding:16px; }

@@ -38,7 +38,7 @@ class BplTransportersPageTest extends TestCase
 
     public function test_the_page_opens(): void
     {
-        $this->actingAs($this->admin())->get('/bpl/sales/transporters')
+        $this->actingAs($this->admin())->get('/bpl/logistics/transporters')
             ->assertOk()
             ->assertSee('BPL Transporters')
             ->assertSee('Transporter Code');

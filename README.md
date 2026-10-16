@@ -15,27 +15,46 @@ and it is the thing to keep in mind before changing anything near the database.
 | --- | --- | --- |
 | BIL | Belimpex | **Converts** hardroll into finished goods (toilet, napkin, facial, towel…) |
 | BPL | Belpapyrus | **Produces** the paper — hardroll and softroll |
+| BHN | BHN (Abuja) | **Converts** like BIL, in Abuja; buys its jumbo rolls from BPL as a customer, like BIL |
 | BOU | Boulos | — |
 
 BIL converts; BPL produces. The BIL tables are named `*_conversion` for that
 reason, and `bpl_production` keeps its name because it really is production.
 Getting this backwards is the most common way to misread the schema.
 
+**BHN runs the exact BIL screens.** Its Abuja system is a clone of the BIL
+legacy codebase, so rather than duplicate the module, gds reuses the Bil module
+with the `bil` connection rebound to `bhn` per request — see *Databases* and
+`ResolveCompanyModule`. Everything below about BIL applies to BHN too.
+
 ---
 
 ## Databases
 
-Three connections, one MySQL server:
+Four connections. `core`/`bil`/`bpl` share one MySQL server (the split legacy
+`bilfg` DB); `bhn` is its own schema, local in dev and **homed to the Abuja
+server in production** (set `BHN_DB_HOST`/`PORT`/… there):
 
 | Connection | Holds |
 | --- | --- |
 | `core` | The app's own data — users, roles, pages, the Company → Factory → Line → Project machine hierarchy, and warehouses with the gates goods move through |
 | `bil` | The legacy BIL schema, still shared live with the old app |
 | `bpl` | The legacy BPL schema |
+| `bhn` | BHN's schema (company 4, Abuja) — a **mirror of BIL's modern structure**, loaded from BHN's own legacy dump. Its cross-schema compat views read Lagos `bpl`/`core` (BHN is a BPL customer). Provisioning: `database/bhn/README.md` |
 
 Cross-database references (a `bil` row pointing at a `core` factory) are **plain
 indexed columns, not foreign keys** — they cannot be, and that is the existing
 convention, not an oversight.
+
+**Serving BHN:** a request under `/bhn` is routed by `ResolveCompanyModule`
+(global web middleware), which rebinds the `bil` connection + `config('bil')` to
+BHN's and sets `ModuleContext`. On a Livewire update (which POSTs to
+`/livewire/update`, not `/bhn/…`) it reads the module from the component
+snapshot path. The Bil models carry no company column — the connection *is* the
+company boundary — so the reused screens operate on BHN's schema transparently.
+Page keys stay literal `bil.*`; `User::canDo` normalises them to `bhn.*` under a
+BHN request, and `config/pages.php` mirrors every BIL page as a BHN page. The
+multi-server design (Lagos + Abuja) is in memory `gds-abuja-multiserver`.
 
 ### Working with the legacy schema
 
@@ -59,20 +78,28 @@ convention, not an oversight.
 ## Layout
 
 ```
-app/Modules/{Core,Bil,Bpl}/     PSR-4 "Modules\", wired by ModuleServiceProvider
+app/Modules/{Core,Bil,Bpl,Bhn}/ PSR-4 "Modules\", wired by ModuleServiceProvider
   Livewire/                     full-page Livewire components
   Models/                       each pins its $connection
-  Views/                        namespaced core:: bil:: bpl::
-routes/{core,bil,bpl}.php       one file per module
+  Views/                        namespaced core:: bil:: bpl:: bhn::
+routes/{core,bil,bpl,bhn}.php   one file per module (bhn.php just requires bil.php)
 config/pages.php                the page + ability registry (access control)
+config/{bil,bhn}.php            per-company identity (company_code, jumbo customer…)
 config/datagrid.php             every DataGrid, for the data-views sync
+database/dumps/                 committable DB snapshots (schema + 2025+ data)
+database/bhn/                   BHN provisioning SQL + how-to
 docs/modules/                   what each module does, screen by screen
 docs/DEPLOYMENT.md              release runbooks, newest first
 deploy/pwa-autostart/           launch the installed PWA at Windows login
 scripts/verify_*.php            standalone checks a release is verified with
+scripts/export_db_snapshot.php  regenerate database/dumps/*.sql.gz
 ```
 
-Currently 127 registered pages and 20 data grids across BIL, BPL and Core.
+The Bhn module is thin: `routes/bhn.php` requires `routes/bil.php`, so every BIL
+route is served under `/bhn` too (its screens, models and views are BIL's,
+reused on the `bhn` connection — see *Databases*).
+
+Currently 192 registered pages across BIL, BPL, BHN and Core (BHN mirrors BIL's).
 **For what each module actually does and how its screens work, see
 [docs/modules/](docs/modules/README.md).** This README is the architecture;
 that is the feature guide.
@@ -116,7 +143,8 @@ Requires PHP 8.3+, MySQL 8, Composer and Node. Laravel 13.
 composer install
 npm install && npm run build
 cp .env.example .env && php artisan key:generate
-# point CORE_/BIL_/BPL_DB_DATABASE at your databases, then:
+# point CORE_/BIL_/BPL_/BHN_DB_DATABASE at your databases (BHN_DB_HOST/PORT too
+# in production, where BHN is on the Abuja server), then:
 php artisan migrate
 php artisan gds:sync-pages
 php artisan gds:sync-data-views
@@ -135,7 +163,19 @@ see `docs/DEPLOYMENT.md`, it must point at the shared folder in production).
 | `gds:sync-shift-contexts` | Shift windows from `config/shifts.php` |
 | `gds:migrate-legacy-auth` | Seed roles from legacy user levels |
 | `gds:import-geo` | Country / state / city reference data into `core.geo_*` |
-| `bil:reconcile-warehouse-stock` | Rebuild the stock aggregate from barcodes |
+| `gds:refresh-legacy` | Load the monthly legacy dump → staging → operational tables. `--profile=legacy_refresh_bhn` loads BHN's single-dump; default is the per-file bilfg dump |
+| `gds:rebuild-machine-maps` | Rebuild the legacy name → id resolver tables (every operational schema in `config/machine_maps.php`) |
+| `gds:provision-bhn-rbac` | Mirror BIL roles → BHN, assign BHN users by legacy level, seed gate grants |
+| `bil:reconcile-warehouse-stock` | Rebuild the stock aggregate from barcodes (add `--module=bhn` for BHN) |
+
+### Database snapshots
+
+`scripts/export_db_snapshot.php` writes `database/dumps/{core,bil,bpl,bhn}.sql.gz`
+— full schema for every table, but transactional ("entry") tables trimmed to
+2025-onward so the set stays small (~38 MB vs ~3 GB). Reference tables are kept
+whole. Regenerate by running the script; restore order and details are in
+`database/dumps/README.md`. These are a committable seed, **not** a full backup,
+and they hold real data — keep the repository private.
 
 ### Reference data: countries, states, cities
 

@@ -31,3 +31,14 @@ Schedule::command('bil:reconcile-fg-stock --fix')
     ->dailyAt('02:30')
     ->withoutOverlapping()
     ->onOneServer();
+
+/*
+| Activity log retention: delete entries older than the retention period —
+| Settings → Activity Log (Admin only), default activity.retention_days (730).
+| Daily, so a shorter setting takes effect the next night. The only thing that
+| removes rows from the log.
+*/
+Schedule::command('gds:prune-activity --apply')
+    ->dailyAt('03:00')
+    ->withoutOverlapping()
+    ->onOneServer();
